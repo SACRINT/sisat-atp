@@ -8,6 +8,7 @@ export interface GrupoInput {
   id: string;
   nombre: string;
   semestre: number;
+  horasPorDia?: number;
 }
 
 export interface DocenteInput {
@@ -273,8 +274,9 @@ export function resolverHorario(params: SolverParams): SolverResult {
     if (!gruposConCarga.has(g.id)) continue;
     const grpGrid = grid.get(g.id);
     if (!grpGrid) continue;
+    const maxPeriodosG = g.horasPorDia || (g.semestre === 1 ? 5 : horasPorDia);
     for (let d = 1; d <= diasLectivos; d++) {
-      for (let p = 1; p <= horasPorDia; p++) {
+      for (let p = 1; p <= maxPeriodosG; p++) {
         if (!grpGrid[d][p]) {
           allSlots.push({ grupoId: g.id, dia: d, periodo: p });
         }
@@ -411,8 +413,9 @@ export function resolverHorario(params: SolverParams): SolverResult {
     const grpGrid = grid.get(g.id);
     if (!grpGrid) continue;
 
+    const maxPeriodosG = g.horasPorDia || (g.semestre === 1 ? 5 : horasPorDia);
     for (let d = 1; d <= diasLectivos; d++) {
-      for (let p = 1; p <= horasPorDia; p++) {
+      for (let p = 1; p <= maxPeriodosG; p++) {
         const u = grpGrid[d][p];
         if (u && u.docenteId !== "__BLOQUEADO__") {
           celdasFinales.push({

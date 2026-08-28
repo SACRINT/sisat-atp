@@ -22,6 +22,8 @@ import {
   FORMACIONES_SOCIOEMOCIONALES as CURRICULUM_AMPLIADO_FFEO,
   FFE_RECURSOS_SOCIOCOGNITIVOS as FFE_RECURSO_SOCIOCOGNITIVO,
   FFE_AREAS_CONOCIMIENTO as FFE_AREA_CONOCIMIENTO,
+  FFE_OPTATIVAS_CATALOGO,
+  obtenerFfeSemestre6,
   resolverSocioemocionalGrupo,
   UACS_LABORALES_MAPA
 } from "@/lib/escuela-grupos";
@@ -295,13 +297,14 @@ export default function WizardConfiguracion({
           id: grupoDbOficial?.id || grupoExistente?.id || `temp_${sem}_${letra}`,
           nombre: nombreGrupo,
           semestre: sem,
+          horasPorDia: (grupoDbOficial as any)?.horasPorDia || (grupoExistente as any)?.horasPorDia || (sem === 1 ? 5 : 6),
           capacitacionNombre: tieneLaboral ? capFinal : undefined,
           ffeoSocioemocional: tieneLaboral ? socioCalculado : undefined,
           ffeOptativas: (Array.isArray(ffeOpts) && ffeOpts.length > 0) ? ffeOpts : [
-            FFE_RECURSO_SOCIOCOGNITIVO[0],
-            FFE_RECURSO_SOCIOCOGNITIVO[1],
-            FFE_AREA_CONOCIMIENTO[0],
-            FFE_AREA_CONOCIMIENTO[1]
+            FFE_OPTATIVAS_CATALOGO[0],
+            FFE_OPTATIVAS_CATALOGO[1],
+            FFE_OPTATIVAS_CATALOGO[7],
+            FFE_OPTATIVAS_CATALOGO[8]
           ]
         });
       }
@@ -710,22 +713,6 @@ export default function WizardConfiguracion({
     }
   };
 
-  // Métricas del Plantel para el Período Semestral Activo (A = 1°,3°,5° | B = 2°,4°,6°)
-  const semestresActivosPeriodo = periodoActivo === "A" ? [1, 3, 5] : [2, 4, 6];
-  const gruposDelPeriodo = grupos.filter((g) => semestresActivosPeriodo.includes(g.semestre));
-  const totalGrupos = gruposDelPeriodo.length;
-  const horasRequeridasPlantel = totalGrupos * 30; // 30 hrs por grupo del periodo activo (ej: 90 hrs para 3 grupos)
-  const totalHorasPlantillaDocente = Object.entries(horasDocentes).reduce((sum, [id, h]) => {
-    const docente = docentes.find(d => d.id === id);
-    const cargoUpper = String(docente?.cargo || "").toUpperCase();
-    // Solo excluir APOYO puro. Administrativos y Responsables SÍ cuentan en la plantilla.
-    if (cargoUpper === "APOYO" || cargoUpper === "PERSONAL_DE_ASISTENCIA" || cargoUpper === "ASISTENCIA") {
-      return sum;
-    }
-    return sum + Number(h || 0);
-  }, 0);
-  // totalHorasAsignadasMatriz se calcula más abajo, después de definir getUACsIndividualesGrupo
-
   // Obtener UACs individuales para cada grupo con Abreviaturas destacadas
   const getUACsIndividualesGrupo = (grupo: any) => {
     const sem = grupo.semestre;
@@ -745,6 +732,7 @@ export default function WizardConfiguracion({
 
     // ── SEMESTRE A (impares) ──────────────────────────────────────────────────
     if (sem === 1) {
+      // 8 Asignaturas Oficiales MCCEMS 2025-2026 (25 horas totales semanales / 5 horas diarias)
       return [
         { id: `uac_1_1`, uacName: "Ciencias Naturales, Experimentales y Tecnología I", abrev: "CNEyT-I", tipo: "UNIVERSAL", horasSemanales: 4 },
         { id: `uac_1_2`, uacName: "Pensamiento Matemático I", abrev: "PENS-MAT-I", tipo: "UNIVERSAL", horasSemanales: 4 },
@@ -752,9 +740,7 @@ export default function WizardConfiguracion({
         { id: `uac_1_4`, uacName: "Lenguaje y Comunicación I", abrev: "LENG-COM-I", tipo: "UNIVERSAL", horasSemanales: 3 },
         { id: `uac_1_5`, uacName: "Inglés I", abrev: "ING-I", tipo: "UNIVERSAL", horasSemanales: 3 },
         { id: `uac_1_6`, uacName: "Cultura Digital I", abrev: "CULT-DIG-I", tipo: "UNIVERSAL", horasSemanales: 3 },
-        { id: `uac_1_7`, uacName: "Laboratorio de Investigación", abrev: "LAB-INV", tipo: "UNIVERSAL", horasSemanales: 3 },
         { id: `uac_1_8`, uacName: "Ciencias Sociales I", abrev: "CS-SOC-I", tipo: "UNIVERSAL", horasSemanales: 2 },
-        { id: `uac_1_9`, uacName: "Actividades Artísticas y Culturales I", abrev: "ART-CULT-I", tipo: "UNIVERSAL", horasSemanales: 2 },
         { id: `uac_1_10`, uacName: "Actividades Físicas y Deportivas I", abrev: "ACT-FIS-I", tipo: "UNIVERSAL", horasSemanales: 2 }
       ];
     }
@@ -786,20 +772,20 @@ export default function WizardConfiguracion({
         { name: `Asignatura 2 de ${capNombre}`, abrev: "LAB-2" }
       ];
       const opts = grupo.ffeOptativas || [
-        FFE_RECURSO_SOCIOCOGNITIVO[0],
-        FFE_RECURSO_SOCIOCOGNITIVO[1],
-        FFE_AREA_CONOCIMIENTO[0],
-        FFE_AREA_CONOCIMIENTO[1]
+        FFE_OPTATIVAS_CATALOGO[0],
+        FFE_OPTATIVAS_CATALOGO[1],
+        FFE_OPTATIVAS_CATALOGO[7],
+        FFE_OPTATIVAS_CATALOGO[8]
       ];
 
       return [
         { id: `uac_5_1`, uacName: "La Energía en los Procesos de la Vida Diaria", abrev: "ENERG-VIDA", tipo: "UNIVERSAL", horasSemanales: 4 },
         { id: `uac_5_2`, uacName: "Conciencia Histórica II. México Durante el Expansionismo Capitalista", abrev: "CONC-HIST-II", tipo: "UNIVERSAL", horasSemanales: 3 },
         { id: `uac_5_3`, uacName: "Taller de Habilidades del Pensamiento", abrev: "TALL-HAB-PENS", tipo: "UNIVERSAL", horasSemanales: 3 },
-        { id: `uac_5_ffe_1`, uacName: opts[0], abrev: "FFE-REC-A", tipo: "FFE_REC_A", horasSemanales: 3 },
-        { id: `uac_5_ffe_2`, uacName: opts[1], abrev: "FFE-REC-B", tipo: "FFE_REC_B", horasSemanales: 3 },
-        { id: `uac_5_ffe_3`, uacName: opts[2], abrev: "FFE-AREA-A", tipo: "FFE_AREA_A", horasSemanales: 3 },
-        { id: `uac_5_ffe_4`, uacName: opts[3], abrev: "FFE-AREA-B", tipo: "FFE_AREA_B", horasSemanales: 3 },
+        { id: `uac_5_ffe_1`, uacName: opts[0] || FFE_OPTATIVAS_CATALOGO[0], abrev: "FFE-1", tipo: "FFE_1", horasSemanales: 3 },
+        { id: `uac_5_ffe_2`, uacName: opts[1] || FFE_OPTATIVAS_CATALOGO[1], abrev: "FFE-2", tipo: "FFE_2", horasSemanales: 3 },
+        { id: `uac_5_ffe_3`, uacName: opts[2] || FFE_OPTATIVAS_CATALOGO[7], abrev: "FFE-3", tipo: "FFE_3", horasSemanales: 3 },
+        { id: `uac_5_ffe_4`, uacName: opts[3] || FFE_OPTATIVAS_CATALOGO[8], abrev: "FFE-4", tipo: "FFE_4", horasSemanales: 3 },
         { id: `uac_5_5`, uacName: grupo.ffeoSocioemocional || FORMACIONES_SOCIOEMOCIONALES[1], abrev: "CURR-AMP-5", tipo: "AMPLIADO", horasSemanales: 2 },
         { id: `uac_5_lab_a`, uacName: uacsLabInfo[0].name, abrev: uacsLabInfo[0].abrev, capNombre, tipo: "LABORAL_A", horasSemanales: 3 },
         { id: `uac_5_lab_b`, uacName: uacsLabInfo[1].name, abrev: uacsLabInfo[1].abrev, capNombre, tipo: "LABORAL_B", horasSemanales: 3 }
@@ -842,21 +828,22 @@ export default function WizardConfiguracion({
     if (sem === 6) {
       const capNombre = grupo.capacitacionNombre || FORMACIONES_LABORALES[0];
       const uacsLabInfo = UACS_LABORALES_MAPA[capNombre]?.sem6 || UACS_LABORALES_MAPA["Administracion"].sem6;
-      const opts = grupo.ffeOptativas || [
-        FFE_RECURSO_SOCIOCOGNITIVO[0],
-        FFE_RECURSO_SOCIOCOGNITIVO[1],
-        FFE_AREA_CONOCIMIENTO[0],
-        FFE_AREA_CONOCIMIENTO[1]
+      const opts5 = grupo.ffeOptativas || [
+        FFE_OPTATIVAS_CATALOGO[0],
+        FFE_OPTATIVAS_CATALOGO[1],
+        FFE_OPTATIVAS_CATALOGO[7],
+        FFE_OPTATIVAS_CATALOGO[8]
       ];
+      const opts6 = opts5.map((f: string) => obtenerFfeSemestre6(f));
 
       return [
         { id: `uac_6_1`, uacName: "La Energía en los Procesos de la Vida Diaria II", abrev: "ENERG-VIDA-II", tipo: "UNIVERSAL", horasSemanales: 4 },
         { id: `uac_6_2`, uacName: "Conciencia Histórica III. México en el Siglo XXI", abrev: "CONC-HIST-III", tipo: "UNIVERSAL", horasSemanales: 3 },
         { id: `uac_6_3`, uacName: "Taller de Habilidades del Pensamiento II", abrev: "TALL-HAB-II", tipo: "UNIVERSAL", horasSemanales: 3 },
-        { id: `uac_6_ffe_1`, uacName: opts[0], abrev: "FFE-REC-A", tipo: "FFE_REC_A", horasSemanales: 3 },
-        { id: `uac_6_ffe_2`, uacName: opts[1], abrev: "FFE-REC-B", tipo: "FFE_REC_B", horasSemanales: 3 },
-        { id: `uac_6_ffe_3`, uacName: opts[2], abrev: "FFE-AREA-A", tipo: "FFE_AREA_A", horasSemanales: 3 },
-        { id: `uac_6_ffe_4`, uacName: opts[3], abrev: "FFE-AREA-B", tipo: "FFE_AREA_B", horasSemanales: 3 },
+        { id: `uac_6_ffe_1`, uacName: opts6[0], abrev: "FFE-1-CONT", tipo: "FFE_1", horasSemanales: 3 },
+        { id: `uac_6_ffe_2`, uacName: opts6[1], abrev: "FFE-2-CONT", tipo: "FFE_2", horasSemanales: 3 },
+        { id: `uac_6_ffe_3`, uacName: opts6[2], abrev: "FFE-3-CONT", tipo: "FFE_3", horasSemanales: 3 },
+        { id: `uac_6_ffe_4`, uacName: opts6[3], abrev: "FFE-4-CONT", tipo: "FFE_4", horasSemanales: 3 },
         { id: `uac_6_5`, uacName: grupo.ffeoSocioemocional || FORMACIONES_SOCIOEMOCIONALES[1], abrev: "CURR-AMP-6", tipo: "AMPLIADO", horasSemanales: 2 },
         { id: `uac_6_lab_a`, uacName: uacsLabInfo[0].name, abrev: uacsLabInfo[0].abrev, capNombre, tipo: "LABORAL_A", horasSemanales: 3 },
         { id: `uac_6_lab_b`, uacName: uacsLabInfo[1].name, abrev: uacsLabInfo[1].abrev, capNombre, tipo: "LABORAL_B", horasSemanales: 3 }
@@ -865,6 +852,26 @@ export default function WizardConfiguracion({
 
     return [];
   };
+
+  // Métricas del Plantel para el Período Semestral Activo (A = 1°,3°,5° | B = 2°,4°,6°)
+  const semestresActivosPeriodo = periodoActivo === "A" ? [1, 3, 5] : [2, 4, 6];
+  const gruposDelPeriodo = grupos.filter((g) => semestresActivosPeriodo.includes(g.semestre));
+  const totalGrupos = gruposDelPeriodo.length;
+  // Cálculo exacto de horas requeridas sumando las UACs de cada grupo activo
+  const horasRequeridasPlantel = gruposDelPeriodo.reduce((sum, g) => {
+    const uacs = getUACsIndividualesGrupo(g);
+    return sum + uacs.reduce((uSum: number, u: any) => uSum + Number(u.horasSemanales || 0), 0);
+  }, 0);
+
+  const totalHorasPlantillaDocente = Object.entries(horasDocentes).reduce((sum, [id, h]) => {
+    const docente = docentes.find(d => d.id === id);
+    const cargoUpper = String(docente?.cargo || "").toUpperCase();
+    // Solo excluir APOYO puro. Administrativos y Responsables SÍ cuentan en la plantilla.
+    if (cargoUpper === "APOYO" || cargoUpper === "PERSONAL_DE_ASISTENCIA" || cargoUpper === "ASISTENCIA") {
+      return sum;
+    }
+    return sum + Number(h || 0);
+  }, 0);
 
   // CORRECTO: Calcular horas asignadas iterando la matriz visible (grupos + UACs activos)
   // NO usar cargas.reduce() porque puede haber datos fantasma de sesiones previas en el estado
@@ -1228,8 +1235,23 @@ export default function WizardConfiguracion({
                                   Grupo {g.nombre} ({g.semestre}° Semestre)
                                 </span>
                                 <span style={{ fontSize: "0.6875rem", fontWeight: 700, background: "#eff6ff", color: "#2563eb", padding: "0.2rem 0.4rem", borderRadius: "6px" }}>
-                                  {(g.semestre === 1 || g.semestre === 2) ? "Universal (10 UACs)" : (g.semestre === 3 || g.semestre === 4) ? "Laboral (9 UACs)" : "Laboral + FFE (10 UACs)"}
+                                  {g.semestre === 1 ? "Universal (8 UACs • 25 hrs)" : (g.semestre === 2 ? "Universal (10 UACs • 30 hrs)" : (g.semestre === 3 || g.semestre === 4) ? "Laboral (9 UACs • 30 hrs)" : "Laboral + FFE (10 UACs • 30 hrs)")}
                                 </span>
+                              </div>
+
+                              <div style={{ marginBottom: "0.65rem" }}>
+                                <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 800, color: "#334155", marginBottom: "0.2rem" }}>
+                                  Jornada Diaria del Grupo (Horas por día)
+                                </label>
+                                <select
+                                  value={g.horasPorDia || (g.semestre === 1 ? 5 : 6)}
+                                  onChange={(e) => handleActualizarConfigGrupo(idx, "horasPorDia", Number(e.target.value))}
+                                  style={{ width: "100%", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #94a3b8", fontSize: "0.75rem", fontWeight: 700, color: "#0f172a" }}
+                                >
+                                  <option value={5}>5 horas por día (25 hrs / semana)</option>
+                                  <option value={6}>6 horas por día (30 hrs / semana)</option>
+                                  <option value={7}>7 horas por día (35 hrs / semana)</option>
+                                </select>
                               </div>
 
                               {g.semestre >= 3 && (
@@ -1286,72 +1308,51 @@ export default function WizardConfiguracion({
                                {g.semestre === 5 && (
                                 <div>
                                   <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 800, color: "#334155", marginBottom: "0.3rem" }}>
-                                    Optativas FFE (2 Recurso Sociocognitivo + 2 Área de Conocimiento)
+                                    Optativas FFE (Selección libre de 4 asignaturas del catálogo oficial MCCEMS)
                                   </label>
                                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.35rem" }}>
-                                    <div>
-                                      <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "#64748b", display: "block" }}>Cuadro 1 (Recurso)</span>
-                                      <select
-                                        value={g.ffeOptativas?.[0] || FFE_RECURSO_SOCIOCOGNITIVO[0]}
-                                        onChange={(e) => handleActualizarOptativaGrupo(idx, 0, e.target.value)}
-                                        style={{ width: "100%", padding: "0.3rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.6875rem", fontWeight: 700 }}
-                                      >
-                                        {FFE_RECURSO_SOCIOCOGNITIVO.map((rec) => (
-                                          <option key={rec} value={rec}>{rec}</option>
-                                        ))}
-                                      </select>
-                                    </div>
+                                    {[0, 1, 2, 3].map((optIdx) => {
+                                      const valorActual = g.ffeOptativas?.[optIdx] || FFE_OPTATIVAS_CATALOGO[optIdx] || FFE_OPTATIVAS_CATALOGO[0];
+                                      const otrasSeleccionadas = (g.ffeOptativas || []).filter((_: any, i: number) => i !== optIdx);
 
-                                    <div>
-                                      <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "#64748b", display: "block" }}>Cuadro 2 (Recurso sin repetir)</span>
-                                      <select
-                                        value={g.ffeOptativas?.[1] || FFE_RECURSO_SOCIOCOGNITIVO[1]}
-                                        onChange={(e) => handleActualizarOptativaGrupo(idx, 1, e.target.value)}
-                                        style={{ width: "100%", padding: "0.3rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.6875rem", fontWeight: 700 }}
-                                      >
-                                        {FFE_RECURSO_SOCIOCOGNITIVO
-                                          .filter((rec) => rec !== g.ffeOptativas?.[0])
-                                          .map((rec) => (
-                                            <option key={rec} value={rec}>{rec}</option>
-                                          ))}
-                                      </select>
-                                    </div>
-
-                                    <div>
-                                      <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "#64748b", display: "block" }}>Cuadro 3 (Área)</span>
-                                      <select
-                                        value={g.ffeOptativas?.[2] || FFE_AREA_CONOCIMIENTO[0]}
-                                        onChange={(e) => handleActualizarOptativaGrupo(idx, 2, e.target.value)}
-                                        style={{ width: "100%", padding: "0.3rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.6875rem", fontWeight: 700 }}
-                                      >
-                                        {FFE_AREA_CONOCIMIENTO.map((area) => (
-                                          <option key={area} value={area}>{area}</option>
-                                        ))}
-                                      </select>
-                                    </div>
-
-                                    <div>
-                                      <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "#64748b", display: "block" }}>Cuadro 4 (Área sin repetir)</span>
-                                      <select
-                                        value={g.ffeOptativas?.[3] || FFE_AREA_CONOCIMIENTO[1]}
-                                        onChange={(e) => handleActualizarOptativaGrupo(idx, 3, e.target.value)}
-                                        style={{ width: "100%", padding: "0.3rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.6875rem", fontWeight: 700 }}
-                                      >
-                                        {FFE_AREA_CONOCIMIENTO
-                                          .filter((area) => area !== g.ffeOptativas?.[2])
-                                          .map((area) => (
-                                            <option key={area} value={area}>{area}</option>
-                                          ))}
-                                      </select>
-                                    </div>
+                                      return (
+                                        <div key={optIdx}>
+                                          <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "#64748b", display: "block" }}>
+                                            Optativa FFE {optIdx + 1}
+                                          </span>
+                                          <select
+                                            value={valorActual}
+                                            onChange={(e) => handleActualizarOptativaGrupo(idx, optIdx, e.target.value)}
+                                            style={{ width: "100%", padding: "0.35rem", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.6875rem", fontWeight: 700, color: "#0f172a" }}
+                                          >
+                                            <optgroup label="Recursos Sociocognitivos">
+                                              {FFE_RECURSO_SOCIOCOGNITIVO.map((mat) => (
+                                                <option key={mat} value={mat} disabled={otrasSeleccionadas.includes(mat)}>
+                                                  {mat} {otrasSeleccionadas.includes(mat) ? "(Ya elegida)" : ""}
+                                                </option>
+                                              ))}
+                                            </optgroup>
+                                            <optgroup label="Áreas de Conocimiento">
+                                              {FFE_AREA_CONOCIMIENTO.map((mat) => (
+                                                <option key={mat} value={mat} disabled={otrasSeleccionadas.includes(mat)}>
+                                                  {mat} {otrasSeleccionadas.includes(mat) ? "(Ya elegida)" : ""}
+                                                </option>
+                                              ))}
+                                            </optgroup>
+                                          </select>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               )}
 
                               {g.semestre === 1 && (
-                                <p style={{ fontSize: "0.72rem", color: "#64748b", margin: 0, fontStyle: "italic" }}>
-                                  1er Semestre lleva el Currículum Fundamental 100% universal para todos los Bachilleratos de Puebla.
-                                </p>
+                                <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "6px", padding: "0.5rem", marginTop: "0.4rem" }}>
+                                  <p style={{ fontSize: "0.72rem", color: "#166534", margin: 0, fontWeight: 700 }}>
+                                    ✓ 1.er Semestre: 8 Asignaturas Fundamentales Oficiales (5 horas diarias = 25 hrs/semana).
+                                  </p>
+                                </div>
                               )}
                             </div>
                           );

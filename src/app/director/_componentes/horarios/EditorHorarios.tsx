@@ -175,6 +175,26 @@ export default function EditorHorarios({
   const diasLectivos = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
   const numHorasPorDia = horarioInicial?.config?.horasPorDia || horario?.config?.horasPorDia || 6;
   const periodos = Array.from({ length: numHorasPorDia }, (_, i) => i + 1);
+  
+  const grupoActivoObj = React.useMemo(() => {
+    return gruposVisibles.find((g) => g.id === grupoSeleccionadoId) || grupos.find((g) => g.id === grupoSeleccionadoId);
+  }, [gruposVisibles, grupos, grupoSeleccionadoId]);
+
+  const docenteActivoObj = React.useMemo(() => {
+    return docentes.find((d) => d.id === docenteSeleccionadoId);
+  }, [docentes, docenteSeleccionadoId]);
+
+  const horasGrupoActual = React.useMemo(() => {
+    if (!grupoActivoObj) return numHorasPorDia;
+    return (grupoActivoObj as any).horasPorDia || (grupoActivoObj.semestre === 1 ? 5 : numHorasPorDia);
+  }, [grupoActivoObj, numHorasPorDia]);
+
+  const periodosVisibles = React.useMemo(() => {
+    if (vistaTab === "GRUPO") {
+      return Array.from({ length: horasGrupoActual }, (_, i) => i + 1);
+    }
+    return Array.from({ length: numHorasPorDia }, (_, i) => i + 1);
+  }, [vistaTab, horasGrupoActual, numHorasPorDia]);
 
   // Helper para asignar estilo de color por nombre de UAC
   const getEstiloAsignatura = (uacName: string) => {
@@ -755,6 +775,67 @@ export default function EditorHorarios({
       <div style={{ display: "flex", gap: "1.25rem", alignItems: "flex-start", width: "100%" }}>
         {/* PANEL IZQUIERDO: Cuadrícula interactiva completa */}
         <div style={{ flex: 1, minWidth: 0, background: "white", borderRadius: "16px", border: "1px solid var(--border)", padding: "1.25rem", boxShadow: "var(--shadow)" }}>
+          
+          {/* TARJETA EJECUTIVA DE METADATOS DEL GRUPO / DOCENTE */}
+          {vistaTab === "GRUPO" && grupoActivoObj && (
+            <div style={{ background: "linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)", border: "1px solid #bfdbfe", borderRadius: "12px", padding: "0.85rem 1.25rem", marginBottom: "1rem", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <div style={{ background: "#2563eb", color: "#ffffff", padding: "0.5rem 0.85rem", borderRadius: "8px", fontWeight: 900, fontSize: "1rem" }}>
+                  {grupoActivoObj.nombre}
+                </div>
+                <div>
+                  <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#1e293b" }}>
+                    {grupoActivoObj.semestre}° Semestre • Bachillerato General Estatal
+                  </div>
+                  <div style={{ fontSize: "0.75rem", color: "#64748b", display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: "0.2rem" }}>
+                    <span>⏱️ Jornada: <strong style={{ color: "#1e3a8a" }}>{horasGrupoActual} hrs/día ({horasGrupoActual * 5} hrs/sem)</strong></span>
+                    {grupoActivoObj.capacitacionNombre && <span>💼 Capacitación: <strong>{grupoActivoObj.capacitacionNombre}</strong></span>}
+                    {grupoActivoObj.ffeoSocioemocional && <span>🌱 FFEO: <strong>{grupoActivoObj.ffeoSocioemocional}</strong></span>}
+                  </div>
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>Asignaturas en Retícula</div>
+                <div style={{ fontSize: "1rem", fontWeight: 900, color: "#1e3a8a" }}>
+                  {(horario?.celdas || []).filter((c: any) => c.grupoId === grupoSeleccionadoId).length} / {horasGrupoActual * 5} hrs asignadas
+                </div>
+              </div>
+            </div>
+          )}
+
+          {vistaTab === "DOCENTE" && docenteActivoObj && (() => {
+            const celdasDoc = (horario?.celdas || []).filter((c: any) => c.docenteId === docenteSeleccionadoId);
+            const totalHrsDoc = celdasDoc.length;
+            const materiasDoc = Array.from(new Set(celdasDoc.map((c: any) => getNombreAsignaturaCelda(c))));
+            const gruposDoc = Array.from(new Set(celdasDoc.map((c: any) => { const grp = grupos.find((g: any) => g.id === c.grupoId); return grp ? grp.nombre : c.grupoId; })));
+
+            return (
+              <div style={{ background: "linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)", border: "1px solid #bfdbfe", borderRadius: "12px", padding: "0.85rem 1.25rem", marginBottom: "1rem", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <div style={{ background: "#1e3a8a", color: "#ffffff", padding: "0.5rem 0.85rem", borderRadius: "8px", fontWeight: 900, fontSize: "1rem" }}>
+                    👨‍🏫
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#1e293b" }}>
+                      Prof. {docenteActivoObj.nombre} {docenteActivoObj.apellidoPaterno || ""}
+                    </div>
+                    <div style={{ fontSize: "0.75rem", color: "#64748b", display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: "0.2rem" }}>
+                      <span>💼 Cargo: <strong>{docenteActivoObj.cargo || "Docente"}</strong></span>
+                      <span>👥 Grupos: <strong>{gruposDoc.length > 0 ? gruposDoc.join(", ") : "Ninguno"}</strong></span>
+                      <span>📚 Materias distintas: <strong>{materiasDoc.length}</strong></span>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>Carga Frente a Grupo</div>
+                  <div style={{ fontSize: "1.125rem", fontWeight: 900, color: totalHrsDoc > 0 ? "#16a34a" : "#64748b" }}>
+                    {totalHrsDoc} hrs / semana
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {!tieneHorarioGeneradoParaGrupo && vistaTab === "GRUPO" ? (
             <div style={{ padding: "3.5rem 2rem", textAlign: "center", background: "#f8fafc", borderRadius: "16px", border: "2px dashed #cbd5e1", margin: "1rem 0" }}>
               <Grid style={{ width: "48px", height: "48px", color: "#94a3b8", margin: "0 auto 1rem" }} />
@@ -783,7 +864,7 @@ export default function EditorHorarios({
                 </tr>
               </thead>
               <tbody>
-                {periodos.map((p) => (
+                {periodosVisibles.map((p) => (
                   <tr key={p}>
                     <td style={{ background: "var(--bg)", textAlign: "center", fontWeight: 800, fontSize: "0.8125rem", color: "var(--text)", border: "1px solid #cbd5e1" }}>
                       Hora {p}

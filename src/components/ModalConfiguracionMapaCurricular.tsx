@@ -528,11 +528,12 @@ export default function ModalConfiguracionMapaCurricular({
                         const opcionesSocio5 = FORMACIONES_SOCIOEMOCIONALES.filter(soc => soc !== socio3);
                         const socio5Actual = opcionesSocio5.includes(cfg.ffeoSocioemocional) ? cfg.ffeoSocioemocional : opcionesSocio5[0];
                         const socio4y6 = FORMACIONES_SOCIOEMOCIONALES.find(soc => soc !== socio3 && soc !== socio5Actual) || FORMACIONES_SOCIOEMOCIONALES[2];
-
-                        const optRecurso1 = cfg.ffeOptativas[0] || FFE_RECURSOS_SOCIOCOGNITIVOS[0];
-                        const optRecurso2 = cfg.ffeOptativas[1] || FFE_RECURSOS_SOCIOCOGNITIVOS[1];
-                        const optArea3 = cfg.ffeOptativas[2] || FFE_AREAS_CONOCIMIENTO[0];
-                        const optArea4 = cfg.ffeOptativas[3] || FFE_AREAS_CONOCIMIENTO[1];
+                        const ffeOpts = cfg.ffeOptativas || [
+                          FFE_OPTATIVAS_CATALOGO[0],
+                          FFE_OPTATIVAS_CATALOGO[1],
+                          FFE_OPTATIVAS_CATALOGO[7],
+                          FFE_OPTATIVAS_CATALOGO[8]
+                        ];
 
                         return (
                           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -574,88 +575,50 @@ export default function ModalConfiguracionMapaCurricular({
                               </div>
                             </div>
 
-                            {/* Optativas FFE Divididas por Categoría */}
+                            {/* Optativas FFE - Selección Libre */}
                             <div style={{ background: "var(--bg-secondary)", padding: "1rem", borderRadius: "10px", border: "1px solid var(--border)" }}>
                               <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 800, color: "var(--primary)", marginBottom: "0.75rem" }}>
-                                Optativas FFE (2 Recurso Sociocognitivo + 2 Área de Conocimiento):
+                                Optativas FFE (Selección libre de 4 asignaturas del catálogo oficial MCCEMS):
                               </label>
 
-                              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem" }}>
-                                {/* Bloque 1: Recursos Sociocognitivos */}
-                                <div style={{ background: "var(--card-bg, #fff)", padding: "0.75rem", borderRadius: "8px", border: "1px solid var(--border)" }}>
-                                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-secondary)", marginBottom: "0.5rem" }}>
-                                    Recursos Sociocognitivos (Optativas 1 y 2):
-                                  </div>
-                                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                                    <select
-                                      className="form-control"
-                                      value={optRecurso1}
-                                      onChange={(e) => {
-                                        const copia = [...cfg.ffeOptativas];
-                                        copia[0] = e.target.value;
-                                        handleUpdateGrupoConfig(g.nombre, "ffeOptativas", copia);
-                                      }}
-                                      style={{ fontSize: "0.75rem" }}
-                                    >
-                                      {FFE_RECURSOS_SOCIOCOGNITIVOS.map(opt => (
-                                        <option key={opt} value={opt}>Optativa 1 (Recurso): {opt}</option>
-                                      ))}
-                                    </select>
+                              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "0.75rem" }}>
+                                {[0, 1, 2, 3].map((optIdx) => {
+                                  const valorActual = ffeOpts[optIdx] || FFE_OPTATIVAS_CATALOGO[optIdx] || FFE_OPTATIVAS_CATALOGO[0];
+                                  const otrasSeleccionadas = ffeOpts.filter((_: any, i: number) => i !== optIdx);
 
-                                    <select
-                                      className="form-control"
-                                      value={optRecurso2}
-                                      onChange={(e) => {
-                                        const copia = [...cfg.ffeOptativas];
-                                        copia[1] = e.target.value;
-                                        handleUpdateGrupoConfig(g.nombre, "ffeOptativas", copia);
-                                      }}
-                                      style={{ fontSize: "0.75rem" }}
-                                    >
-                                      {FFE_RECURSOS_SOCIOCOGNITIVOS.filter(o => o !== optRecurso1).map(opt => (
-                                        <option key={opt} value={opt}>Optativa 2 (Recurso): {opt}</option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                </div>
-
-                                {/* Bloque 2: Áreas de Conocimiento */}
-                                <div style={{ background: "var(--card-bg, #fff)", padding: "0.75rem", borderRadius: "8px", border: "1px solid var(--border)" }}>
-                                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-secondary)", marginBottom: "0.5rem" }}>
-                                    Áreas de Conocimiento (Optativas 3 y 4):
-                                  </div>
-                                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                                    <select
-                                      className="form-control"
-                                      value={optArea3}
-                                      onChange={(e) => {
-                                        const copia = [...cfg.ffeOptativas];
-                                        copia[2] = e.target.value;
-                                        handleUpdateGrupoConfig(g.nombre, "ffeOptativas", copia);
-                                      }}
-                                      style={{ fontSize: "0.75rem" }}
-                                    >
-                                      {FFE_AREAS_CONOCIMIENTO.map(opt => (
-                                        <option key={opt} value={opt}>Optativa 3 (Área): {opt}</option>
-                                      ))}
-                                    </select>
-
-                                    <select
-                                      className="form-control"
-                                      value={optArea4}
-                                      onChange={(e) => {
-                                        const copia = [...cfg.ffeOptativas];
-                                        copia[3] = e.target.value;
-                                        handleUpdateGrupoConfig(g.nombre, "ffeOptativas", copia);
-                                      }}
-                                      style={{ fontSize: "0.75rem" }}
-                                    >
-                                      {FFE_AREAS_CONOCIMIENTO.filter(o => o !== optArea3).map(opt => (
-                                        <option key={opt} value={opt}>Optativa 4 (Área): {opt}</option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                </div>
+                                  return (
+                                    <div key={optIdx} style={{ background: "var(--card-bg, #fff)", padding: "0.75rem", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                                      <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-secondary)", marginBottom: "0.35rem" }}>
+                                        Optativa FFE {optIdx + 1}:
+                                      </div>
+                                      <select
+                                        className="form-control"
+                                        value={valorActual}
+                                        onChange={(e) => {
+                                          const copia = [...ffeOpts];
+                                          copia[optIdx] = e.target.value;
+                                          handleUpdateGrupoConfig(g.nombre, "ffeOptativas", copia);
+                                        }}
+                                        style={{ fontSize: "0.75rem", width: "100%" }}
+                                      >
+                                        <optgroup label="Recursos Sociocognitivos">
+                                          {FFE_RECURSOS_SOCIOCOGNITIVOS.map(opt => (
+                                            <option key={opt} value={opt} disabled={otrasSeleccionadas.includes(opt)}>
+                                              {opt} {otrasSeleccionadas.includes(opt) ? "(Ya elegida)" : ""}
+                                            </option>
+                                          ))}
+                                        </optgroup>
+                                        <optgroup label="Áreas de Conocimiento">
+                                          {FFE_AREAS_CONOCIMIENTO.map(opt => (
+                                            <option key={opt} value={opt} disabled={otrasSeleccionadas.includes(opt)}>
+                                              {opt} {otrasSeleccionadas.includes(opt) ? "(Ya elegida)" : ""}
+                                            </option>
+                                          ))}
+                                        </optgroup>
+                                      </select>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
 

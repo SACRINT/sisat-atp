@@ -84,7 +84,12 @@ export async function POST(req: NextRequest) {
     const resultadoSolver = resolverHorario({
       diasLectivos: config?.diasLectivos || 5,
       horasPorDia: config?.horasPorDia || 6,
-      grupos: grupos.map(g => ({ id: g.id, nombre: g.nombre, semestre: g.semestre })),
+      grupos: grupos.map(g => ({
+        id: g.id,
+        nombre: g.nombre,
+        semestre: g.semestre,
+        horasPorDia: (g as any).horasPorDia || (g.semestre === 1 ? 5 : config?.horasPorDia || 6)
+      })),
       docentes: docentes.map(d => ({ id: d.id, nombreCompleto: `${d.nombre} ${d.apellidoPaterno}`.trim() })),
       aulas: aulas.map(a => ({ id: a.id, nombre: a.nombre, tipo: a.tipo })),
       cargas: cargas.map(c => ({
