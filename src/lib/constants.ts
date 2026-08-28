@@ -22,6 +22,33 @@ export function ordenarPeriodosEscolares<T extends { mes?: number | null; semest
     });
 }
 
+export const ACTIVIDADES_CULTURA_PAZ: Record<number, string> = {
+    1: "Día Internacional de la Paz",
+    2: "Actividades colectivas del ABC de las emociones",
+    3: "Día Internacional de la No Violencia",
+    4: "Día de la Resistencia Indígena",
+    5: "Conformación de Comité de Paz",
+    6: "Vive Saludable, Vive Feliz",
+    7: "Día de los Derechos Humanos",
+    8: "Prevención de Adicciones (El Fentanilo te Mata)",
+};
+
+/** Devuelve el nombre amigable de un periodo según el programa (mes, semestre o actividad de Cultura de Paz) */
+export function getNombrePeriodo(
+    periodo: { mes?: number | null; semestre?: number | null },
+    programaNombre?: string | null
+): string {
+    const pNom = (programaNombre || "").toUpperCase();
+    if (pNom.includes("CULTURA DE PAZ") || pNom.includes("SEGURIDAD")) {
+        if (periodo.mes && ACTIVIDADES_CULTURA_PAZ[periodo.mes]) {
+            return ACTIVIDADES_CULTURA_PAZ[periodo.mes];
+        }
+    }
+    if (periodo.mes) return MESES[periodo.mes] || `Mes ${periodo.mes}`;
+    if (periodo.semestre) return `Semestre ${periodo.semestre}`;
+    return "Entrega Única / Anual";
+}
+
 export const ESTADOS = ["PENDIENTE", "EN_REVISION", "REQUIERE_CORRECCION", "APROBADO", "NO_APROBADO", "NO_ENTREGADO", "EXENTO", "ENTREGADO_FISICO"];
 
 export const ESTADO_LABELS: Record<string, string> = {

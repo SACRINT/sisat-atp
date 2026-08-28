@@ -1,6 +1,7 @@
 /**
  * Motor Solver de Restricciones para Generación de Horarios Escolares
- * SISAT-ATP - Algoritmo de Backtracking Multi-Pasada con Heurística MRV & Degree
+ * SISAT-ATP - Algoritmo CSP Backtracking con Heurística MRV (Minimum Remaining Values),
+ * Forward-Checking y Ordenación de Valor LCV
  */
 
 export interface GrupoInput {
@@ -43,14 +44,14 @@ export interface CeldaFijaInput {
 
 export interface RestriccionDocenteInput {
   docenteId: string;
-  diasIndisponibles?: number[]; // ej. [3] para Miércoles
+  diasIndisponibles?: number[]; // ej. [5] para Viernes
   periodosIndisponibles?: { dia: number; periodo: number }[];
 }
 
 export interface SolverParams {
   diasLectivos: number;   // Def 5
   horasPorDia: number;    // Def 6 o 7
-  restriccionMaxHrsDia?: number; // Def 2 (o 1 si se pide distribución equitativa estricta)
+  restriccionMaxHrsDia?: number; // Def 2
   grupos: GrupoInput[];
   docentes: DocenteInput[];
   aulas: AulaInput[];
@@ -83,36 +84,68 @@ export interface SolverResult {
   };
 }
 
+interface SubjectCargaInternal {
+  id: string;
+  grupoId: string;
+  docenteId: string;
+  asignaturaId: string;
+  horasRestantes: number;
+  totalHoras: number;
+  requiereAulaEspecial: boolean;
+  aulaEspecialId?: string;
+}
+
+interface SlotItem {
+  grupoId: string;
+  dia: number;
+  periodo: number;
+}
+
+interface GridCell {
+  docenteId: string;
+  asignaturaId: string;
+  aulaId?: string;
+  cargaId?: string;
+  esBloqueado: boolean;
+}
+
 export function resolverHorario(params: SolverParams): SolverResult {
   const {
     diasLectivos = 5,
     horasPorDia = 6,
     grupos,
     docentes,
-    aulas,
+    aulas = [],
     cargas,
     celdasFijas = [],
     restriccionesDocentes = [],
     slotsLibresBloqueados
   } = params;
 
-  const celdasResultado: CeldaResultado[] = [];
   const conflictos: string[] = [];
 
-  // Mapeos rápidos de ocupación
-  // Key: `${dia}_${periodo}_${docenteId}` -> boolean
-  const ocupacionDocente = new Set<string>();
-  // Key: `${dia}_${periodo}_${grupoId}` -> boolean
-  const ocupacionGrupo = new Set<string>();
-  // Key: `${dia}_${periodo}_${aulaId}` -> boolean
-  const ocupacionAula = new Set<string>();
+  // 1. Estructura de Retícula por Grupo
+  // grid[grupoId][dia][periodo] = GridCell | null
+  const grid = new Map<string, (GridCell | null)[][]>();
+  for (const g of grupos) {
+    const days: (GridCell | null)[][] = [];
+    for (let d = 0; d <= diasLectivos; d++) {
+      days.push(new Array(horasPorDia + 1).fill(null));
+    }
+    grid.set(g.id, days);
+  }
 
-  // ID sets para clasificación rápida de slotsLibresBloqueados
+  // Conjuntos de Ocupación
+  const docenteOcupado = new Set<string>(); // `${dia}_${periodo}_${docenteId}`
+  const aulaOcupada = new Set<string>();    // `${dia}_${periodo}_${aulaId}`
+  const dailySubjectCount = new Map<string, number>(); // `${grupoId}_${asignaturaId}_${dia}` -> count
+  const dailyDocenteCount = new Map<string, number>(); // `${docenteId}_${dia}` -> count
+
   const docIds = new Set(docentes.map(d => d.id));
   const grpIds = new Set(grupos.map(g => g.id));
   const aulaIds = new Set(aulas.map(a => a.id));
 
-  // 0. Bloquear slots libres bloqueados explícitamente fijados por el director (por docente, grupo o aula)
+  // 2. Procesar Slots Libres Bloqueados (Candados en horas vacías)
   if (slotsLibresBloqueados) {
     const slotsArr = Array.isArray(slotsLibresBloqueados)
       ? slotsLibresBloqueados
@@ -121,341 +154,296 @@ export function resolverHorario(params: SolverParams): SolverResult {
     for (const key of slotsArr) {
       const parts = key.split("_");
       if (parts.length >= 3) {
-        const dia = parts[0];
-        const periodo = parts[1];
+        const dia = parseInt(parts[0], 10);
+        const periodo = parseInt(parts[1], 10);
         const filtroId = parts.slice(2).join("_");
 
-        const slotKey = `${dia}_${periodo}_${filtroId}`;
-        if (docIds.has(filtroId)) {
-          ocupacionDocente.add(slotKey);
-        }
-        if (grpIds.has(filtroId)) {
-          ocupacionGrupo.add(slotKey);
-        }
-        if (aulaIds.has(filtroId)) {
-          ocupacionAula.add(slotKey);
-        }
-        // Si no coincide con ninguno explícito, registrarlo en docente y grupo por seguridad
-        if (!docIds.has(filtroId) && !grpIds.has(filtroId) && !aulaIds.has(filtroId)) {
-          ocupacionDocente.add(slotKey);
-          ocupacionGrupo.add(slotKey);
-        }
-      }
-    }
-  }
-
-  // 0.1. Bloquear días o periodos indisponibles para docentes por restricciones del chat IA
-  for (const restr of restriccionesDocentes) {
-    if (restr.diasIndisponibles) {
-      for (const dia of restr.diasIndisponibles) {
-        for (let p = 1; p <= horasPorDia; p++) {
-          ocupacionDocente.add(`${dia}_${p}_${restr.docenteId}`);
-        }
-      }
-    }
-    if (restr.periodosIndisponibles) {
-      for (const pi of restr.periodosIndisponibles) {
-        ocupacionDocente.add(`${pi.dia}_${pi.periodo}_${restr.docenteId}`);
-      }
-    }
-  }
-
-  // Contadores de materia por grupo por día (para intentar no repetir la misma materia más de 2h/día)
-  // Key: `${grupoId}_${asignaturaId}_${dia}` -> count
-  const conteoMateriaDia = new Map<string, number>();
-
-  // 1. Colocar celdas fijas primero
-  for (const fija of celdasFijas) {
-    const keyDocente = `${fija.diaSemana}_${fija.periodo}_${fija.docenteId}`;
-    const keyGrupo = `${fija.diaSemana}_${fija.periodo}_${fija.grupoId}`;
-
-    if (ocupacionDocente.has(keyDocente)) {
-      conflictos.push(`Conflicto en celda fija: El docente ya tiene clase el día ${fija.diaSemana}, periodo ${fija.periodo}`);
-    }
-    if (ocupacionGrupo.has(keyGrupo)) {
-      conflictos.push(`Conflicto en celda fija: El grupo ya tiene clase el día ${fija.diaSemana}, periodo ${fija.periodo}`);
-    }
-
-    ocupacionDocente.add(keyDocente);
-    ocupacionGrupo.add(keyGrupo);
-    if (fija.aulaId) {
-      ocupacionAula.add(`${fija.diaSemana}_${fija.periodo}_${fija.aulaId}`);
-    }
-
-    const keyMat = `${fija.grupoId}_${fija.asignaturaId}_${fija.diaSemana}`;
-    conteoMateriaDia.set(keyMat, (conteoMateriaDia.get(keyMat) || 0) + 1);
-
-    celdasResultado.push({
-      ...fija,
-      esBloqueado: true
-    });
-  }
-
-  // 2. Expandir las cargas pendientes en "unidades lectivas de 1 hora"
-  interface UnidadClase {
-    id: string;
-    cargaId: string;
-    grupoId: string;
-    docenteId: string;
-    asignaturaId: string;
-    requiereAulaEspecial: boolean;
-    aulaEspecialId?: string;
-    colocada: boolean;
-  }
-
-  const unidadesClase: UnidadClase[] = [];
-  let totalRequeridas = 0;
-
-  for (const carga of cargas) {
-    // Restar horas ya fijadas
-    const fijadasCount = celdasFijas.filter(
-      f => f.grupoId === carga.grupoId && f.asignaturaId === carga.asignaturaId
-    ).length;
-
-    const horasFaltantes = Math.max(0, carga.horasSemanales - fijadasCount);
-    totalRequeridas += carga.horasSemanales;
-
-    for (let h = 0; h < horasFaltantes; h++) {
-      unidadesClase.push({
-        id: `${carga.id}_h${h}`,
-        cargaId: carga.id,
-        grupoId: carga.grupoId,
-        docenteId: carga.docenteId,
-        asignaturaId: carga.asignaturaId,
-        requiereAulaEspecial: !!carga.requiereAulaEspecial,
-        aulaEspecialId: carga.aulaEspecialId,
-        colocada: false
-      });
-    }
-  }
-
-  // Ordenar unidades con heurística (materias con aula especial primero, luego por docente)
-  unidadesClase.sort((a, b) => (b.requiereAulaEspecial ? 1 : 0) - (a.requiereAulaEspecial ? 1 : 0));
-
-  let asignadasCorrectamente = 0;
-
-  // -------------------------------------------------------------------------
-  // PASADA 1: Intentar ubicar cada unidad respetando máximo 2 hrs/día de la misma UAC
-  // -------------------------------------------------------------------------
-  for (const unidad of unidadesClase) {
-    if (unidad.colocada) continue;
-
-    for (let dia = 1; dia <= diasLectivos; dia++) {
-      if (unidad.colocada) break;
-
-      const keyMat = `${unidad.grupoId}_${unidad.asignaturaId}_${dia}`;
-      const cuantasHoy = conteoMateriaDia.get(keyMat) || 0;
-      
-      // Regla suave de Pasada 1: Máximo 2 horas de la misma materia por día (o lo configurado)
-      const limitePasada1 = params.restriccionMaxHrsDia ?? 2;
-      if (cuantasHoy >= limitePasada1) continue;
-
-      for (let periodo = 1; periodo <= horasPorDia; periodo++) {
-        const keyDoc = `${dia}_${periodo}_${unidad.docenteId}`;
-        const keyGrp = `${dia}_${periodo}_${unidad.grupoId}`;
-        let keyAula = "";
-
-        if (unidad.requiereAulaEspecial && unidad.aulaEspecialId) {
-          keyAula = `${dia}_${periodo}_${unidad.aulaEspecialId}`;
-          if (ocupacionAula.has(keyAula)) continue;
-        }
-
-        // Verificar no ocupación de docente ni grupo
-        if (ocupacionDocente.has(keyDoc) || ocupacionGrupo.has(keyGrp)) {
-          continue;
-        }
-
-        // Asignar celda
-        ocupacionDocente.add(keyDoc);
-        ocupacionGrupo.add(keyGrp);
-        if (keyAula) ocupacionAula.add(keyAula);
-
-        conteoMateriaDia.set(keyMat, cuantasHoy + 1);
-
-        celdasResultado.push({
-          diaSemana: dia,
-          periodo: periodo,
-          grupoId: unidad.grupoId,
-          docenteId: unidad.docenteId,
-          asignaturaId: unidad.asignaturaId,
-          aulaId: unidad.aulaEspecialId || undefined,
-          cargaId: unidad.cargaId,
-          esBloqueado: false
-        });
-
-        unidad.colocada = true;
-        asignadasCorrectamente++;
-        break;
-      }
-    }
-  }
-
-  // -------------------------------------------------------------------------
-  // PASADA 2: Para unidades pendientes, relajar el límite de 2 hrs/día (permitir 3 hrs/día si es necesario)
-  // -------------------------------------------------------------------------
-  for (const unidad of unidadesClase) {
-    if (unidad.colocada) continue;
-
-    for (let dia = 1; dia <= diasLectivos; dia++) {
-      if (unidad.colocada) break;
-
-      const keyMat = `${unidad.grupoId}_${unidad.asignaturaId}_${dia}`;
-      const cuantasHoy = conteoMateriaDia.get(keyMat) || 0;
-
-      // Si se exige explícitamente 1hr/día, NO relajar en Pasada 2. De lo contrario, permitir relajación.
-      if (params.restriccionMaxHrsDia === 1 && cuantasHoy >= 1) continue;
-
-      for (let periodo = 1; periodo <= horasPorDia; periodo++) {
-        const keyDoc = `${dia}_${periodo}_${unidad.docenteId}`;
-        const keyGrp = `${dia}_${periodo}_${unidad.grupoId}`;
-        let keyAula = "";
-
-        if (unidad.requiereAulaEspecial && unidad.aulaEspecialId) {
-          keyAula = `${dia}_${periodo}_${unidad.aulaEspecialId}`;
-          if (ocupacionAula.has(keyAula)) continue;
-        }
-
-        // Estricto: Docente y Grupo NO deben estar ocupados
-        if (ocupacionDocente.has(keyDoc) || ocupacionGrupo.has(keyGrp)) {
-          continue;
-        }
-
-        // Asignar celda en Pasada 2
-        ocupacionDocente.add(keyDoc);
-        ocupacionGrupo.add(keyGrp);
-        if (keyAula) ocupacionAula.add(keyAula);
-
-        conteoMateriaDia.set(keyMat, cuantasHoy + 1);
-
-        celdasResultado.push({
-          diaSemana: dia,
-          periodo: periodo,
-          grupoId: unidad.grupoId,
-          docenteId: unidad.docenteId,
-          asignaturaId: unidad.asignaturaId,
-          aulaId: unidad.aulaEspecialId || undefined,
-          cargaId: unidad.cargaId,
-          esBloqueado: false
-        });
-
-        unidad.colocada = true;
-        asignadasCorrectamente++;
-        console.log(`[solver] Pasada 2 ubicó unidad ${unidad.id} (Docente: ${unidad.docenteId}, Grupo: ${unidad.grupoId}) en día ${dia}, periodo ${periodo}`);
-        break;
-      }
-    }
-  }
-
-  // -------------------------------------------------------------------------
-  // PASADA 3: Reubicación de Celdas Existentes (Re-balancing) si aún hay unidades sin colocar
-  // -------------------------------------------------------------------------
-  for (const unidad of unidadesClase) {
-    if (unidad.colocada) continue;
-
-    // Buscar cualquier hueco libre del GRUPO en la semana donde el DOCENTE de la unidad también esté LIBRE
-    for (let dia = 1; dia <= diasLectivos; dia++) {
-      if (unidad.colocada) break;
-
-      for (let periodo = 1; periodo <= horasPorDia; periodo++) {
-        if (unidad.colocada) break;
-
-        const keyDoc = `${dia}_${periodo}_${unidad.docenteId}`;
-        const keyGrp = `${dia}_${periodo}_${unidad.grupoId}`;
-
-        // Si el grupo o el docente están ocupados en este hueco, intentar desplazar la celda ocupante
-        if (!ocupacionGrupo.has(keyGrp) && !ocupacionDocente.has(keyDoc)) {
-          // Asignar directamente
-          ocupacionDocente.add(keyDoc);
-          ocupacionGrupo.add(keyGrp);
-
-          celdasResultado.push({
-            diaSemana: dia,
-            periodo: periodo,
-            grupoId: unidad.grupoId,
-            docenteId: unidad.docenteId,
-            asignaturaId: unidad.asignaturaId,
-            aulaId: unidad.aulaEspecialId || undefined,
-            cargaId: unidad.cargaId,
-            esBloqueado: false
-          });
-
-          unidad.colocada = true;
-          asignadasCorrectamente++;
-          break;
-        }
-
-        // Si sólo el grupo está ocupado por OTRA materia de la misma escuela, ver si esa otra materia se puede mover a otro hueco
-        if (!ocupacionDocente.has(keyDoc) && ocupacionGrupo.has(keyGrp)) {
-          const idxOcupante = celdasResultado.findIndex(
-            c => c.grupoId === unidad.grupoId && c.diaSemana === dia && c.periodo === periodo && !c.esBloqueado
-          );
-
-          if (idxOcupante >= 0) {
-            const ocupante = celdasResultado[idxOcupante];
-
-            // Intentar encontrar un nuevo lugar para 'ocupante'
-            for (let d2 = 1; d2 <= diasLectivos; d2++) {
-              if (unidad.colocada) break;
-
-              for (let p2 = 1; p2 <= horasPorDia; p2++) {
-                if (d2 === dia && p2 === periodo) continue;
-
-                const kDoc2 = `${d2}_${p2}_${ocupante.docenteId}`;
-                const kGrp2 = `${d2}_${p2}_${ocupante.grupoId}`;
-
-                if (!ocupacionDocente.has(kDoc2) && !ocupacionGrupo.has(kGrp2)) {
-                  // Mover ocupante a d2, p2
-                  ocupacionDocente.delete(`${dia}_${periodo}_${ocupante.docenteId}`);
-                  ocupacionGrupo.delete(`${dia}_${periodo}_${ocupante.grupoId}`);
-
-                  ocupacionDocente.add(kDoc2);
-                  ocupacionGrupo.add(kGrp2);
-
-                  celdasResultado[idxOcupante].diaSemana = d2;
-                  celdasResultado[idxOcupante].periodo = p2;
-
-                  // Ahora colocar la 'unidad' en dia, periodo
-                  ocupacionDocente.add(keyDoc);
-                  ocupacionGrupo.add(keyGrp);
-
-                  celdasResultado.push({
-                    diaSemana: dia,
-                    periodo: periodo,
-                    grupoId: unidad.grupoId,
-                    docenteId: unidad.docenteId,
-                    asignaturaId: unidad.asignaturaId,
-                    aulaId: unidad.aulaEspecialId || undefined,
-                    cargaId: unidad.cargaId,
-                    esBloqueado: false
-                  });
-
-                  unidad.colocada = true;
-                  asignadasCorrectamente++;
-                  console.log(`[solver] Pasada 3 desplazó celda y ubicó unidad ${unidad.id} en día ${dia}, periodo ${periodo}`);
-                  break;
-                }
-              }
+        if (dia >= 1 && dia <= diasLectivos && periodo >= 1 && periodo <= horasPorDia) {
+          if (docIds.has(filtroId)) {
+            docenteOcupado.add(`${dia}_${periodo}_${filtroId}`);
+          }
+          if (grpIds.has(filtroId)) {
+            const grpGrid = grid.get(filtroId);
+            if (grpGrid && !grpGrid[dia][periodo]) {
+              // Marcar slot de grupo como bloqueado para no asignar clase
+              grpGrid[dia][periodo] = {
+                docenteId: "__BLOQUEADO__",
+                asignaturaId: "__BLOQUEADO__",
+                esBloqueado: true
+              };
             }
+          }
+          if (aulaIds.has(filtroId)) {
+            aulaOcupada.add(`${dia}_${periodo}_${filtroId}`);
           }
         }
       }
     }
   }
 
-  // Registrar conflictos para unidades que definitivamente no pudieron colocarse
-  for (const unidad of unidadesClase) {
-    if (!unidad.colocada) {
-      conflictos.push(`No se pudo ubicar 1 hora de asignatura ID ${unidad.asignaturaId} para Grupo ID ${unidad.grupoId} por falta de espacio/compatibilidad de docente.`);
+  // 3. Procesar Restricciones de Disponibilidad de Docentes
+  for (const restr of restriccionesDocentes) {
+    if (restr.diasIndisponibles) {
+      for (const d of restr.diasIndisponibles) {
+        for (let p = 1; p <= horasPorDia; p++) {
+          docenteOcupado.add(`${d}_${p}_${restr.docenteId}`);
+        }
+      }
+    }
+    if (restr.periodosIndisponibles) {
+      for (const pi of restr.periodosIndisponibles) {
+        docenteOcupado.add(`${pi.dia}_${pi.periodo}_${restr.docenteId}`);
+      }
     }
   }
 
-  // 3. Calcular Métricas de Huecos
+  // 4. Colocar Celdas Fijas
+  const celdasResultado: CeldaResultado[] = [];
+  for (const f of celdasFijas) {
+    const kDoc = `${f.diaSemana}_${f.periodo}_${f.docenteId}`;
+    const kGrp = grid.get(f.grupoId);
+
+    if (docenteOcupado.has(kDoc)) {
+      conflictos.push(`Conflicto con celda fija: El docente ya está ocupado el día ${f.diaSemana}, periodo ${f.periodo}`);
+    }
+    if (kGrp && kGrp[f.diaSemana][f.periodo] && kGrp[f.diaSemana][f.periodo]?.docenteId !== "__BLOQUEADO__") {
+      conflictos.push(`Conflicto con celda fija: El grupo ya tiene clase asignada el día ${f.diaSemana}, periodo ${f.periodo}`);
+    }
+
+    if (kGrp) {
+      kGrp[f.diaSemana][f.periodo] = {
+        docenteId: f.docenteId,
+        asignaturaId: f.asignaturaId,
+        aulaId: f.aulaId,
+        esBloqueado: true
+      };
+    }
+    docenteOcupado.add(kDoc);
+    if (f.aulaId) {
+      aulaOcupada.add(`${f.diaSemana}_${f.periodo}_${f.aulaId}`);
+    }
+
+    const kMat = `${f.grupoId}_${f.asignaturaId}_${f.diaSemana}`;
+    dailySubjectCount.set(kMat, (dailySubjectCount.get(kMat) || 0) + 1);
+
+    const kDocDia = `${f.docenteId}_${f.diaSemana}`;
+    dailyDocenteCount.set(kDocDia, (dailyDocenteCount.get(kDocDia) || 0) + 1);
+
+    celdasResultado.push({
+      diaSemana: f.diaSemana,
+      periodo: f.periodo,
+      grupoId: f.grupoId,
+      docenteId: f.docenteId,
+      asignaturaId: f.asignaturaId,
+      aulaId: f.aulaId,
+      esBloqueado: true
+    });
+  }
+
+  // 5. Preparar Cargas Pendientes
+  const subjectCargas: SubjectCargaInternal[] = [];
+  let totalRequeridas = 0;
+
+  for (const c of cargas) {
+    totalRequeridas += c.horasSemanales;
+    const fijadas = celdasFijas.filter(f => f.grupoId === c.grupoId && f.asignaturaId === c.asignaturaId).length;
+    const restantes = Math.max(0, c.horasSemanales - fijadas);
+    if (restantes > 0) {
+      subjectCargas.push({
+        id: c.id,
+        grupoId: c.grupoId,
+        docenteId: c.docenteId,
+        asignaturaId: c.asignaturaId,
+        horasRestantes: restantes,
+        totalHoras: c.horasSemanales,
+        requiereAulaEspecial: !!c.requiereAulaEspecial,
+        aulaEspecialId: c.aulaEspecialId
+      });
+    }
+  }
+
+  // 6. Extraer todos los Slots a Asignar (únicamente para grupos con cargas o celdas fijas)
+  const gruposConCarga = new Set([
+    ...subjectCargas.map(c => c.grupoId),
+    ...celdasFijas.map(f => f.grupoId)
+  ]);
+
+  const allSlots: SlotItem[] = [];
+  for (const g of grupos) {
+    if (!gruposConCarga.has(g.id)) continue;
+    const grpGrid = grid.get(g.id);
+    if (!grpGrid) continue;
+    for (let d = 1; d <= diasLectivos; d++) {
+      for (let p = 1; p <= horasPorDia; p++) {
+        if (!grpGrid[d][p]) {
+          allSlots.push({ grupoId: g.id, dia: d, periodo: p });
+        }
+      }
+    }
+  }
+
+  // Función para obtener candidatos de un slot con restricciones duras y suaves
+  function getCandidatesForSlot(slot: SlotItem, maxHrsPerDay: number): SubjectCargaInternal[] {
+    const { grupoId, dia, periodo } = slot;
+    const kDocPrefix = `${dia}_${periodo}_`;
+
+    return subjectCargas.filter(c => {
+      if (c.grupoId !== grupoId) return false;
+      if (c.horasRestantes <= 0) return false;
+      if (docenteOcupado.has(`${kDocPrefix}${c.docenteId}`)) return false;
+
+      if (c.requiereAulaEspecial && c.aulaEspecialId) {
+        if (aulaOcupada.has(`${dia}_${periodo}_${c.aulaEspecialId}`)) return false;
+      }
+
+      // Límite de horas por materia por día para el grupo
+      const kMat = `${grupoId}_${c.asignaturaId}_${dia}`;
+      const countToday = dailySubjectCount.get(kMat) || 0;
+      if (countToday >= maxHrsPerDay) return false;
+
+      return true;
+    });
+  }
+
+  // 7. Backtracking con Heurística MRV (Minimum Remaining Values) y Forward-Checking
+  let nodesExplored = 0;
+  const MAX_NODES = 400000;
+
+  function solveBacktracking(slotIndex: number, maxHrsPerDay: number): boolean {
+    if (slotIndex >= allSlots.length) {
+      return true;
+    }
+
+    nodesExplored++;
+    if (nodesExplored > MAX_NODES) return false;
+
+    // Encontrar dinámicamente el slot más restringido (MRV)
+    let bestSlotIdx = slotIndex;
+    let minCandidates = 9999;
+    let bestCandidates: SubjectCargaInternal[] = [];
+
+    for (let i = slotIndex; i < allSlots.length; i++) {
+      const cand = getCandidatesForSlot(allSlots[i], maxHrsPerDay);
+      if (cand.length === 0) {
+        return false; // Forward checking detectó un slot sin opciones válidas
+      }
+      if (cand.length < minCandidates) {
+        minCandidates = cand.length;
+        bestSlotIdx = i;
+        bestCandidates = cand;
+        if (minCandidates === 1) break;
+      }
+    }
+
+    // Intercambiar slot seleccionado con slotIndex actual
+    const currentSlot = allSlots[bestSlotIdx];
+    allSlots[bestSlotIdx] = allSlots[slotIndex];
+    allSlots[slotIndex] = currentSlot;
+
+    const { grupoId, dia, periodo } = currentSlot;
+    const kDocPrefix = `${dia}_${periodo}_`;
+
+    // Ordenar candidatos por LCV / Saturación docente (más horas restantes van primero)
+    bestCandidates.sort((a, b) => b.horasRestantes - a.horasRestantes);
+
+    const grpGrid = grid.get(grupoId)!;
+
+    for (const carga of bestCandidates) {
+      const kDoc = `${kDocPrefix}${carga.docenteId}`;
+      const kMat = `${grupoId}_${carga.asignaturaId}_${dia}`;
+      const kAula = (carga.requiereAulaEspecial && carga.aulaEspecialId)
+        ? `${dia}_${periodo}_${carga.aulaEspecialId}`
+        : null;
+
+      // Asignar
+      grpGrid[dia][periodo] = {
+        docenteId: carga.docenteId,
+        asignaturaId: carga.asignaturaId,
+        aulaId: carga.aulaEspecialId,
+        cargaId: carga.id,
+        esBloqueado: false
+      };
+      docenteOcupado.add(kDoc);
+      if (kAula) aulaOcupada.add(kAula);
+      dailySubjectCount.set(kMat, (dailySubjectCount.get(kMat) || 0) + 1);
+      carga.horasRestantes--;
+
+      if (solveBacktracking(slotIndex + 1, maxHrsPerDay)) {
+        return true;
+      }
+
+      // Deshacer asignación (Backtrack)
+      grpGrid[dia][periodo] = null;
+      docenteOcupado.delete(kDoc);
+      if (kAula) aulaOcupada.delete(kAula);
+      dailySubjectCount.set(kMat, (dailySubjectCount.get(kMat) || 0) - 1);
+      carga.horasRestantes++;
+    }
+
+    // Restaurar orden de slots
+    const temp = allSlots[slotIndex];
+    allSlots[slotIndex] = allSlots[bestSlotIdx];
+    allSlots[bestSlotIdx] = temp;
+
+    return false;
+  }
+
+  // Ejecución en cascada con relajación controlada
+  const limiteInicial = params.restriccionMaxHrsDia ?? 2;
+  let exito = solveBacktracking(0, limiteInicial);
+
+  if (!exito && limiteInicial <= 2) {
+    // Relajación a 3 horas por día para materias de alta carga semanal
+    nodesExplored = 0;
+    exito = solveBacktracking(0, 3);
+  }
+
+  if (!exito && limiteInicial < 4) {
+    // Relajación máxima a 4 horas por día en casos de extrema compresión semanal
+    nodesExplored = 0;
+    exito = solveBacktracking(0, 4);
+  }
+
+  // 8. Construir Resultado Final de Celdas
+  const celdasFinales: CeldaResultado[] = [];
+
+  for (const g of grupos) {
+    const grpGrid = grid.get(g.id);
+    if (!grpGrid) continue;
+
+    for (let d = 1; d <= diasLectivos; d++) {
+      for (let p = 1; p <= horasPorDia; p++) {
+        const u = grpGrid[d][p];
+        if (u && u.docenteId !== "__BLOQUEADO__") {
+          celdasFinales.push({
+            diaSemana: d,
+            periodo: p,
+            grupoId: g.id,
+            docenteId: u.docenteId,
+            asignaturaId: u.asignaturaId,
+            aulaId: u.aulaId,
+            cargaId: u.cargaId,
+            esBloqueado: u.esBloqueado
+          });
+        }
+      }
+    }
+  }
+
+  // Reportar asignaturas faltantes si no hubo éxito total
+  for (const sc of subjectCargas) {
+    if (sc.horasRestantes > 0) {
+      conflictos.push(`Faltaron ubicar ${sc.horasRestantes} hora(s) de la materia ID ${sc.asignaturaId} en el Grupo ID ${sc.grupoId}`);
+    }
+  }
+
+  // 9. Métricas de Huecos
   let huecosDocentes = 0;
   let huecosGrupos = 0;
 
   for (const g of grupos) {
     for (let d = 1; d <= diasLectivos; d++) {
-      const periodosOcupados = celdasResultado
+      const periodosOcupados = celdasFinales
         .filter(c => c.grupoId === g.id && c.diaSemana === d)
         .map(c => c.periodo)
         .sort((a, b) => a - b);
@@ -469,12 +457,28 @@ export function resolverHorario(params: SolverParams): SolverResult {
     }
   }
 
+  for (const doc of docentes) {
+    for (let d = 1; d <= diasLectivos; d++) {
+      const periodosDoc = celdasFinales
+        .filter(c => c.docenteId === doc.id && c.diaSemana === d)
+        .map(c => c.periodo)
+        .sort((a, b) => a - b);
+
+      if (periodosDoc.length > 1) {
+        const minP = periodosDoc[0];
+        const maxP = periodosDoc[periodosDoc.length - 1];
+        const span = maxP - minP + 1;
+        huecosDocentes += (span - periodosDoc.length);
+      }
+    }
+  }
+
   return {
-    exito: asignadasCorrectamente + (celdasFijas.length) >= totalRequeridas,
-    celdas: celdasResultado,
+    exito: exito && celdasFinales.length >= totalRequeridas,
+    celdas: celdasFinales,
     conflictos,
     metricas: {
-      totalClasesProgramadas: celdasResultado.length,
+      totalClasesProgramadas: celdasFinales.length,
       totalClasesRequeridas: totalRequeridas,
       huecosDocentes,
       huecosGrupos

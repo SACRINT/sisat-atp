@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Calendar, PlusCircle, Save, X, RefreshCw, Trophy, ToggleLeft, ToggleRight, Check, Zap } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { ordenarPeriodosEscolares } from "@/lib/constants";
+import { ordenarPeriodosEscolares, getNombrePeriodo } from "@/lib/constants";
 
 export default function GestionFechas({
     programas,
@@ -221,13 +221,7 @@ export default function GestionFechas({
     };
 
     const getPeriodoLabel = (prog: any, periodo: any) => {
-        if (prog.tipo === "MENSUAL") {
-            const meses = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-            return meses[periodo.mes];
-        } else if (prog.tipo === "SEMESTRAL") {
-            return `Semestre ${periodo.semestre}`;
-        }
-        return "Entrega Única / Anual";
+        return getNombrePeriodo(periodo, prog?.nombre);
     };
 
     // Format date for inputs (YYYY-MM-DD)

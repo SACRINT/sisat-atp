@@ -37,11 +37,10 @@ const ESTADO_CONFIG: Record<string, { color: string; icon: React.ReactNode; labe
     NO_ENTREGADO: { color: "var(--text-muted)", icon: <XCircle size={14} />, label: "No Entregado" },
 };
 
+import { getNombrePeriodo } from "@/lib/constants";
+
 function getPeriodoLabel(ent: EntregaDirector): string {
-    const periodo = ent.periodoEntrega;
-    if (periodo.mes) return MESES[periodo.mes];
-    if (periodo.semestre) return `Semestre ${periodo.semestre}`;
-    return "Ciclo completo";
+    return getNombrePeriodo(ent.periodoEntrega, ent.periodoEntrega.programa?.nombre);
 }
 
 export default function EntregasListado({

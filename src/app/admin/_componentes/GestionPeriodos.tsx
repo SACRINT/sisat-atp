@@ -15,7 +15,7 @@ import {
     ZapOff,
     Zap,
 } from "lucide-react";
-import { MESES } from "@/lib/constants";
+import { MESES, getNombrePeriodo } from "@/lib/constants";
 import { ProgramaAdmin } from "@/types";
 
 interface SidebarConfig {
@@ -183,10 +183,8 @@ export default function GestionPeriodos({ programas, sidebarConfig, readOnly = f
         }
     }
 
-    function getPeriodoLabel(periodo: { mes: number | null; semestre: number | null }): string {
-        if (periodo.mes) return MESES[periodo.mes] || `Mes ${periodo.mes}`;
-        if (periodo.semestre) return `Semestre ${periodo.semestre}`;
-        return "Ciclo completo";
+    function getPeriodoLabel(periodo: { mes: number | null; semestre: number | null }, programaNombre?: string | null): string {
+        return getNombrePeriodo(periodo, programaNombre);
     }
 
     return (
@@ -342,7 +340,7 @@ export default function GestionPeriodos({ programas, sidebarConfig, readOnly = f
                                                             {!isFantasma && !isInactivo && <CheckCircle2 size={14} style={{ color: "var(--success)", flexShrink: 0 }} />}
                                                             {isInactivo && <AlertTriangle size={14} style={{ color: "var(--text-muted)", flexShrink: 0 }} />}
                                                             <span style={{ fontWeight: 600, fontSize: "0.875rem" }}>
-                                                                {getPeriodoLabel(periodo)}
+                                                                {getPeriodoLabel(periodo, prog.nombre)}
                                                             </span>
                                                             {isFantasma && (
                                                                 <span style={{ fontSize: "0.6875rem", background: "#fef3c7", color: "#92400e", padding: "0.125rem 0.4rem", borderRadius: "4px", fontWeight: 700 }}>

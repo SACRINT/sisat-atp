@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronUp, ChevronDown, MessageSquare, Download, Eye, Loader2, FileCheck2, FilePlus2, Trash2, Upload, RefreshCw } from "lucide-react";
 import JSZip from "jszip";
-import { MESES, ESTADOS, ESTADO_LABELS } from "@/lib/constants";
+import { MESES, ESTADOS, ESTADO_LABELS, getNombrePeriodo } from "@/lib/constants";
 import { ProgramaAdmin } from "@/types";
 import { getDownloadUrl } from "@/lib/download-url";
 import PdfViewerModal from "@/app/_componentes/PdfViewerModal";
@@ -212,7 +212,7 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
             let fileCount = 0;
 
             for (const p of prog.periodos.filter(per => per.activo)) {
-                const periodLabel = getPeriodoLabel(p).replace(/[/\\?%*:|"<>]/g, '-');
+                const periodLabel = getPeriodoLabel(p, prog.nombre).replace(/[/\\?%*:|"<>]/g, '-');
                 for (const ent of p.entregas) {
                     if (ent.archivos && ent.archivos.length > 0) {
                         const cct = ent.escuela.cct;
@@ -352,10 +352,8 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
         }
     }
 
-    function getPeriodoLabel(periodo: { mes: number | null; semestre: number | null }): string {
-        if (periodo.mes) return MESES[periodo.mes];
-        if (periodo.semestre) return `Semestre ${periodo.semestre}`;
-        return "Ciclo completo";
+    function getPeriodoLabel(periodo: { mes: number | null; semestre: number | null }, programaNombre?: string | null): string {
+        return getNombrePeriodo(periodo, programaNombre);
     }
 
     return (
@@ -555,7 +553,7 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                                                     onClick={() => setExpandedPeriodo(expandedPeriodo === periodo.id ? null : periodo.id)}
                                                 >
                                                     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                                        {getPeriodoLabel(periodo)} ({statPerEntregas.filter((e) => e.estado !== "NO_ENTREGADO").length}/{statPerEntregas.length} recibidas)
+                                                        {getPeriodoLabel(periodo, prog.nombre)} ({statPerEntregas.filter((e) => e.estado !== "NO_ENTREGADO").length}/{statPerEntregas.length} recibidas)
                                                         {!periodo.activo && (
                                                             <span style={{ fontSize: "0.7rem", background: "#e2e8f0", color: "#64748b", padding: "0.1rem 0.4rem", borderRadius: "4px", fontWeight: 500 }}>Inactivo</span>
                                                         )}
@@ -563,7 +561,7 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                                                     {!readOnly && (
                                                         <div style={{ display: "flex", gap: "0.5rem" }}>
                                                             <button
-                                                                onClick={(e) => { e.stopPropagation(); handleBulkEstadoPeriodo(periodo.id, "EXENTO", getPeriodoLabel(periodo)); }}
+                                                                onClick={(e) => { e.stopPropagation(); handleBulkEstadoPeriodo(periodo.id, "EXENTO", getPeriodoLabel(periodo, prog.nombre)); }}
                                                                 disabled={updatingPeriodo === periodo.id}
                                                                 style={{ padding: "0.15rem 0.4rem", fontSize: "0.7rem", borderRadius: "4px", background: "#f1f5f9", border: "1px solid #cbd5e1", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.25rem" }}
                                                                 title="Marcar mes como No Aplica para todas las escuelas"

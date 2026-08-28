@@ -52,12 +52,32 @@ export async function POST(req: NextRequest) {
 
         const programa = entrega.periodoEntrega.programa;
         const escuela = entrega.escuela;
+        const periodo = entrega.periodoEntrega;
+
+        let nombreFinal = fileData.name;
+        const pNom = programa.nombre.toUpperCase();
+        if (pNom.includes("CULTURA DE PAZ") || pNom.includes("SEGURIDAD")) {
+            const ext = fileData.name.includes(".") ? fileData.name.slice(fileData.name.lastIndexOf(".")) : "";
+            const zona = (escuela.zonaEscolar || "Zona004").replace(/\s+/g, "");
+            const { ACTIVIDADES_CULTURA_PAZ } = await import("@/lib/constants");
+            const actividad = periodo.mes && ACTIVIDADES_CULTURA_PAZ[periodo.mes]
+                ? ACTIVIDADES_CULTURA_PAZ[periodo.mes]
+                    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                    .replace(/[^a-zA-Z0-9]/g, "_")
+                    .toLowerCase()
+                : "culturadepaz";
+            const fechaObj = periodo.fechaLimite ? new Date(periodo.fechaLimite) : new Date();
+            const d = String(fechaObj.getDate()).padStart(2, "0");
+            const m = String(fechaObj.getMonth() + 1).padStart(2, "0");
+            const y = String(fechaObj.getFullYear());
+            nombreFinal = `${zona}_${actividad}_${d}${m}${y}${ext}`;
+        }
 
         // Save Archivo record
         const archivo = await prisma.archivo.create({
             data: {
                 entregaId,
-                nombre: fileData.name,
+                nombre: nombreFinal,
                 driveId: fileData.publicId, // using Cloudinary public_id
                 driveUrl: fileData.url,     // using Cloudinary secure_url
                 tipo: "ENTREGA",
@@ -76,8 +96,7 @@ export async function POST(req: NextRequest) {
         });
 
         // Build period label for email notification
-        let periodoLabel = "Ciclo 2025-2026";
-        const periodo = entrega.periodoEntrega;
+        let periodoLabel = "Ciclo 2026-2027";
         if (periodo.mes) {
             const meses = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
                 "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];

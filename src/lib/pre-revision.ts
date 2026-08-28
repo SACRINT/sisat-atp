@@ -116,7 +116,7 @@ function cleanAndParseGeminiJson(raw: string) {
 }
 
 export interface PreRevisionResult {
-    tipo: "DIA_NARANJA" | "ACOSO_ESCOLAR" | "PMC" | "PAEC" | "INFORME_FINAL" | "PIPS" | "OTROS";
+    tipo: "DIA_NARANJA" | "ACOSO_ESCOLAR" | "PMC" | "PAEC" | "INFORME_FINAL" | "PIPS" | "CONCENTRADO_INSCRITOS" | "CARTAS_COMPROMISO" | "INFORMES_BIMESTRALES" | "SIMULACRO" | "CULTURA_PAZ" | "PIPC" | "SEGUROS" | "OTROS";
     aprobado?: boolean;
     error?: string;
     // Día Naranja fields
@@ -143,6 +143,20 @@ export interface PreRevisionResult {
     sellado?: boolean;
     explicacion?: string;
     puntuacion?: string;
+    // Cultura de Paz fields
+    resumenActividad?: string;
+    participantesEstimados?: string;
+    tieneEvidenciaFotografica?: boolean;
+    tieneFirmasSellos?: boolean;
+    // PIPC fields
+    tieneBrigadas?: boolean;
+    tienePlanEvacuacion?: boolean;
+    tieneCroquisSenaletica?: boolean;
+    tieneDirectorioEmergencias?: boolean;
+    // Seguros fields
+    tipoSiniestroReportado?: string;
+    tienePolizaReferenciada?: boolean;
+    tieneEvidenciaSoporte?: boolean;
 }
 
 function parsePercentage(scoreStr: string): number {
@@ -834,6 +848,307 @@ ${part3.observaciones}`;
                 } catch (e: any) {
                     console.error(`Error analyzing PMC/PAEC delivery ${entregaId}:`, e);
                     throw e;
+                }
+            }
+
+        } else if (programaNombre.includes("CONCENTRADO") || programaNombre.includes("INSCRITOS")) {
+            // --- CONCENTRADO DE INSCRITOS/REINSCRITOS ---
+            const file = entrega.archivos.find(a => a.tipo === "ENTREGA" && a.driveUrl);
+            if (file) {
+                const isExcel = file.nombre.toLowerCase().endsWith(".xlsx") || file.nombre.toLowerCase().endsWith(".xls");
+                if (!isExcel) {
+                    resultado = { tipo: "CONCENTRADO_INSCRITOS", aprobado: false, error: "El archivo debe ser un Excel (.xlsx)" };
+                } else {
+                    try {
+                        const { validarConcentrado } = await import("@/lib/validadores/validador-concentrados");
+                        const buffer = await downloadFile(file.driveUrl!);
+                        const resultadoValidacion = validarConcentrado(buffer);
+
+                        const erroresCriticos = resultadoValidacion.inconsistencias.filter(i => i.severidad === "ERROR_CRITICO").length;
+                        const aprobado = erroresCriticos === 0;
+                        const score = Math.max(0, 100 - resultadoValidacion.inconsistencias.length * 5);
+
+                        resultado = {
+                            tipo: "CONCENTRADO_INSCRITOS",
+                            aprobado,
+                            puntuacion: `${score}%`,
+                            explicacion: `Registros: ${resultadoValidacion.totalRegistros} | H: ${resultadoValidacion.totalHombres} | M: ${resultadoValidacion.totalMujeres} | Inconsistencias: ${resultadoValidacion.inconsistencias.length} (${erroresCriticos} críticas)`,
+                        };
+                    } catch (e: any) {
+                        console.error("Error validating concentrado Excel:", e);
+                        resultado = { tipo: "CONCENTRADO_INSCRITOS", aprobado: false, error: e.message };
+                    }
+                }
+            }
+
+        } else if (programaNombre.includes("CARTAS") && programaNombre.includes("COMPROMISO")) {
+            // --- SEGUIMIENTO A CARTAS COMPROMISO ---
+            const file = entrega.archivos.find(a => a.tipo === "ENTREGA" && a.driveUrl);
+            if (file) {
+                try {
+                    const buffer = await downloadFile(file.driveUrl!);
+                    let extractedText = "";
+                    if (file.nombre.toLowerCase().endsWith(".pdf")) {
+                        const pdfRes = await extractTextFromPdf(buffer);
+                        extractedText = pdfRes.text;
+                    } else if (file.nombre.toLowerCase().endsWith(".docx")) {
+                        extractedText = await extractTextFromDocx(buffer);
+                    }
+
+                    const systemInstruction = "Eres un Asesor Técnico Pedagógico experto en revisión de documentación escolar.";
+                    const prompt = `Analiza este documento de seguimiento a Cartas Compromiso de la escuela ${escuelaNombre} (${escuelaCct}).
+Verifica que:
+1. Todos los alumnos cuenten con carta compromiso firmada.
+2. Las fechas de firma estén dentro del ciclo escolar actual.
+3. Esté presente la firma del director.
+4. No haya campos obligatorios vacíos.
+
+Responde únicamente en formato JSON:
+{
+  "aprobado": true/false,
+  "puntuacion": "Porcentaje de cumplimiento",
+  "observaciones": "Detalle hallazgos (máx 300 palabras)",
+  "estadoRecomendado": "APROBADO" o "REQUIERE_CORRECCION"
+}`;
+
+                    let rawResponse: string;
+                    if (extractedText && extractedText.length > 50) {
+                        rawResponse = await callGemini(systemInstruction, prompt + "\n\nTexto extraído del documento:\n" + extractedText.slice(0, 15000), undefined, undefined, undefined, false, entrega.escuelaId);
+                    } else {
+                        rawResponse = await callGemini(systemInstruction, prompt, buffer, undefined, undefined, false, entrega.escuelaId);
+                    }
+                    const parsed = cleanAndParseGeminiJson(rawResponse);
+                    resultado = {
+                        tipo: "CARTAS_COMPROMISO",
+                        aprobado: parsed.aprobado,
+                        puntuacion: parsed.puntuacion,
+                        explicacion: parsed.observaciones,
+                        tieneIncidencias: parsed.estadoRecomendado === "REQUIERE_CORRECCION",
+                    };
+                } catch (e: any) {
+                    console.error("Error analyzing cartas compromiso:", e);
+                    resultado = { tipo: "CARTAS_COMPROMISO", aprobado: false, error: e.message };
+                }
+            }
+
+        } else if (programaNombre.includes("INFORMES BIMESTRALES") || programaNombre.includes("INFORME BIMESTRAL")) {
+            // --- INFORMES BIMESTRALES A PADRES ---
+            const file = entrega.archivos.find(a => a.tipo === "ENTREGA" && a.driveUrl);
+            if (file) {
+                try {
+                    const buffer = await downloadFile(file.driveUrl!);
+                    let extractedText = "";
+                    if (file.nombre.toLowerCase().endsWith(".pdf")) {
+                        const pdfRes = await extractTextFromPdf(buffer);
+                        extractedText = pdfRes.text;
+                    } else if (file.nombre.toLowerCase().endsWith(".docx")) {
+                        extractedText = await extractTextFromDocx(buffer);
+                    }
+
+                    const systemInstruction = "Eres un Asesor Técnico Pedagógico experto en revisión de informes escolares.";
+                    const prompt = `Analiza este Informe Bimestral a Padres de Familia de ${escuelaNombre} (${escuelaCct}).
+Verifica:
+1. Estructura del informe (estadísticas, asistencia, aprovechamiento).
+2. Fechas correctas del bimestre.
+3. Firma del director.
+4. Estadísticas presentes (alumnos, aprovechamiento, deserción).
+
+Responde únicamente en formato JSON:
+{
+  "aprobado": true/false,
+  "puntuacion": "Porcentaje",
+  "observaciones": "Detalle (máx 300 palabras)",
+  "estadoRecomendado": "APROBADO" o "REQUIERE_CORRECCION"
+}`;
+
+                    let rawResponse: string;
+                    if (extractedText && extractedText.length > 50) {
+                        rawResponse = await callGemini(systemInstruction, prompt + "\n\nTexto extraído:\n" + extractedText.slice(0, 15000), undefined, undefined, undefined, false, entrega.escuelaId);
+                    } else {
+                        rawResponse = await callGemini(systemInstruction, prompt, buffer, undefined, undefined, false, entrega.escuelaId);
+                    }
+                    const parsed = cleanAndParseGeminiJson(rawResponse);
+                    resultado = {
+                        tipo: "INFORMES_BIMESTRALES",
+                        aprobado: parsed.aprobado,
+                        puntuacion: parsed.puntuacion,
+                        explicacion: parsed.observaciones,
+                        tieneIncidencias: parsed.estadoRecomendado === "REQUIERE_CORRECCION",
+                    };
+                } catch (e: any) {
+                    console.error("Error analyzing informe bimestral:", e);
+                    resultado = { tipo: "INFORMES_BIMESTRALES", aprobado: false, error: e.message };
+                }
+            }
+
+        } else if (programaNombre.includes("SIMULACRO")) {
+            // --- SIMULACRO NACIONAL ---
+            const file = entrega.archivos.find(a => a.tipo === "ENTREGA" && a.driveUrl);
+            if (file) {
+                try {
+                    const buffer = await downloadFile(file.driveUrl!);
+                    let extractedText = "";
+                    if (file.nombre.toLowerCase().endsWith(".pdf")) {
+                        const pdfRes = await extractTextFromPdf(buffer);
+                        extractedText = pdfRes.text;
+                    }
+
+                    const systemInstruction = "Eres un experto en protección civil escolar.";
+                    const prompt = `Analiza este reporte del Simulacro Nacional de ${escuelaNombre} (${escuelaCct}).
+Verifica:
+1. Hora de evacuación reportada.
+2. Número de participantes.
+3. Tiempo de evacuación.
+4. Descripción de incidencias.
+
+Responde únicamente en formato JSON:
+{
+  "aprobado": true/false,
+  "puntuacion": "Porcentaje",
+  "observaciones": "Detalle (máx 300 palabras)",
+  "estadoRecomendado": "APROBADO" o "REQUIERE_CORRECCION"
+}`;
+
+                    let rawResponse: string;
+                    if (extractedText && extractedText.length > 50) {
+                        rawResponse = await callGemini(systemInstruction, prompt + "\n\nTexto extraído:\n" + extractedText.slice(0, 15000), undefined, undefined, undefined, false, entrega.escuelaId);
+                    } else {
+                        rawResponse = await callGemini(systemInstruction, prompt, buffer, undefined, undefined, false, entrega.escuelaId);
+                    }
+                    const parsed = cleanAndParseGeminiJson(rawResponse);
+                    resultado = {
+                        tipo: "SIMULACRO",
+                        aprobado: parsed.aprobado,
+                        puntuacion: parsed.puntuacion,
+                        explicacion: parsed.observaciones,
+                        tieneIncidencias: parsed.estadoRecomendado === "REQUIERE_CORRECCION",
+                    };
+                } catch (e: any) {
+                    console.error("Error analyzing simulacro:", e);
+                    resultado = { tipo: "SIMULACRO", aprobado: false, error: e.message };
+                }
+            }
+
+        } else if (programaNombre.includes("CULTURA DE PAZ") || programaNombre.includes("SEGURIDAD Y CULTURA")) {
+            // --- CULTURA DE PAZ ---
+            const file = entrega.archivos.find(a => a.tipo === "ENTREGA" && a.driveUrl);
+            if (file) {
+                try {
+                    const { evaluarCulturaPaz } = await import("@/lib/validadores/validador-cultura-paz");
+                    const { ACTIVIDADES_CULTURA_PAZ } = await import("@/lib/constants");
+                    const buffer = await downloadFile(file.driveUrl!);
+                    let extractedText = "";
+                    if (file.nombre.toLowerCase().endsWith(".pdf")) {
+                        const pdfRes = await extractTextFromPdf(buffer);
+                        extractedText = pdfRes.text;
+                    } else if (file.nombre.toLowerCase().endsWith(".docx")) {
+                        extractedText = await extractTextFromDocx(buffer);
+                    }
+
+                    const mesIndex = entrega.periodoEntrega.mes || 1;
+                    const actividadNombre = ACTIVIDADES_CULTURA_PAZ[mesIndex] || "Actividad de Cultura de Paz";
+
+                    const evaluacion = await evaluarCulturaPaz(
+                        extractedText,
+                        buffer,
+                        { nombre: escuelaNombre, cct: escuelaCct },
+                        actividadNombre,
+                        entrega.escuelaId
+                    );
+
+                    resultado = {
+                        tipo: "CULTURA_PAZ",
+                        aprobado: evaluacion.aprobado,
+                        puntuacion: evaluacion.puntuacion,
+                        resumenActividad: evaluacion.resumenActividad,
+                        tieneEvidenciaFotografica: evaluacion.tieneEvidenciaFotografica,
+                        tieneFirmasSellos: evaluacion.tieneFirmasSellos,
+                        participantesEstimados: evaluacion.participantesEstimados,
+                        explicacion: evaluacion.observaciones,
+                        tieneIncidencias: evaluacion.estadoRecomendado === "REQUIERE_CORRECCION",
+                    };
+                } catch (e: any) {
+                    console.error("Error analyzing cultura de paz:", e);
+                    resultado = { tipo: "CULTURA_PAZ", aprobado: false, error: e.message };
+                }
+            }
+
+        } else if (programaNombre.includes("PIPC") || programaNombre.includes("PROTECCIÓN CIVIL") || programaNombre.includes("PROTECCION CIVIL")) {
+            // --- PIPC ---
+            const file = entrega.archivos.find(a => a.tipo === "ENTREGA" && a.driveUrl);
+            if (file) {
+                try {
+                    const { evaluarPIPC } = await import("@/lib/validadores/validador-pipc");
+                    const buffer = await downloadFile(file.driveUrl!);
+                    let extractedText = "";
+                    if (file.nombre.toLowerCase().endsWith(".pdf")) {
+                        const pdfRes = await extractTextFromPdf(buffer);
+                        extractedText = pdfRes.text;
+                    } else if (file.nombre.toLowerCase().endsWith(".docx")) {
+                        extractedText = await extractTextFromDocx(buffer);
+                    }
+
+                    const evaluacion = await evaluarPIPC(
+                        extractedText,
+                        buffer,
+                        { nombre: escuelaNombre, cct: escuelaCct },
+                        entrega.escuelaId
+                    );
+
+                    resultado = {
+                        tipo: "PIPC",
+                        aprobado: evaluacion.aprobado,
+                        puntuacion: evaluacion.puntuacion,
+                        tieneBrigadas: evaluacion.tieneBrigadas,
+                        tienePlanEvacuacion: evaluacion.tienePlanEvacuacion,
+                        tieneCroquisSenaletica: evaluacion.tieneCroquisSenaletica,
+                        tieneDirectorioEmergencias: evaluacion.tieneDirectorioEmergencias,
+                        tieneFirmasSellos: evaluacion.tieneFirmasSellos,
+                        explicacion: evaluacion.observaciones,
+                        tieneIncidencias: evaluacion.estadoRecomendado === "REQUIERE_CORRECCION",
+                    };
+                } catch (e: any) {
+                    console.error("Error analyzing PIPC:", e);
+                    resultado = { tipo: "PIPC", aprobado: false, error: e.message };
+                }
+            }
+
+        } else if (programaNombre.includes("SEGUROS") || programaNombre.includes("SINIESTRO")) {
+            // --- SEGUROS / SINIESTROS ---
+            const file = entrega.archivos.find(a => a.tipo === "ENTREGA" && a.driveUrl);
+            if (file) {
+                try {
+                    const { evaluarSeguros } = await import("@/lib/validadores/validador-seguros");
+                    const buffer = await downloadFile(file.driveUrl!);
+                    let extractedText = "";
+                    if (file.nombre.toLowerCase().endsWith(".pdf")) {
+                        const pdfRes = await extractTextFromPdf(buffer);
+                        extractedText = pdfRes.text;
+                    } else if (file.nombre.toLowerCase().endsWith(".docx")) {
+                        extractedText = await extractTextFromDocx(buffer);
+                    }
+
+                    const evaluacion = await evaluarSeguros(
+                        extractedText,
+                        buffer,
+                        { nombre: escuelaNombre, cct: escuelaCct },
+                        entrega.escuelaId
+                    );
+
+                    resultado = {
+                        tipo: "SEGUROS",
+                        aprobado: evaluacion.aprobado,
+                        puntuacion: evaluacion.puntuacion,
+                        tipoSiniestroReportado: evaluacion.tipoSiniestroReportado,
+                        tienePolizaReferenciada: evaluacion.tienePolizaReferenciada,
+                        tieneEvidenciaSoporte: evaluacion.tieneEvidenciaSoporte,
+                        tieneFirmasSellos: evaluacion.tieneFirmasSellos,
+                        explicacion: evaluacion.observaciones,
+                        tieneIncidencias: evaluacion.estadoRecomendado === "REQUIERE_CORRECCION",
+                    };
+                } catch (e: any) {
+                    console.error("Error analyzing seguros:", e);
+                    resultado = { tipo: "SEGUROS", aprobado: false, error: e.message };
                 }
             }
         }

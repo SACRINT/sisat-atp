@@ -1,0 +1,2 @@
+{"timestamp":"2026-08-27T16:28:08.132Z","level":"info","message":"Tool invocation started","correlationId":"e5728a7f-894d-4b89-990a-4268570946b8","tool":"testsprite_check_account_info"}
+{"timestamp":"2026-08-27T16:28:08.805Z","level":"info","message":"Tool invocation completed","correlationId":"e5728a7f-894d-4b89-990a-4268570946b8","tool":"testsprite_check_account_info"}

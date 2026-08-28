@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Search, FileText, ChevronUp, ChevronDown, MessageSquare, Download, Mail, Eye, Upload, Trash2, Loader2, RefreshCw } from "lucide-react";
-import { MESES, ESTADOS, ESTADO_LABELS } from "@/lib/constants";
+import { MESES, ESTADOS, ESTADO_LABELS, getNombrePeriodo } from "@/lib/constants";
 import { EscuelaAdmin } from "@/types";
 import { getEntregaDownloadUrl } from "@/lib/download-url";
 import PdfViewerModal from "@/app/_componentes/PdfViewerModal";
@@ -399,11 +399,7 @@ export default function ListadoEscuelas({ escuelas, onSetMessage, onSetCorreccio
                                     return semA - semB;
                                 }).map((ent) => {
                                     const styles = getEstadoStyles(ent.estado);
-                                    const periodoLabel = ent.periodoEntrega.mes
-                                        ? `${MESES[ent.periodoEntrega.mes]}`
-                                        : ent.periodoEntrega.semestre
-                                            ? `Semestre ${ent.periodoEntrega.semestre}`
-                                            : "";
+                                    const periodoLabel = getNombrePeriodo(ent.periodoEntrega, ent.periodoEntrega.programa.nombre);
 
                                     return (
                                         <div key={ent.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)", gap: "0.5rem", flexWrap: "wrap" }}>

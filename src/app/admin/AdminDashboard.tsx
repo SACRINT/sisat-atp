@@ -1916,6 +1916,196 @@ export default function AdminDashboard({
                                         </div>
                                     );
                                 }
+
+                                if (res.tipo === "CULTURA_PAZ") {
+                                    return (
+                                        <div style={{
+                                            marginBottom: "1rem", padding: "0.75rem", borderRadius: "8px",
+                                            border: res.tieneIncidencias || res.aprobado === false ? "1px solid #fecaca" : "1px solid #bbf7d0",
+                                            background: res.tieneIncidencias || res.aprobado === false ? "#fdf2f2" : "#f0fdf4", fontSize: "0.8125rem"
+                                        }}>
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                                                <h4 style={{ margin: 0, color: "#15803d", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                                                    🕊️ Pre-Revisión: Cultura de Paz (Semestre &quot;A&quot;)
+                                                </h4>
+                                                <span style={{ fontWeight: 700, background: "white", padding: "0.15rem 0.4rem", borderRadius: "4px", border: "1px solid #86efac", color: "#166534" }}>
+                                                    {res.puntuacion || "Evaluado"}
+                                                </span>
+                                            </div>
+
+                                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                                                <div style={{ background: "white", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #dcfce7" }}>
+                                                    <span style={{ color: "var(--text-muted)", fontSize: "0.7rem", display: "block" }}>Evidencia Gráfica/Fotos</span>
+                                                    <strong style={{ color: res.tieneEvidenciaFotografica ? "#16a34a" : "#dc2626" }}>
+                                                        {res.tieneEvidenciaFotografica ? "✅ Detectadas" : "❌ No detectadas"}
+                                                    </strong>
+                                                </div>
+                                                <div style={{ background: "white", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #dcfce7" }}>
+                                                    <span style={{ color: "var(--text-muted)", fontSize: "0.7rem", display: "block" }}>Firmas y Sellos</span>
+                                                    <strong style={{ color: res.tieneFirmasSellos ? "#16a34a" : "#dc2626" }}>
+                                                        {res.tieneFirmasSellos ? "✅ Cumple" : "❌ Incompleto"}
+                                                    </strong>
+                                                </div>
+                                                <div style={{ background: "white", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #dcfce7" }}>
+                                                    <span style={{ color: "var(--text-muted)", fontSize: "0.7rem", display: "block" }}>Participantes</span>
+                                                    <strong style={{ color: "#1e3a8a" }}>{res.participantesEstimados || "N/D"}</strong>
+                                                </div>
+                                            </div>
+
+                                            {res.resumenActividad && (
+                                                <div style={{ marginTop: "0.5rem", background: "white", padding: "0.5rem", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
+                                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem" }}>
+                                                        <strong style={{ color: "#166534", fontSize: "0.75rem" }}>📋 Resumen Ejecutivo de la Actividad (para Formulario de Zona):</strong>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                navigator.clipboard.writeText(res.resumenActividad || "");
+                                                                const btn = e.currentTarget;
+                                                                const oldText = btn.innerText;
+                                                                btn.innerText = "✓ Copiado";
+                                                                setTimeout(() => { btn.innerText = oldText; }, 1500);
+                                                            }}
+                                                            style={{
+                                                                fontSize: "0.68rem", padding: "0.15rem 0.4rem", borderRadius: "4px",
+                                                                background: "#16a34a", color: "white", border: "none", cursor: "pointer"
+                                                            }}
+                                                        >
+                                                            Copiar Resumen
+                                                        </button>
+                                                    </div>
+                                                    <p style={{ margin: 0, fontSize: "0.75rem", color: "#374151", lineHeight: "1.4" }}>
+                                                        {res.resumenActividad}
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {res.explicacion && (
+                                                <div style={{ marginTop: "0.5rem", color: "#4b5563", fontSize: "0.75rem" }}>
+                                                    <strong>Observaciones del modelo:</strong> {res.explicacion}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                }
+
+                                if (res.tipo === "PIPC") {
+                                    return (
+                                        <div style={{
+                                            marginBottom: "1rem", padding: "0.75rem", borderRadius: "8px",
+                                            border: res.tieneIncidencias || res.aprobado === false ? "1px solid #fecaca" : "1px solid #fed7aa",
+                                            background: res.tieneIncidencias || res.aprobado === false ? "#fdf2f2" : "#fff7ed", fontSize: "0.8125rem"
+                                        }}>
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                                                <h4 style={{ margin: 0, color: "#c2410c", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                                                    🦺 Pre-Revisión: Programa Interno de Protección Civil (PIPC)
+                                                </h4>
+                                                <span style={{ fontWeight: 700, background: "white", padding: "0.15rem 0.4rem", borderRadius: "4px", border: "1px solid #fdba74", color: "#9a3412" }}>
+                                                    {res.puntuacion || "Evaluado"}
+                                                </span>
+                                            </div>
+
+                                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                                                <div style={{ background: "white", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #fed7aa" }}>
+                                                    <span style={{ color: "var(--text-muted)", fontSize: "0.7rem", display: "block" }}>Acta de Brigadas</span>
+                                                    <strong style={{ color: res.tieneBrigadas ? "#16a34a" : "#dc2626" }}>
+                                                        {res.tieneBrigadas ? "✅ Presente" : "❌ No detectada"}
+                                                    </strong>
+                                                </div>
+                                                <div style={{ background: "white", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #fed7aa" }}>
+                                                    <span style={{ color: "var(--text-muted)", fontSize: "0.7rem", display: "block" }}>Plan de Evacuación</span>
+                                                    <strong style={{ color: res.tienePlanEvacuacion ? "#16a34a" : "#dc2626" }}>
+                                                        {res.tienePlanEvacuacion ? "✅ Presente" : "❌ No detectado"}
+                                                    </strong>
+                                                </div>
+                                                <div style={{ background: "white", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #fed7aa" }}>
+                                                    <span style={{ color: "var(--text-muted)", fontSize: "0.7rem", display: "block" }}>Croquis / Señalética</span>
+                                                    <strong style={{ color: res.tieneCroquisSenaletica ? "#16a34a" : "#dc2626" }}>
+                                                        {res.tieneCroquisSenaletica ? "✅ Presente" : "❌ No detectado"}
+                                                    </strong>
+                                                </div>
+                                                <div style={{ background: "white", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #fed7aa" }}>
+                                                    <span style={{ color: "var(--text-muted)", fontSize: "0.7rem", display: "block" }}>Directorio Emergencias</span>
+                                                    <strong style={{ color: res.tieneDirectorioEmergencias ? "#16a34a" : "#dc2626" }}>
+                                                        {res.tieneDirectorioEmergencias ? "✅ Presente" : "❌ No detectado"}
+                                                    </strong>
+                                                </div>
+                                            </div>
+
+                                            {res.explicacion && (
+                                                <div style={{ marginTop: "0.5rem", color: "#4b5563", fontSize: "0.75rem" }}>
+                                                    <strong>Observaciones:</strong> {res.explicacion}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                }
+
+                                if (res.tipo === "SEGUROS") {
+                                    return (
+                                        <div style={{
+                                            marginBottom: "1rem", padding: "0.75rem", borderRadius: "8px",
+                                            border: res.tieneIncidencias || res.aprobado === false ? "1px solid #fecaca" : "1px solid #e9d5ff",
+                                            background: res.tieneIncidencias || res.aprobado === false ? "#fdf2f2" : "#faf5ff", fontSize: "0.8125rem"
+                                        }}>
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                                                <h4 style={{ margin: 0, color: "#7e22ce", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                                                    🛡️ Pre-Revisión: Seguros y Reporte de Siniestros
+                                                </h4>
+                                                <span style={{ fontWeight: 700, background: "white", padding: "0.15rem 0.4rem", borderRadius: "4px", border: "1px solid #d8b4fe", color: "#6b21a8" }}>
+                                                    {res.puntuacion || "Evaluado"}
+                                                </span>
+                                            </div>
+
+                                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                                                <div style={{ background: "white", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #f3e8ff" }}>
+                                                    <span style={{ color: "var(--text-muted)", fontSize: "0.7rem", display: "block" }}>Tipo de Siniestro</span>
+                                                    <strong style={{ color: "#6b21a8" }}>{res.tipoSiniestroReportado || "Cero siniestros / Informativo"}</strong>
+                                                </div>
+                                                <div style={{ background: "white", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #f3e8ff" }}>
+                                                    <span style={{ color: "var(--text-muted)", fontSize: "0.7rem", display: "block" }}>Póliza Referenciada</span>
+                                                    <strong style={{ color: res.tienePolizaReferenciada ? "#16a34a" : "#dc2626" }}>
+                                                        {res.tienePolizaReferenciada ? "✅ Sí" : "❌ No"}
+                                                    </strong>
+                                                </div>
+                                                <div style={{ background: "white", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #f3e8ff" }}>
+                                                    <span style={{ color: "var(--text-muted)", fontSize: "0.7rem", display: "block" }}>Evidencia de Soporte</span>
+                                                    <strong style={{ color: res.tieneEvidenciaSoporte ? "#16a34a" : "#dc2626" }}>
+                                                        {res.tieneEvidenciaSoporte ? "✅ Sí" : "❌ No"}
+                                                    </strong>
+                                                </div>
+                                            </div>
+
+                                            {res.explicacion && (
+                                                <div style={{ marginTop: "0.5rem", color: "#4b5563", fontSize: "0.75rem" }}>
+                                                    <strong>Observaciones:</strong> {res.explicacion}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                }
+
+                                if (res.explicacion) {
+                                    return (
+                                        <div style={{
+                                            marginBottom: "1rem", padding: "0.75rem", borderRadius: "8px",
+                                            border: res.tieneIncidencias || res.aprobado === false ? "1px solid #fecaca" : "1px solid #bfdbfe",
+                                            background: res.tieneIncidencias || res.aprobado === false ? "#fdf2f2" : "#eff6ff", fontSize: "0.8125rem"
+                                        }}>
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                                                <h4 style={{ margin: 0, color: "#1e40af", fontWeight: 700 }}>
+                                                    🔍 Observaciones de la Supervisión ({res.tipo})
+                                                </h4>
+                                                {res.puntuacion && (
+                                                    <span style={{ fontWeight: 700, background: "white", padding: "0.15rem 0.4rem", borderRadius: "4px", border: "1px solid var(--border)" }}>
+                                                        {res.puntuacion}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p style={{ margin: 0, color: "#374151" }}>{res.explicacion}</p>
+                                        </div>
+                                    );
+                                }
+
                                 return null;
                             })()}
 

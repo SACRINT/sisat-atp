@@ -162,6 +162,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const aulas = await prisma.horarioAula.findMany({ where: { escuelaId } });
+
     // 5. Si es factible y requiere re-optimización mediante Solver
     let huboReGeneracion = false;
 
@@ -187,21 +189,22 @@ export async function POST(req: NextRequest) {
             restriccionMaxHrsDia,
             grupos: grupos.map(g => ({ id: g.id, nombre: g.nombre, semestre: g.semestre })),
             docentes: docentes.map(d => ({ id: d.id, nombreCompleto: `${d.nombre} ${d.apellidoPaterno}`.trim() })),
-            aulas: [],
+            aulas: aulas.map(a => ({ id: a.id, nombre: a.nombre, tipo: a.tipo })),
             cargas: cargas.map(c => ({
               id: c.id,
               docenteId: c.personalId,
               grupoId: c.grupoId,
               asignaturaId: c.asignaturaId,
               horasSemanales: c.horasSemanales,
-              requiereAulaEspecial: c.requiereAulaEspecial
+              requiereAulaEspecial: c.requiereAulaEspecial,
+              aulaEspecialId: c.aulaEspecialId || undefined
             })),
             celdasFijas: celdasFijasExistentes,
             restriccionesDocentes: accion.bloqueosDocentes || [],
             slotsLibresBloqueados
           });
 
-          if (resultadoSolver.celdas && resultadoSolver.celdas.length > 0) {
+          if (resultadoSolver.exito && resultadoSolver.celdas && resultadoSolver.celdas.length > 0) {
             await prisma.horarioCelda.deleteMany({ where: { horarioId } });
             await prisma.horarioCelda.createMany({
               data: resultadoSolver.celdas.map(c => ({
@@ -216,7 +219,18 @@ export async function POST(req: NextRequest) {
                 esBloqueado: !!c.esBloqueado
               }))
             });
+            await prisma.horarioGenerado.update({
+              where: { id: horarioId },
+              data: {
+                scoreMetricas: {
+                  ...resultadoSolver.metricas,
+                  slotsLibresBloqueados
+                }
+              }
+            });
             huboReGeneracion = true;
+          } else {
+            console.warn(`[api/horarios/chat] Solver reportó no-éxito (${resultadoSolver.celdas?.length || 0} celdas generadas de ${resultadoSolver.metricas?.totalClasesRequeridas || 0} requeridas). Se mantiene el horario previo.`);
           }
         }
       }
