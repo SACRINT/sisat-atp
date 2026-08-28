@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { horarioId, mensaje } = body;
+    const { horarioId, mensaje, slotsLibresBloqueados: clientSlots, celdas: clientCeldas } = body;
 
     if (!horarioId || !mensaje) {
       return NextResponse.json({ error: "horarioId y mensaje son requeridos" }, { status: 400 });
@@ -48,11 +48,15 @@ export async function POST(req: NextRequest) {
 
     const escuelaId = horario.escuelaId;
 
-    // Extraer slotsLibresBloqueados desde scoreMetricas del horario
+    // Extraer y combinar slotsLibresBloqueados desde scoreMetricas y desde el cliente
     const scoreMetricas = (horario.scoreMetricas as any) || {};
-    const slotsLibresBloqueados: string[] = Array.isArray(scoreMetricas.slotsLibresBloqueados)
+    const dbSlots: string[] = Array.isArray(scoreMetricas.slotsLibresBloqueados)
       ? scoreMetricas.slotsLibresBloqueados
       : [];
+    const clientSlotsArr: string[] = Array.isArray(clientSlots)
+      ? clientSlots
+      : [];
+    let slotsLibresBloqueados: string[] = Array.from(new Set([...dbSlots, ...clientSlotsArr]));
 
     // Cargar datos de la escuela y cargas actuales
     const config = await prisma.horarioConfiguracion.findUnique({ where: { escuelaId } });
@@ -64,9 +68,13 @@ export async function POST(req: NextRequest) {
     const cargas = await prisma.horarioCargaDocente.findMany({ where: { escuelaId } });
 
     // Calcular horas asignadas reales a cada docente para la validación de factibilidad
+    const celdasParaCalculo = (Array.isArray(clientCeldas) && clientCeldas.length > 0)
+      ? clientCeldas
+      : horario.celdas;
+
     const docentesConHoras = docentes.map((d) => {
-      const hrsAsignadas = horario.celdas
-        .filter((c) => c.docenteId === d.id)
+      const hrsAsignadas = celdasParaCalculo
+        .filter((c: any) => c.docenteId === d.id)
         .length; // cada celda es 1 hora lectiva
       return {
         id: d.id,
@@ -96,7 +104,7 @@ export async function POST(req: NextRequest) {
         grupos: grupos.map(g => ({ id: g.id, nombre: g.nombre })),
         docentes: docentesConHoras,
         materias: materias.map(m => ({ id: m.id, nombre: m.uacName })),
-        celdasActuales: horario.celdas,
+        celdasActuales: celdasParaCalculo,
         slotsLibresBloqueados,
         historialConversacion
       },
@@ -170,9 +178,9 @@ export async function POST(req: NextRequest) {
     if (respuestaIA.acciones && respuestaIA.acciones.length > 0) {
       for (const accion of respuestaIA.acciones) {
         if (accion.tipo === "REGENERAR_CON_RESTRICCIONES") {
-          const celdasFijasExistentes = horario.celdas
-            .filter((c) => c.esBloqueado)
-            .map((c) => ({
+          const celdasFijasExistentes = celdasParaCalculo
+            .filter((c: any) => c.esBloqueado)
+            .map((c: any) => ({
               diaSemana: c.diaSemana,
               periodo: c.periodo,
               grupoId: c.grupoId,
@@ -183,11 +191,55 @@ export async function POST(req: NextRequest) {
 
           const restriccionMaxHrsDia = accion.restriccionDistribucion === "MAX_1_HR_DIA" ? 1 : 2;
 
+          // Si la IA generó bloqueos específicos a docentes, acumularlos en slotsLibresBloqueados
+          const horasDiaConfig = config?.horasPorDia || 6;
+          if (accion.bloqueosDocentes && Array.isArray(accion.bloqueosDocentes)) {
+            for (const bd of accion.bloqueosDocentes) {
+              if (bd.diasIndisponibles && Array.isArray(bd.diasIndisponibles)) {
+                for (const d of bd.diasIndisponibles) {
+                  for (let p = 1; p <= horasDiaConfig; p++) {
+                    slotsLibresBloqueados.push(`${d}_${p}_${bd.docenteId}`);
+                  }
+                }
+              }
+              if (bd.periodosIndisponibles && Array.isArray(bd.periodosIndisponibles)) {
+                for (const pi of bd.periodosIndisponibles) {
+                  slotsLibresBloqueados.push(`${pi.dia}_${pi.periodo}_${bd.docenteId}`);
+                }
+              }
+            }
+          }
+
+          // Si la IA generó bloqueos específicos a grupos, acumularlos en slotsLibresBloqueados
+          if (accion.bloqueosGrupos && Array.isArray(accion.bloqueosGrupos)) {
+            for (const bg of accion.bloqueosGrupos) {
+              if (bg.diasIndisponibles && Array.isArray(bg.diasIndisponibles)) {
+                for (const d of bg.diasIndisponibles) {
+                  for (let p = 1; p <= horasDiaConfig; p++) {
+                    slotsLibresBloqueados.push(`${d}_${p}_${bg.grupoId}`);
+                  }
+                }
+              }
+              if (bg.periodosIndisponibles && Array.isArray(bg.periodosIndisponibles)) {
+                for (const pi of bg.periodosIndisponibles) {
+                  slotsLibresBloqueados.push(`${pi.dia}_${pi.periodo}_${bg.grupoId}`);
+                }
+              }
+            }
+          }
+
+          slotsLibresBloqueados = Array.from(new Set(slotsLibresBloqueados));
+
           const resultadoSolver = resolverHorario({
             diasLectivos: config?.diasLectivos || 5,
             horasPorDia: config?.horasPorDia || 6,
             restriccionMaxHrsDia,
-            grupos: grupos.map(g => ({ id: g.id, nombre: g.nombre, semestre: g.semestre })),
+            grupos: grupos.map(g => ({
+              id: g.id,
+              nombre: g.nombre,
+              semestre: g.semestre,
+              horasPorDia: (g as any).horasPorDia || (g.semestre === 1 ? 5 : config?.horasPorDia || 6)
+            })),
             docentes: docentes.map(d => ({ id: d.id, nombreCompleto: `${d.nombre} ${d.apellidoPaterno}`.trim() })),
             aulas: aulas.map(a => ({ id: a.id, nombre: a.nombre, tipo: a.tipo })),
             cargas: cargas.map(c => ({

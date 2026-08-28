@@ -1,8 +1,21 @@
 import { callGemini } from "@/lib/gemini";
 
+export interface BloqueoDocenteIA {
+  docenteId: string;
+  diasIndisponibles?: number[];
+  periodosIndisponibles?: { dia: number; periodo: number }[];
+}
+
+export interface BloqueoGrupoIA {
+  grupoId: string;
+  diasIndisponibles?: number[];
+  periodosIndisponibles?: { dia: number; periodo: number }[];
+}
+
 export interface AccionHorario {
   tipo: "REGENERAR_CON_RESTRICCIONES" | "MOVER_CELDA" | "FIJAR_CELDA";
-  bloqueosDocentes?: { docenteId: string; diasIndisponibles?: number[] }[];
+  bloqueosDocentes?: BloqueoDocenteIA[];
+  bloqueosGrupos?: BloqueoGrupoIA[];
   restriccionDistribucion?: "MAX_1_HR_DIA";
   grupoId?: string;
   docenteId?: string;
@@ -39,8 +52,8 @@ Tu tarea es analizar en lenguaje natural los comandos de directores, VALIDAR LA 
 
 REGLAS DE BLOQUEO DE HORAS LIBRES (ESTRICTO E INVIOLABLE):
 - El director ha fijado previamente horas libres y bloqueos con candado (🔒).
-- Las horas libres bloqueadas NUNCA deben asignarse a ninguna materia.
-- Si el usuario dice "respeta las horas libres bloqueadas", debes confirmarle que el Solver las mantendrá estrictamente protegidas como intocables.
+- Las horas libres bloqueadas NUNCA deben asignarse a ninguna materia bajo ninguna circunstancia.
+- Si el usuario dice "respeta las horas libres bloqueadas" o pide bloquear días/horas adicionales a docentes o grupos, DEBES incluir esas restricciones explícitamente en 'bloqueosDocentes' o 'bloqueosGrupos'.
 
 IMPORTANTE SOBRE LA MEMORIA CONVERSACIONAL:
 - Si el usuario te da una nueva instrucción, DEBES acumularla con las instrucciones anteriores del historial.
@@ -52,14 +65,17 @@ REGLA DE VALIDACIÓN MATEMÁTICA DE DÍAS LIBRES (CRÍTICO):
    - Capacidad máxima de horas en 4 días = 4 × horasPorDia (ej: 4 × 6 = 24 horas).
    - Compara las 'horasAsignadas' del docente con la capacidad máxima:
      * Si horasAsignadas > capacidadMáxima (ej: 25 hrs > 24 hrs): ES MATEMÁTICAMENTE IMPOSIBLE otorgar el día entero libre.
-     * En este caso DEBES responder con "factible": false, "acciones": [] y explicar claramente al director.
+     * En este caso DEBES responder con "factible": false, "acciones": [] y explicar claramente al director por qué excede la capacidad máxima semanal.
 
 2. Si piden distribuir asignaturas "equitativamente" o "1 hora por día":
    - Agrega a la acción la propiedad "restriccionDistribucion": "MAX_1_HR_DIA".
 
+3. Si piden bloquear horas o periodos específicos (ej: "no pongas clases en la 6ta hora a Nemorio el viernes"):
+   - Agrega en 'bloqueosDocentes' el 'docenteId' con 'periodosIndisponibles': [{ "dia": 5, "periodo": 6 }].
+
 FORMATO DE RESPUESTA OBLIGATORIO (JSON ESTRICTO):
 {
-  "explicacion": "Explicación amable y profesional sobre la factibilidad y las acciones aplicadas, mencionando que conservas los cambios previos y los bloqueos de horas libres",
+  "explicacion": "Explicación amable y profesional sobre la factibilidad y las acciones aplicadas, confirmando explícitamente que se respetan los bloqueos de horas libres solicitados",
   "factible": true | false,
   "advertencia": "Advertencia en caso de colisión o nulo",
   "acciones": [
@@ -69,7 +85,15 @@ FORMATO DE RESPUESTA OBLIGATORIO (JSON ESTRICTO):
       "bloqueosDocentes": [
         {
           "docenteId": "ID_DEL_DOCENTE",
-          "diasIndisponibles": [3]
+          "diasIndisponibles": [3],
+          "periodosIndisponibles": [{ "dia": 5, "periodo": 6 }]
+        }
+      ],
+      "bloqueosGrupos": [
+        {
+          "grupoId": "ID_DEL_GRUPO",
+          "diasIndisponibles": [],
+          "periodosIndisponibles": []
         }
       ]
     }
@@ -80,8 +104,24 @@ FORMATO DE RESPUESTA OBLIGATORIO (JSON ESTRICTO):
     ? `\nHISTORIAL DE LA CONVERSACIÓN (¡Conserva y acumula estas peticiones si son restricciones!):\n${contextoHorario.historialConversacion.map(m => `${m.role === 'user' ? 'DIRECTOR' : 'ASISTENTE'}: ${m.content}`).join('\n')}`
     : "";
 
-  const slotsLibresInfo = contextoHorario.slotsLibresBloqueados && contextoHorario.slotsLibresBloqueados.length > 0
-    ? `\nSLOTS LIBRES BLOQUEADOS POR EL DIRECTOR (INTOCABLES): ${JSON.stringify(contextoHorario.slotsLibresBloqueados)}`
+  const diasNombres = ["", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+  const slotsLegibles = (contextoHorario.slotsLibresBloqueados || []).map(key => {
+    const parts = key.split("_");
+    if (parts.length >= 3) {
+      const dia = parseInt(parts[0], 10);
+      const periodo = parseInt(parts[1], 10);
+      const filtroId = parts.slice(2).join("_");
+      const doc = contextoHorario.docentes.find(d => d.id === filtroId);
+      if (doc) return `• ${diasNombres[dia] || `Día ${dia}`} Periodo ${periodo}: Docente ${doc.nombreCompleto} (ID: ${doc.id}) [BLOQUEADO INTOCABLE]`;
+      const grp = contextoHorario.grupos.find(g => g.id === filtroId);
+      if (grp) return `• ${diasNombres[dia] || `Día ${dia}`} Periodo ${periodo}: Grupo ${grp.nombre} (ID: ${grp.id}) [BLOQUEADO INTOCABLE]`;
+      return `• ${diasNombres[dia] || `Día ${dia}`} Periodo ${periodo}: ID ${filtroId} [BLOQUEADO INTOCABLE]`;
+    }
+    return `• ${key} [BLOQUEADO INTOCABLE]`;
+  });
+
+  const slotsLibresInfo = slotsLegibles.length > 0
+    ? `\nSLOTS LIBRES BLOQUEADOS POR EL DIRECTOR EN LA RETÍCULA (INVIOLABLES, PROHIBIDO ASIGNAR MATERIAS AQUÍ):\n${slotsLegibles.join('\n')}`
     : "";
 
   const prompt = `

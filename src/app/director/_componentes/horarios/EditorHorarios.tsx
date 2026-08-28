@@ -319,13 +319,24 @@ export default function EditorHorarios({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           horarioId: horario.id,
-          mensaje: userMsg
+          mensaje: userMsg,
+          slotsLibresBloqueados: Array.from(slotsLibresBloqueados),
+          celdas: horario.celdas
         })
       });
 
       const data = await res.json();
       if (data.success) {
         setHorario(data.horario);
+        if (data.horario?.scoreMetricas?.slotsLibresBloqueados && Array.isArray(data.horario.scoreMetricas.slotsLibresBloqueados)) {
+          const nuevosSlots = new Set<string>(data.horario.scoreMetricas.slotsLibresBloqueados);
+          setSlotsLibresBloqueados(nuevosSlots);
+          if (typeof window !== "undefined" && escuela?.id && horario?.id) {
+            try {
+              localStorage.setItem(`horarios_slots_libres_${escuela.id}_${horario.id}`, JSON.stringify(Array.from(nuevosSlots)));
+            } catch (e) {}
+          }
+        }
         setChatHistorial(data.horario.mensajesChat || []);
         setHayCambiosSinGuardar(false);
         toast.success("Ajuste procesado por el Asistente IA");
@@ -394,7 +405,8 @@ export default function EditorHorarios({
       targetDia,
       targetPeriodo,
       numHorasPorDia,
-      slotsLibresBloqueados
+      slotsLibresBloqueados,
+      grupos
     );
 
     if (!resultado.success) {
@@ -906,13 +918,21 @@ export default function EditorHorarios({
                                   </p>
                                   <button
                                     onClick={(e) => toggleBloquearCelda(celda, e)}
-                                    title={celda.esBloqueado ? "Celda bloqueada (Haga clic para desbloquear)" : "Fijar celda para que la IA no la mueva"}
-                                    style={{ background: "none", border: "none", cursor: "pointer", padding: "0 2px" }}
+                                    title={celda.esBloqueado ? "🔒 Celda protegida con candado (Clic para desbloquear)" : "Clic para fijar con candado"}
+                                    style={{
+                                      background: celda.esBloqueado ? "#fef3c7" : "transparent",
+                                      borderRadius: "4px",
+                                      border: celda.esBloqueado ? "1px solid #f59e0b" : "none",
+                                      cursor: "pointer",
+                                      padding: "1px 3px",
+                                      display: "inline-flex",
+                                      alignItems: "center"
+                                    }}
                                   >
                                     {celda.esBloqueado ? (
-                                      <Lock style={{ width: "13px", height: "13px", color: "#d97706" }} />
+                                      <Lock style={{ width: "12px", height: "12px", color: "#d97706" }} />
                                     ) : (
-                                      <Unlock style={{ width: "13px", height: "13px", color: "#94a3b8" }} />
+                                      <Unlock style={{ width: "11px", height: "11px", color: "#94a3b8", opacity: 0.3 }} />
                                     )}
                                   </button>
                                 </div>
