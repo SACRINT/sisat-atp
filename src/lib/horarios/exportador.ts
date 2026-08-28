@@ -372,62 +372,114 @@ export function exportarHorarioPDF(datos: DatosExportacionHorario) {
 // EXPORTACIÓN A WORD (.DOCX) — Formato editable
 // =========================================================================
 export async function exportarHorarioDOCX(datos: DatosExportacionHorario) {
-  const sections: any[] = [];
+  const sections = datos.filas.map((fila) => {
+    const children: any[] = [];
 
-  for (const fila of datos.filas) {
-    // Encabezado institucional formal
-    sections.push(
+    // 1. Encabezado institucional formal (Exactamente las 6 líneas oficiales sin duplicación)
+    children.push(
       new Paragraph({
-        text: "GOBIERNO DEL ESTADO DE PUEBLA",
-        heading: HeadingLevel.HEADING_2,
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: "GOBIERNO DEL ESTADO DE PUEBLA", bold: true, size: 24, color: "1e3a8a" })]
+        spacing: { after: 40 },
+        children: [
+          new TextRun({
+            text: "DIRECCIÓN DE BACHILLERATOS GENERALES",
+            bold: true,
+            size: 22,
+            color: "1e293b"
+          })
+        ]
       }),
       new Paragraph({
-        text: "SECRETARÍA DE EDUCACIÓN PÚBLICA | SUBSECRETARÍA DE EDUCACIÓN OBLIGATORIA",
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: "SECRETARÍA DE EDUCACIÓN PÚBLICA | SUBSECRETARÍA DE EDUCACIÓN OBLIGATORIA", bold: false, size: 18, color: "475569" })]
+        spacing: { after: 40 },
+        children: [
+          new TextRun({
+            text: `SUPERVISIÓN ESCOLAR ZONA ${datos.zonaEscolar || "004"}`,
+            bold: true,
+            size: 20,
+            color: "1e293b"
+          })
+        ]
       }),
       new Paragraph({
-        text: "SUPERVISIÓN ESCOLAR DE BACHILLERATOS GENERALES ZONA ESCOLAR 004",
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: "DIRECCIÓN DE BACHILLERATOS GENERALES | SUPERVISIÓN ESCOLAR ZONA 004", bold: true, size: 18, color: "475569" })]
+        spacing: { after: 40 },
+        children: [
+          new TextRun({
+            text: `PLANTEL: ${datos.nombreEscuela.toUpperCase()}`,
+            bold: true,
+            size: 22,
+            color: "0f172a"
+          })
+        ]
       }),
       new Paragraph({
-        text: `PLANTEL: ${datos.nombreEscuela.toUpperCase()} (CCT: ${datos.cct})`,
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: `PLANTEL: ${datos.nombreEscuela.toUpperCase()} (CCT: ${datos.cct})`, bold: true, size: 20, color: "0f172a" })]
+        spacing: { after: 40 },
+        children: [
+          new TextRun({
+            text: `CCT: ${datos.cct.toUpperCase()}`,
+            bold: true,
+            size: 20,
+            color: "0f172a"
+          })
+        ]
       }),
       new Paragraph({
-        text: `${fila.encabezado.toUpperCase()} ${fila.subtitulo ? " - " + fila.subtitulo : ""}`,
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: `${fila.encabezado.toUpperCase()} ${fila.subtitulo ? " - " + fila.subtitulo : ""}`, bold: true, size: 22, color: "1e3a8a" })]
+        spacing: { after: 40 },
+        children: [
+          new TextRun({
+            text: fila.encabezado.toUpperCase().startsWith("DOCENTE") || fila.encabezado.toUpperCase().startsWith("GRUPO") || fila.encabezado.toUpperCase().startsWith("AULA")
+              ? fila.encabezado.toUpperCase()
+              : `DOCENTE: ${fila.encabezado.toUpperCase()}`,
+            bold: true,
+            size: 22,
+            color: "1e3a8a"
+          })
+        ]
       }),
       new Paragraph({
-        text: `${datos.tituloTabla.toUpperCase()} • CICLO ESCOLAR ${datos.cicloEscolar || "2026-2027"}`,
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: `${datos.tituloTabla.toUpperCase()} • CICLO ESCOLAR ${datos.cicloEscolar || "2026-2027"}`, bold: false, size: 18, color: "64748b" })]
-      }),
-      new Paragraph({ text: "" })
+        spacing: { after: 180 },
+        children: [
+          new TextRun({
+            text: `CICLO ESCOLAR ${datos.cicloEscolar || "2026-2027"}`,
+            bold: true,
+            size: 18,
+            color: "475569"
+          })
+        ]
+      })
     );
 
-    // Cabecera de la tabla: Periodo | Lunes | Martes | ... | Viernes
+    // 2. Cabecera de la tabla: Periodo | Lunes | Martes | ... | Viernes
     const headerCells = ["Periodo", ...datos.dias].map(
       (d) =>
         new TableCell({
-          children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: d.toUpperCase(), bold: true, size: 17, color: "FFFFFF" })] })],
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [new TextRun({ text: d.toUpperCase(), bold: true, size: 17, color: "FFFFFF" })]
+            })
+          ],
           shading: { type: ShadingType.SOLID, color: "1e3a8a", fill: "1e3a8a" },
           width: { size: d === "Periodo" ? 1500 : 2000, type: WidthType.DXA }
         })
     );
     const headerRow = new TableRow({ children: headerCells, tableHeader: true });
 
-    // Filas de datos
+    // 3. Filas de datos
     const bodyRows: TableRow[] = [];
     for (let p = 0; p < datos.periodos.length; p++) {
       const cells: TableCell[] = [
         new TableCell({
-          children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `Hora ${p + 1}`, bold: true, size: 16, color: "1e3a8a" })] })],
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [new TextRun({ text: `Hora ${p + 1}`, bold: true, size: 16, color: "1e3a8a" })]
+            })
+          ],
           shading: { type: ShadingType.SOLID, color: "f1f5f9", fill: "f1f5f9" },
           width: { size: 1500, type: WidthType.DXA }
         })
@@ -446,13 +498,25 @@ export async function exportarHorarioDOCX(datos: DatosExportacionHorario) {
           if (val.materia) textoLineas.push(val.materia);
           if (val.docente && !fila.encabezado.startsWith("DOCENTE")) textoLineas.push(`Doc: ${val.docente}`);
           if (val.grupo && !fila.encabezado.startsWith("GRUPO")) textoLineas.push(`Gpo: ${val.grupo}`);
+          if (val.aula) textoLineas.push(`Aula: ${val.aula}`);
         }
 
         const esLibre = textoLineas[0] === "Libre";
         cells.push(
           new TableCell({
             children: textoLineas.map(
-              (l, idx) => new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: l, bold: idx === 0 && !esLibre, size: 15, color: esLibre ? "94a3b8" : "0f172a" })] })
+              (l, idx) =>
+                new Paragraph({
+                  alignment: AlignmentType.CENTER,
+                  children: [
+                    new TextRun({
+                      text: l,
+                      bold: idx === 0 && !esLibre,
+                      size: 15,
+                      color: esLibre ? "94a3b8" : "0f172a"
+                    })
+                  ]
+                })
             ),
             shading: esLibre ? undefined : { type: ShadingType.SOLID, color: "f0f9ff", fill: "f0f9ff" },
             width: { size: 2000, type: WidthType.DXA }
@@ -473,38 +537,65 @@ export async function exportarHorarioDOCX(datos: DatosExportacionHorario) {
       }
     });
 
-    // Tabla de Firmas en 3 Columnas
+    // 4. Tabla de Firmas en 3 Columnas
     const tablaFirmas = new Table({
       rows: [
         new TableRow({
           children: [
             new TableCell({
               children: [
-                new Paragraph({ text: "" }),
-                new Paragraph({ text: "" }),
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "____________________________________", bold: false, size: 16, color: "64748b" })] }),
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: fila.encabezado.startsWith("DOCENTE") ? "DOCENTE DE LA ASIGNATURA" : "ASESOR / TITULAR DE GRUPO", bold: true, size: 16, color: "1e3a8a" })] }),
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Nombre y Firma", size: 14, color: "64748b" })] })
+                new Paragraph({ children: [] }),
+                new Paragraph({ children: [] }),
+                new Paragraph({
+                  alignment: AlignmentType.CENTER,
+                  children: [new TextRun({ text: "____________________________________", bold: false, size: 16, color: "64748b" })]
+                }),
+                new Paragraph({
+                  alignment: AlignmentType.CENTER,
+                  children: [new TextRun({ text: fila.encabezado.startsWith("DOCENTE") ? "DOCENTE DE LA ASIGNATURA" : "ASESOR / TITULAR DE GRUPO", bold: true, size: 16, color: "1e3a8a" })]
+                }),
+                new Paragraph({
+                  alignment: AlignmentType.CENTER,
+                  children: [new TextRun({ text: "Nombre y Firma", size: 14, color: "64748b" })]
+                })
               ],
               width: { size: 33, type: WidthType.PERCENTAGE }
             }),
             new TableCell({
               children: [
-                new Paragraph({ text: "" }),
-                new Paragraph({ text: "" }),
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "____________________________________", bold: false, size: 16, color: "64748b" })] }),
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "DIRECCIÓN DEL PLANTEL", bold: true, size: 16, color: "1e3a8a" })] }),
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Sello y Firma Oficial", size: 14, color: "64748b" })] })
+                new Paragraph({ children: [] }),
+                new Paragraph({ children: [] }),
+                new Paragraph({
+                  alignment: AlignmentType.CENTER,
+                  children: [new TextRun({ text: "____________________________________", bold: false, size: 16, color: "64748b" })]
+                }),
+                new Paragraph({
+                  alignment: AlignmentType.CENTER,
+                  children: [new TextRun({ text: "DIRECCIÓN DEL PLANTEL", bold: true, size: 16, color: "1e3a8a" })]
+                }),
+                new Paragraph({
+                  alignment: AlignmentType.CENTER,
+                  children: [new TextRun({ text: "Sello y Firma Oficial", size: 14, color: "64748b" })]
+                })
               ],
               width: { size: 34, type: WidthType.PERCENTAGE }
             }),
             new TableCell({
               children: [
-                new Paragraph({ text: "" }),
-                new Paragraph({ text: "" }),
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "____________________________________", bold: false, size: 16, color: "64748b" })] }),
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "SUPERVISIÓN ESCOLAR ZONA 004", bold: true, size: 16, color: "1e3a8a" })] }),
-                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Vo. Bo. Supervisión Escolar", size: 14, color: "64748b" })] })
+                new Paragraph({ children: [] }),
+                new Paragraph({ children: [] }),
+                new Paragraph({
+                  alignment: AlignmentType.CENTER,
+                  children: [new TextRun({ text: "____________________________________", bold: false, size: 16, color: "64748b" })]
+                }),
+                new Paragraph({
+                  alignment: AlignmentType.CENTER,
+                  children: [new TextRun({ text: `SUPERVISIÓN ESCOLAR ZONA ${datos.zonaEscolar || "004"}`, bold: true, size: 16, color: "1e3a8a" })]
+                }),
+                new Paragraph({
+                  alignment: AlignmentType.CENTER,
+                  children: [new TextRun({ text: "Vo. Bo. Supervisión Escolar", size: 14, color: "64748b" })]
+                })
               ],
               width: { size: 33, type: WidthType.PERCENTAGE }
             })
@@ -514,11 +605,29 @@ export async function exportarHorarioDOCX(datos: DatosExportacionHorario) {
       width: { size: 100, type: WidthType.PERCENTAGE }
     });
 
-    sections.push(tabla, new Paragraph({ text: "" }), tablaFirmas, new Paragraph({ text: "" }));
-  }
+    children.push(
+      tabla,
+      new Paragraph({ spacing: { before: 120, after: 120 }, children: [] }),
+      tablaFirmas
+    );
+
+    return {
+      properties: {
+        page: {
+          margin: {
+            top: 720,
+            bottom: 720,
+            left: 720,
+            right: 720
+          }
+        }
+      },
+      children
+    };
+  });
 
   const doc = new Document({
-    sections: [{ children: sections }]
+    sections
   });
 
   const buffer = await Packer.toBlob(doc);

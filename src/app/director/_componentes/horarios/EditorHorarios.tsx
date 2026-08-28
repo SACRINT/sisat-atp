@@ -508,7 +508,7 @@ export default function EditorHorarios({
             }
           }
         }
-        filasExport.push({ encabezado: `GRUPO ${g?.nombre || ""}`, celdas: celdasMapa });
+        filasExport.push({ encabezado: `GRUPO: ${g?.nombre || ""}`, celdas: celdasMapa });
       } else if (vistaTab === "DOCENTE") {
         const dObj = docentes.find(item => item.id === docenteSeleccionadoId);
         const nomDoc = dObj ? `${dObj.nombre} ${dObj.apellidoPaterno || ""}`.trim() : "DOCENTE";
@@ -559,13 +559,15 @@ export default function EditorHorarios({
             }
           }
         }
-        filasExport.push({ encabezado: `GRUPO ${g.nombre}`, celdas: celdasMapa });
+        filasExport.push({ encabezado: `GRUPO: ${g.nombre}`, celdas: celdasMapa });
       }
     }
 
     const payload = {
       nombreEscuela: escuela.nombre,
       cct: escuela.cct || "CCT",
+      zonaEscolar: (escuela as any).zona || "004",
+      cicloEscolar: (horario as any)?.cicloEscolar?.nombre || "2026-2027",
       tipoVista: tipoVistaPDF,
       tituloTabla,
       dias: diasLectivos,
