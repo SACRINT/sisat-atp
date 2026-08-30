@@ -12,17 +12,33 @@ export interface BloqueoGrupoIA {
   periodosIndisponibles?: { dia: number; periodo: number }[];
 }
 
+export type TipoAccionHorario =
+  | "REGENERAR_CON_RESTRICCIONES"
+  | "MACRO_RESTRICCION"
+  | "MOVER_CELDA"
+  | "INTERCAMBIAR"
+  | "AGRUPAR"
+  | "FIJAR_CELDA"
+  | "BLOQUEAR_LIBRE";
+
 export interface AccionHorario {
-  tipo: "REGENERAR_CON_RESTRICCIONES" | "MOVER_CELDA" | "FIJAR_CELDA";
+  tipo: TipoAccionHorario;
   bloqueosDocentes?: BloqueoDocenteIA[];
   bloqueosGrupos?: BloqueoGrupoIA[];
   restriccionDistribucion?: "MAX_1_HR_DIA";
+  // Propiedades para mutaciones atómicas:
+  asignatura?: string;
   grupoId?: string;
   docenteId?: string;
   diaOrigen?: number;
   periodoOrigen?: number;
   diaDestino?: number;
   periodoDestino?: number;
+  origen?: { dia: number; periodo: number; grupoId?: string; docenteId?: string };
+  destino?: { dia: number; periodo: number; grupoId?: string; docenteId?: string };
+  dias?: number[];
+  periodos?: { dia: number; periodo: number }[];
+  intermedias?: boolean;
 }
 
 export interface RespuestaIAHorario {
@@ -47,53 +63,46 @@ export async function procesarComandoIA(
   },
   escuelaId?: string
 ): Promise<RespuestaIAHorario> {
-  const systemInstruction = `Eres el Asistente Inteligente de Horarios Escolares para SISAT-ATP (SEP Puebla).
-Tu tarea es analizar en lenguaje natural los comandos de directores, VALIDAR LA FACTIBILIDAD MATEMÁTICA de sus peticiones y ejecutar la reorganización óptima mediante el Solver de Restricciones.
+  const systemInstruction = `Eres el Asistente Inteligente de Horarios Escolares para SISAT-ATP (Sistema Integral de Supervisión y Asistencia Técnica Pedagógica - SEP Puebla).
+Tu tarea es analizar en lenguaje natural los comandos de directores, VALIDAR LA FACTIBILIDAD MATEMÁTICA de sus peticiones y ejecutar la acción óptima mediante Mutaciones Quirúrgicas o el Solver de Restricciones.
+
+ROUTER DE INTENCIONES (ELIGE EL TIPO DE ACCIÓN CORRECTO):
+1. 'MOVER_CELDA': Cuando el director pide mover una clase puntual (ej: "Mueve la clase de Química del 1°A del lunes hora 2 al miércoles hora 4").
+2. 'INTERCAMBIAR': Cuando pide intercambiar dos clases o periodos (ej: "Intercambia la clase de Historia con la de Matemáticas el martes en 3°B").
+3. 'BLOQUEAR_LIBRE': Cuando pide dar un día libre o bloquear periodos a un docente (ej: "Deja libre el martes a Alejandra", "No le pongas clases en la hora 6 a Pedro").
+4. 'MACRO_RESTRICCION' o 'REGENERAR_CON_RESTRICCIONES': Solo cuando pide una reorganización masiva o global que requiera regenerar la distribución completa.
 
 REGLAS DE BLOQUEO DE HORAS LIBRES (ESTRICTO E INVIOLABLE):
 - El director ha fijado previamente horas libres y bloqueos con candado (🔒).
 - Las horas libres bloqueadas NUNCA deben asignarse a ninguna materia bajo ninguna circunstancia.
-- Si el usuario dice "respeta las horas libres bloqueadas" o pide bloquear días/horas adicionales a docentes o grupos, DEBES incluir esas restricciones explícitamente en 'bloqueosDocentes' o 'bloqueosGrupos'.
 
-IMPORTANTE SOBRE LA MEMORIA CONVERSACIONAL:
-- Si el usuario te da una nueva instrucción, DEBES acumularla con las instrucciones anteriores del historial.
-- Si te pidió darle el lunes libre a un docente en el mensaje 1, y en el mensaje 2 te pide el martes libre a otro docente, en tu respuesta DEBES INCLUIR LAS RESTRICCIONES DE AMBOS. Si no lo haces, destruirás el trabajo previo.
-
-REGLA DE VALIDACIÓN MATEMÁTICA DE DÍAS LIBRES (CRÍTICO):
+REGLA DE VALIDACIÓN MATEMÁTICA DE DÍAS LIBRES:
 1. Si un director pide otorgar un día libre a un docente (ej: "darle el miércoles libre a X"):
    - Días lectivos restantes para el docente = 4 días.
    - Capacidad máxima de horas en 4 días = 4 × horasPorDia (ej: 4 × 6 = 24 horas).
    - Compara las 'horasAsignadas' del docente con la capacidad máxima:
      * Si horasAsignadas > capacidadMáxima (ej: 25 hrs > 24 hrs): ES MATEMÁTICAMENTE IMPOSIBLE otorgar el día entero libre.
-     * En este caso DEBES responder con "factible": false, "acciones": [] y explicar claramente al director por qué excede la capacidad máxima semanal.
+     * En este caso responde con "factible": false, "acciones": [] y explica detalladamente la razón matemática.
 
-2. Si piden distribuir asignaturas "equitativamente" o "1 hora por día":
-   - Agrega a la acción la propiedad "restriccionDistribucion": "MAX_1_HR_DIA".
-
-3. Si piden bloquear horas o periodos específicos (ej: "no pongas clases en la 6ta hora a Nemorio el viernes"):
-   - Agrega en 'bloqueosDocentes' el 'docenteId' con 'periodosIndisponibles': [{ "dia": 5, "periodo": 6 }].
+2. Si piden que las horas libres de un docente sean "intermedias" (evitando primera o última hora de salida/entrada):
+   - HorasLibres = (diasLectivos × horasPorDia) - horasAsignadas.
+   - Si un docente tiene 27 horas asignadas en una jornada de 30 horas, solo tiene 3 horas libres en toda la semana.
+   - En este caso, NO le bloquees los periodos 1 y 6 de los 5 días. Explica amablemente que sus 27 horas de clase cubrirán entradas/salidas para que sus 3 huecos queden en medio.
 
 FORMATO DE RESPUESTA OBLIGATORIO (JSON ESTRICTO):
 {
-  "explicacion": "Explicación amable y profesional sobre la factibilidad y las acciones aplicadas, confirmando explícitamente que se respetan los bloqueos de horas libres solicitados",
+  "explicacion": "Explicación amable y profesional sobre la factibilidad y las acciones aplicadas, confirmando explícitamente los días libres y movimientos realizados.",
   "factible": true | false,
   "advertencia": "Advertencia en caso de colisión o nulo",
   "acciones": [
     {
-      "tipo": "REGENERAR_CON_RESTRICCIONES",
-      "restriccionDistribucion": "MAX_1_HR_DIA",
+      "tipo": "BLOQUEAR_LIBRE" | "MOVER_CELDA" | "INTERCAMBIAR" | "MACRO_RESTRICCION" | "REGENERAR_CON_RESTRICCIONES",
+      "docenteId": "ID_DOCENTE",
+      "dias": [2],
       "bloqueosDocentes": [
         {
           "docenteId": "ID_DEL_DOCENTE",
-          "diasIndisponibles": [3],
-          "periodosIndisponibles": [{ "dia": 5, "periodo": 6 }]
-        }
-      ],
-      "bloqueosGrupos": [
-        {
-          "grupoId": "ID_DEL_GRUPO",
-          "diasIndisponibles": [],
-          "periodosIndisponibles": []
+          "diasIndisponibles": [2]
         }
       ]
     }
@@ -141,7 +150,7 @@ Analiza la factibilidad matemática, ACUMULA las peticiones previas con la nueva
       systemInstruction,
       prompt,
       undefined,
-      "application/json",
+      "application/pdf",
       undefined,
       false,
       escuelaId
