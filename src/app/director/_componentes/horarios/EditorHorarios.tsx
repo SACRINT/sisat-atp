@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState } from "react";
 import {
@@ -88,7 +88,7 @@ export default function EditorHorarios({
   const [docenteSeleccionadoId, setDocenteSeleccionadoId] = useState<string>(docentes[0]?.id || "");
   const [aulaSeleccionadaId, setAulaSeleccionadaId] = useState<string>(aulas[0]?.id || "");
 
-  // Grupos filtrados segÃºn periodo semestral (A = 1Â°,3Â°,5Â° | B = 2Â°,4Â°,6Â°)
+  // Grupos filtrados según periodo semestral (A = 1°,3°,5° | B = 2°,4°,6°)
   const gruposVisibles = React.useMemo(() => {
     const semestresDeseados = periodoFiltro === "A" ? [1, 3, 5] : [2, 4, 6];
     const filtrados = grupos.filter((g) => semestresDeseados.includes(g.semestre));
@@ -104,7 +104,7 @@ export default function EditorHorarios({
             ...g,
             id: `virtual_${semB}_${letra}`,
             semestre: semB,
-            nombre: `${semB}Â° ${letra}`
+            nombre: `${semB}° ${letra}`
           };
         });
       }
@@ -166,7 +166,7 @@ export default function EditorHorarios({
         toast.success("Hora libre desbloqueada");
       } else {
         nuevo.add(key);
-        toast.success("ðŸ”’ Hora libre fijada â€” el sistema no colocarÃ¡ clases aquÃ­");
+        toast.success("🔒 Hora libre fijada — el sistema no colocará clases aquí");
       }
       if (typeof window !== "undefined" && escuela?.id && horario?.id) {
         try {
@@ -197,11 +197,11 @@ export default function EditorHorarios({
     if (todasBloqueadas) {
       horasDelDia.forEach(p => nuevosSlots.delete(`${diaSemana}_${p}_${filtroId}`));
       setSlotsLibresBloqueados(nuevosSlots);
-      toast.success(`DÃ­a ${diasLectivos[diaSemana - 1]} desbloqueado`);
+      toast.success(`Día ${diasLectivos[diaSemana - 1]} desbloqueado`);
     } else {
       horasDelDia.forEach(p => nuevosSlots.add(`${diaSemana}_${p}_${filtroId}`));
       setSlotsLibresBloqueados(nuevosSlots);
-      toast.success(`ðŸ”’ DÃ­a ${diasLectivos[diaSemana - 1]} completo bloqueado (${horasDelDia.length} horas protegidas)`);
+      toast.success(`🔒 Día ${diasLectivos[diaSemana - 1]} completo bloqueado (${horasDelDia.length} horas protegidas)`);
     }
 
     if (typeof window !== "undefined" && escuela?.id && horario?.id) {
@@ -211,14 +211,14 @@ export default function EditorHorarios({
     }
     setHayCambiosSinGuardar(true);
 
-    // Si se acaba de bloquear el dÃ­a y hay clases asignadas en ese dÃ­a para esta entidad, reoptimizar con Solver Global
+    // Si se acaba de bloquear el día y hay clases asignadas en ese día para esta entidad, reoptimizar con Solver Global
     const tieneClasesEnDia = (horario?.celdas || []).some(
       (c: any) => c.diaSemana === diaSemana && (normalizarId(c.docenteId) === normalizarId(filtroId) || normalizarId(c.grupoId) === normalizarId(filtroId))
     );
 
     if (!todasBloqueadas && tieneClasesEnDia) {
-      const diaNombre = diasLectivos[diaSemana - 1] || `DÃ­a ${diaSemana}`;
-      const toastId = toast.loading(`âš¡ Reubicando clases fuera del dÃ­a ${diaNombre} con Solver Global...`);
+      const diaNombre = diasLectivos[diaSemana - 1] || `Día ${diaSemana}`;
+      const toastId = toast.loading(`⚡ Reubicando clases fuera del día ${diaNombre} con Solver Global...`);
       setRegenerandoHorario(true);
       try {
         const celdasBase = (horario?.celdas || []).filter(
@@ -238,9 +238,9 @@ export default function EditorHorarios({
           setHorario(data.horario);
           if (onGuardarHorario) onGuardarHorario(data.horario);
           setHayCambiosSinGuardar(false);
-          toast.success(`âœ¨ Â¡DÃ­a ${diaNombre} bloqueado y clases reubicadas automÃ¡ticamente!`, { id: toastId, duration: 4000 });
+          toast.success(`✨ ¡Día ${diaNombre} bloqueado y clases reubicadas automáticamente!`, { id: toastId, duration: 4000 });
         } else {
-          toast.error(data.error || "No fue posible reubicar todas las clases fuera de este dÃ­a.", { id: toastId });
+          toast.error(data.error || "No fue posible reubicar todas las clases fuera de este día.", { id: toastId });
         }
       } catch (err) {
         toast.error("Error al reoptimizar horario", { id: toastId });
@@ -254,8 +254,8 @@ export default function EditorHorarios({
     if (!horario?.id) return;
     const candadosActivos = (horario.celdas || []).filter((c: any) => c.esBloqueado).length;
     const confirmMsg = candadosActivos > 0
-      ? `Â¿Vaciar la retÃ­cula del horario? Se eliminarÃ¡n las clases para que puedas pre-fijar bloqueos y dÃ­as libres libremente.\n\nðŸ”’ Se preservarÃ¡n ${candadosActivos} materia(s) con candado.`
-      : "Â¿Vaciar la retÃ­cula del horario? Todas las casillas quedarÃ¡n libres para que puedas pre-fijar bloqueos y dÃ­as libres antes de reoptimizar.";
+      ? `¿Vaciar la retícula del horario? Se eliminarán las clases para que puedas pre-fijar bloqueos y días libres libremente.\n\n🔒 Se preservarán ${candadosActivos} materia(s) con candado.`
+      : "¿Vaciar la retícula del horario? Todas las casillas quedarán libres para que puedas pre-fijar bloqueos y días libres antes de reoptimizar.";
 
     const confirmar = window.confirm(confirmMsg);
     if (!confirmar) return;
@@ -273,12 +273,12 @@ export default function EditorHorarios({
           onGuardarHorario(data.horario);
         }
         setHayCambiosSinGuardar(false);
-        toast.success("ðŸ§¹ RetÃ­cula vaciada. Ahora puedes bloquear dÃ­as u horas libres antes de reoptimizar.");
+        toast.success("🧹 Retícula vaciada. Ahora puedes bloquear días u horas libres antes de reoptimizar.");
       } else {
-        toast.error(data.error || "Error al vaciar retÃ­cula");
+        toast.error(data.error || "Error al vaciar retícula");
       }
     } catch (err) {
-      toast.error("Error de conexiÃ³n al vaciar retÃ­cula");
+      toast.error("Error de conexión al vaciar retícula");
     } finally {
       setLimpiandoHorario(false);
     }
@@ -287,7 +287,7 @@ export default function EditorHorarios({
   const handleRegenerarHorarioGlobal = async () => {
     if (!horario?.id) return;
     setRegenerandoHorario(true);
-    const toastId = toast.loading("âš¡ Reoptimizando horario completo con Solver Global...");
+    const toastId = toast.loading("⚡ Reoptimizando horario completo con Solver Global...");
 
     try {
       const res = await fetch("/api/horarios/regenerar", {
@@ -308,14 +308,14 @@ export default function EditorHorarios({
         }
         setHayCambiosSinGuardar(false);
         toast.success(
-          `âœ¨ Â¡Horario reoptimizado al 100%! (${data.horario.celdas?.length || 0} horas asignadas, 0 empalmes)`,
+          `✨ ¡Horario reoptimizado al 100%! (${data.horario.celdas?.length || 0} horas asignadas, 0 empalmes)`,
           { id: toastId }
         );
       } else {
         toast.error(data.error || "No fue posible generar con las restricciones actuales", { id: toastId });
       }
     } catch (err) {
-      toast.error("Error de conexiÃ³n al reoptimizar horario", { id: toastId });
+      toast.error("Error de conexión al reoptimizar horario", { id: toastId });
     } finally {
       setRegenerandoHorario(false);
     }
@@ -325,7 +325,7 @@ export default function EditorHorarios({
   const draggedCeldaRef = React.useRef<any>(null);
   const [dragOverPos, setDragOverPos] = useState<{ dia: number; periodo: number } | null>(null);
 
-  const diasLectivos = ["Lunes", "Martes", "MiÃ©rcoles", "Jueves", "Viernes"];
+  const diasLectivos = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
   const numHorasPorDia = horarioInicial?.config?.horasPorDia || horario?.config?.horasPorDia || 6;
   const periodos = Array.from({ length: numHorasPorDia }, (_, i) => i + 1);
   
@@ -394,7 +394,7 @@ export default function EditorHorarios({
   const handleDragStart = (e: React.DragEvent, celda: any) => {
     if (celda.esBloqueado) {
       e.preventDefault();
-      toast.error("ðŸ”’ Esta celda estÃ¡ fijada con candado. DesbloquÃ©ela antes de moverla.");
+      toast.error("🔒 Esta celda está fijada con candado. Desbloquéela antes de moverla.");
       return;
     }
     setDraggedCelda(celda);
@@ -405,18 +405,18 @@ export default function EditorHorarios({
 
   const validarSlotDestinoSimple = (dia: number, periodo: number, celda: any): { ok: boolean; razon?: string } => {
     if (!celda) return { ok: true };
-    if (celda.esBloqueado) return { ok: false, razon: "ðŸ”’ Celda fijada con candado." };
+    if (celda.esBloqueado) return { ok: false, razon: "🔒 Celda fijada con candado." };
     const gid = normalizarId(celda.grupoId);
     const grp = grupos.find((g: any) => normalizarId(g.id) === gid);
     const maxP = grp?.horasPorDia || (grp?.semestre === 1 ? 5 : numHorasPorDia);
-    if (periodo > maxP) return { ok: false, razon: `âš ï¸ Jornada del grupo: ${maxP}h mÃ¡x. No cabe en Hora ${periodo}.` };
+    if (periodo > maxP) return { ok: false, razon: `⚠️ Jornada del grupo: ${maxP}h máx. No cabe en Hora ${periodo}.` };
     if (esSlotLibreBloqueado(dia, periodo, normalizarId(celda.docenteId)) || esSlotLibreBloqueado(dia, periodo, gid)) {
-      return { ok: false, razon: "ðŸ”’ Hora libre bloqueada para este docente o grupo." };
+      return { ok: false, razon: "🔒 Hora libre bloqueada para este docente o grupo." };
     }
     const destConCandado = horario?.celdas?.find(
       (c: any) => c.diaSemana === dia && c.periodo === periodo && normalizarId(c.grupoId) === gid && c.esBloqueado
     );
-    if (destConCandado) return { ok: false, razon: "ðŸ”’ La celda destino estÃ¡ fijada con candado." };
+    if (destConCandado) return { ok: false, razon: "🔒 La celda destino está fijada con candado." };
     return { ok: true };
   };
 
@@ -443,7 +443,7 @@ export default function EditorHorarios({
 
   const handleBloquearSlotOcupado = async (dia: number, periodo: number, filtroId: string, celda: any) => {
     const key = `${dia}_${periodo}_${filtroId}`;
-    const diaNombre = diasLectivos[dia - 1] || `DÃ­a ${dia}`;
+    const diaNombre = diasLectivos[dia - 1] || `Día ${dia}`;
     const uacNombre = getNombreAsignaturaCelda(celda);
 
     // 1. Agregar a slots libres bloqueados
@@ -458,11 +458,11 @@ export default function EditorHorarios({
     }
 
     // 2. Reoptimizar con Solver Global para reubicar la clase fuera de este slot
-    const toastId = toast.loading(`ðŸ”’ Bloqueando ${diaNombre} Hora ${periodo} y reubicando "${uacNombre}" con Solver Global...`);
+    const toastId = toast.loading(`🔒 Bloqueando ${diaNombre} Hora ${periodo} y reubicando "${uacNombre}" con Solver Global...`);
     setRegenerandoHorario(true);
 
     try {
-      // Filtrar la celda de esta posiciÃ³n para que el solver la coloque en otro slot libre
+      // Filtrar la celda de esta posición para que el solver la coloque en otro slot libre
       const celdasBase = (horario?.celdas || []).filter(
         (c: any) => !(c.diaSemana === dia && c.periodo === periodo && normalizarId(c.grupoId) === normalizarId(celda.grupoId))
       );
@@ -484,7 +484,7 @@ export default function EditorHorarios({
           onGuardarHorario(data.horario);
         }
         setHayCambiosSinGuardar(false);
-        toast.success(`ðŸ”’ ${diaNombre} Hora ${periodo} bloqueada exitosamente. "${uacNombre}" fue reubicada automÃ¡ticamente.`, { id: toastId, duration: 4000 });
+        toast.success(`🔒 ${diaNombre} Hora ${periodo} bloqueada exitosamente. "${uacNombre}" fue reubicada automáticamente.`, { id: toastId, duration: 4000 });
       } else {
         toast.error(data.error || "No fue posible reubicar la clase al bloquear esta hora.", { id: toastId });
       }
@@ -503,14 +503,14 @@ export default function EditorHorarios({
     const sourceDia = celdaArrastrada.diaSemana;
     const sourcePeriodo = celdaArrastrada.periodo;
 
-    // Misma posiciÃ³n â†’ no-op
+    // Misma posición → no-op
     if (sourceDia === targetDia && sourcePeriodo === targetPeriodo) {
       draggedCeldaRef.current = null;
       setDraggedCelda(null);
       return;
     }
 
-    // ValidaciÃ³n simple (solo candado en destino y jornada mÃ¡xima)
+    // Validación simple (solo candado en destino y jornada máxima)
     const validacion = validarSlotDestinoSimple(targetDia, targetPeriodo, celdaArrastrada);
     if (!validacion.ok) {
       toast.error(validacion.razon || "Movimiento no permitido.");
@@ -527,7 +527,7 @@ export default function EditorHorarios({
       nombre: g.nombre
     }));
 
-    // 1. Intentar primero con el solver local ultra-rÃ¡pido (<5ms)
+    // 1. Intentar primero con el solver local ultra-rápido (<5ms)
     const resultadoLocal = reacomodarHorarioConRipple(
       horario.celdas,
       celdaArrastrada,
@@ -546,7 +546,7 @@ export default function EditorHorarios({
 
       const matNombre = getNombreAsignaturaCelda(celdaArrastrada);
       if (resultadoLocal.numMovidas && resultadoLocal.numMovidas > 2) {
-        toast.success(`ðŸ”„ ReubicaciÃ³n en cadena: ${resultadoLocal.numMovidas} clases reacomodadas sin empalmes.`, { duration: 4000 });
+        toast.success(`🔄 Reubicación en cadena: ${resultadoLocal.numMovidas} clases reacomodadas sin empalmes.`, { duration: 4000 });
       } else if (resultadoLocal.numMovidas === 2) {
         const celdaDestino = horario.celdas.find(
           (c: any) =>
@@ -555,25 +555,25 @@ export default function EditorHorarios({
             c.id !== celdaArrastrada.id
         );
         const matDest = celdaDestino ? getNombreAsignaturaCelda(celdaDestino) : "otra materia";
-        toast.success(`ðŸ”„ Swap: "${matNombre}" â‡„ "${matDest}"`);
+        toast.success(`🔄 Swap: "${matNombre}" ⇄ "${matDest}"`);
       } else {
-        toast.success(`âœ… "${matNombre}" reubicada al DÃ­a ${diasLectivos[targetDia - 1] || targetDia}, Hora ${targetPeriodo}`);
+        toast.success(`✅ "${matNombre}" reubicada al Día ${diasLectivos[targetDia - 1] || targetDia}, Hora ${targetPeriodo}`);
       }
       return;
     }
 
-    // 2. Si el movimiento local requiere reorganizaciÃ³n profunda multianual:
-    // ACTIVAR REOPTIMIZACIÃ“N GLOBAL AUTOMÃTICA (Solver Global CSP)
+    // 2. Si el movimiento local requiere reorganización profunda multianual:
+    // ACTIVAR REOPTIMIZACIÓN GLOBAL AUTOMÁTICA (Solver Global CSP)
     draggedCeldaRef.current = null;
     setDraggedCelda(null);
 
     const matNombre = getNombreAsignaturaCelda(celdaArrastrada);
-    const diaDestNombre = diasLectivos[targetDia - 1] || `DÃ­a ${targetDia}`;
-    const toastId = toast.loading(`âš¡ Reoptimizando horario global para colocar "${matNombre}" en ${diaDestNombre} Hora ${targetPeriodo}...`);
+    const diaDestNombre = diasLectivos[targetDia - 1] || `Día ${targetDia}`;
+    const toastId = toast.loading(`⚡ Reoptimizando horario global para colocar "${matNombre}" en ${diaDestNombre} Hora ${targetPeriodo}...`);
     setRegenerandoHorario(true);
 
     try {
-      // Remover la celda de su posiciÃ³n original y fijarla en la nueva
+      // Remover la celda de su posición original y fijarla en la nueva
       const celdasBase = (horario.celdas || []).filter(
         (c: any) => !(c.diaSemana === sourceDia && c.periodo === sourcePeriodo && normalizarId(c.grupoId) === normalizarId(celdaArrastrada.grupoId))
       );
@@ -604,12 +604,12 @@ export default function EditorHorarios({
           onGuardarHorario(data.horario);
         }
         setHayCambiosSinGuardar(false);
-        toast.success(`âœ¨ Â¡"${matNombre}" reubicada exitosamente y horario reacomodado con Solver Global!`, { id: toastId, duration: 4000 });
+        toast.success(`✨ ¡"${matNombre}" reubicada exitosamente y horario reacomodado con Solver Global!`, { id: toastId, duration: 4000 });
       } else {
         toast.error(data.error || "No fue posible reacomodar el horario con este movimiento debido a colisiones estrictas de jornada o bloqueos.", { id: toastId, duration: 5000 });
       }
     } catch (err) {
-      toast.error("Error de conexiÃ³n al reoptimizar horario global", { id: toastId });
+      toast.error("Error de conexión al reoptimizar horario global", { id: toastId });
     } finally {
       setRegenerandoHorario(false);
     }
@@ -655,7 +655,7 @@ export default function EditorHorarios({
 
     setHorario({ ...horario, celdas: celdasActualizadas });
     setHayCambiosSinGuardar(true);
-    toast.success(estadoNuevo ? "ðŸ”’ Celda fijada (la IA no la moverÃ¡)" : "Celda desbloqueada para la IA");
+    toast.success(estadoNuevo ? "🔒 Celda fijada (la IA no la moverá)" : "Celda desbloqueada para la IA");
   };
 
   const handleGuardarHorarioDB = async () => {
@@ -681,12 +681,12 @@ export default function EditorHorarios({
         if (onGuardarHorario) {
           onGuardarHorario(data.horario);
         }
-        toast.success("ðŸ’¾ Â¡Horario guardado permanentemente!");
+        toast.success("💾 ¡Horario guardado permanentemente!");
       } else {
         toast.error(data.error || "Error al guardar el horario");
       }
     } catch (err) {
-      toast.error("Error de conexiÃ³n al guardar el horario");
+      toast.error("Error de conexión al guardar el horario");
     } finally {
       setGuardandoCambios(false);
     }
@@ -733,12 +733,12 @@ export default function EditorHorarios({
         }
         setChatHistorial(data.horario.mensajesChat || []);
         setHayCambiosSinGuardar(false);
-        toast.success("âœ¨ Â¡Horario reorganizado con Ã©xito por la IA!");
+        toast.success("✨ ¡Horario reorganizado con éxito por la IA!");
       } else {
         toast.error(data.error || "Error al procesar mensaje");
       }
     } catch (err) {
-      toast.error("Error de conexiÃ³n con el chat de IA");
+      toast.error("Error de conexión con el chat de IA");
     } finally {
       setEnviandoChat(false);
     }
@@ -747,7 +747,7 @@ export default function EditorHorarios({
   const handleLimpiarChat = async () => {
     if (!horario?.id) return;
     const confirmar = window.confirm(
-      "Â¿Limpiar el historial de chat? Los mensajes anteriores se borrarÃ¡n."
+      "¿Limpiar el historial de chat? Los mensajes anteriores se borrarán."
     );
     if (!confirmar) return;
 
@@ -759,12 +759,12 @@ export default function EditorHorarios({
       if (data.success) {
         setChatHistorial([]);
         setLimpiadoChat(true);
-        toast.success("ðŸ—‘ï¸ Historial del chat limpiado correctamente");
+        toast.success("🗑️ Historial del chat limpiado correctamente");
       } else {
         toast.error(data.error || "Error al limpiar el chat");
       }
     } catch (err) {
-      toast.error("Error de conexiÃ³n al limpiar el chat");
+      toast.error("Error de conexión al limpiar el chat");
     }
   };
 
@@ -774,7 +774,7 @@ export default function EditorHorarios({
   ) => {
     setMostrarModalExportar(false);
 
-    // Filtrar Ãºnicamente grupos y docentes que tienen clases activas asignadas en este semestre
+    // Filtrar únicamente grupos y docentes que tienen clases activas asignadas en este semestre
     const gruposActivos = grupos.filter(g =>
       horario?.celdas?.some((c: any) => c.grupoId === g.id)
     );
@@ -808,7 +808,7 @@ export default function EditorHorarios({
         },
         "DOCENTE"
       );
-      toast.success("ðŸ“Š Sumario Maestro generado en Excel");
+      toast.success("📊 Sumario Maestro generado en Excel");
       return;
     }
 
@@ -833,7 +833,7 @@ export default function EditorHorarios({
         },
         "GRUPO"
       );
-      toast.success("ðŸ“Š Sumario por Grupo generado en Excel");
+      toast.success("📊 Sumario por Grupo generado en Excel");
       return;
     }
 
@@ -929,24 +929,24 @@ export default function EditorHorarios({
         toast.success("Excel generado correctamente");
       } else if (formato === "DOCX") {
         await exportarHorarioDOCX(payload);
-        toast.success("ðŸ“ Word (.docx) generado correctamente");
+        toast.success("📝 Word (.docx) generado correctamente");
       } else if (formato === "WHATSAPP_SQUARE") {
         toast.loading("Generando tarjeta de WhatsApp...");
         await exportarHorarioWhatsApp(payload, "square");
         toast.dismiss();
-        toast.success("ðŸ“± Imagen WhatsApp (1:1) generada correctamente");
+        toast.success("📱 Imagen WhatsApp (1:1) generada correctamente");
       } else if (formato === "WHATSAPP_STORY") {
         toast.loading("Generando historia vertical...");
         await exportarHorarioWhatsApp(payload, "story");
         toast.dismiss();
-        toast.success("ðŸ“± Imagen Historia (9:16) generada correctamente");
+        toast.success("📱 Imagen Historia (9:16) generada correctamente");
       } else {
         exportarHorarioPDF(payload);
         toast.success("PDF generado exitosamente");
       }
     } catch (err: any) {
       console.error("Error al exportar:", err);
-      toast.error("OcurriÃ³ un error al generar la exportaciÃ³n");
+      toast.error("Ocurrió un error al generar la exportación");
     }
   };
 
@@ -1070,10 +1070,10 @@ export default function EditorHorarios({
               gap: "0.35rem",
               transition: "all 0.15s ease"
             }}
-            title="Vaciar las clases para dejar la retÃ­cula libre y pre-fijar dÃ­as libres con candado"
+            title="Vaciar las clases para dejar la retícula libre y pre-fijar días libres con candado"
           >
             <Trash2 style={{ width: "15px", height: "15px" }} />
-            {limpiandoHorario ? "Limpiando..." : "Limpiar RetÃ­cula"}
+            {limpiandoHorario ? "Limpiando..." : "Limpiar Retícula"}
           </button>
 
           <button
@@ -1094,7 +1094,7 @@ export default function EditorHorarios({
               boxShadow: "0 2px 10px rgba(124, 58, 237, 0.4)",
               transition: "all 0.15s ease"
             }}
-            title="Reoptimizar las 255 horas con el Solver Global respetando todos tus candados y horas/dÃ­as bloqueados"
+            title="Reoptimizar las 255 horas con el Solver Global respetando todos tus candados y horas/días bloqueados"
           >
             <Sparkles style={{ width: "15px", height: "15px", animation: regenerandoHorario ? "spin 1s linear infinite" : "none" }} />
             {regenerandoHorario ? "Reoptimizando..." : "Reoptimizar Horario"}
@@ -1147,7 +1147,7 @@ export default function EditorHorarios({
         </div>
       </div>
 
-      {/* Selectores de elemento segÃºn Tab activa */}
+      {/* Selectores de elemento según Tab activa */}
       <div style={{ padding: "0.75rem 1.25rem", background: "#1e293b", border: "1px solid #334155", borderRadius: "12px", display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
         <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" }}>Filtrar Vista:</span>
         {vistaTab === "GRUPO" && (
@@ -1171,7 +1171,7 @@ export default function EditorHorarios({
                   color: periodoFiltro === "A" ? "white" : "#94a3b8"
                 }}
               >
-                ðŸ“… Semestre A (1Âº, 3Âº, 5Âº)
+                📅 Semestre A (1º, 3º, 5º)
               </button>
               <button
                 type="button"
@@ -1200,7 +1200,7 @@ export default function EditorHorarios({
                   color: periodoFiltro === "B" ? "white" : "#94a3b8"
                 }}
               >
-                ðŸ“… Semestre B (2Âº, 4Âº, 6Âº)
+                📅 Semestre B (2º, 4º, 6º)
               </button>
             </div>
 
@@ -1241,9 +1241,9 @@ export default function EditorHorarios({
         )}
       </div>
 
-      {/* RetÃ­cula Principal y Panel Lateral de Chat */}
+      {/* Retícula Principal y Panel Lateral de Chat */}
       <div style={{ display: "flex", gap: "1.25rem", alignItems: "flex-start", width: "100%" }}>
-        {/* PANEL IZQUIERDO: CuadrÃ­cula interactiva completa */}
+        {/* PANEL IZQUIERDO: Cuadrícula interactiva completa */}
         <div style={{ flex: 1, minWidth: 0, background: "#0f172a", borderRadius: "16px", border: "1px solid #334155", padding: "1.25rem", boxShadow: "0 4px 16px rgba(0,0,0,0.25)" }}>
           
           {/* TARJETA EJECUTIVA DE METADATOS DEL GRUPO / DOCENTE */}
@@ -1255,17 +1255,17 @@ export default function EditorHorarios({
                 </div>
                 <div>
                   <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#ffffff" }}>
-                    {grupoActivoObj.semestre}Â° Semestre â€¢ Bachillerato General Estatal
+                    {grupoActivoObj.semestre}° Semestre • Bachillerato General Estatal
                   </div>
                   <div style={{ fontSize: "0.75rem", color: "#94a3b8", display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: "0.2rem" }}>
-                    <span>â±ï¸ Jornada: <strong style={{ color: "#38bdf8" }}>{horasGrupoActual} hrs/dÃ­a ({horasGrupoActual * 5} hrs/sem)</strong></span>
-                    {grupoActivoObj.capacitacionNombre && <span>ðŸ’¼ CapacitaciÃ³n: <strong style={{ color: "#fbbf24" }}>{grupoActivoObj.capacitacionNombre}</strong></span>}
-                    {grupoActivoObj.ffeoSocioemocional && <span>ðŸŒ± FFEO: <strong style={{ color: "#4ade80" }}>{grupoActivoObj.ffeoSocioemocional}</strong></span>}
+                    <span>⏱️ Jornada: <strong style={{ color: "#38bdf8" }}>{horasGrupoActual} hrs/día ({horasGrupoActual * 5} hrs/sem)</strong></span>
+                    {grupoActivoObj.capacitacionNombre && <span>💼 Capacitación: <strong style={{ color: "#fbbf24" }}>{grupoActivoObj.capacitacionNombre}</strong></span>}
+                    {grupoActivoObj.ffeoSocioemocional && <span>🌱 FFEO: <strong style={{ color: "#4ade80" }}>{grupoActivoObj.ffeoSocioemocional}</strong></span>}
                   </div>
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" }}>Asignaturas en RetÃ­cula</div>
+                <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" }}>Asignaturas en Retícula</div>
                 <div style={{ fontSize: "1rem", fontWeight: 900, color: "#38bdf8" }}>
                   {(horario?.celdas || []).filter((c: any) => c.grupoId === grupoSeleccionadoId).length} / {horasGrupoActual * 5} hrs asignadas
                 </div>
@@ -1290,16 +1290,16 @@ export default function EditorHorarios({
               <div style={{ background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)", border: "1px solid #334155", borderRadius: "12px", padding: "0.85rem 1.25rem", marginBottom: "1rem", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                   <div style={{ background: "#2563eb", color: "#ffffff", padding: "0.5rem 0.85rem", borderRadius: "8px", fontWeight: 900, fontSize: "1rem" }}>
-                    ðŸ‘¨â€ðŸ«
+                    👨‍🏫
                   </div>
                   <div>
                     <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#ffffff" }}>
                       Prof. {docenteActivoObj.nombre} {docenteActivoObj.apellidoPaterno || ""}
                     </div>
                     <div style={{ fontSize: "0.75rem", color: "#94a3b8", display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: "0.2rem" }}>
-                      <span>ðŸ’¼ Cargo: <strong style={{ color: "#60a5fa" }}>{docenteActivoObj.cargo || "Docente"}</strong></span>
-                      <span>ðŸ‘¥ Grupos: <strong style={{ color: "#cbd5e1" }}>{gruposDoc.length > 0 ? gruposDoc.join(", ") : "Ninguno"}</strong></span>
-                      <span>ðŸ“š Materias distintas: <strong style={{ color: "#38bdf8" }}>{materiasDoc.length}</strong></span>
+                      <span>💼 Cargo: <strong style={{ color: "#60a5fa" }}>{docenteActivoObj.cargo || "Docente"}</strong></span>
+                      <span>👥 Grupos: <strong style={{ color: "#cbd5e1" }}>{gruposDoc.length > 0 ? gruposDoc.join(", ") : "Ninguno"}</strong></span>
+                      <span>📚 Materias distintas: <strong style={{ color: "#38bdf8" }}>{materiasDoc.length}</strong></span>
                     </div>
                   </div>
                 </div>
@@ -1317,17 +1317,17 @@ export default function EditorHorarios({
             <div style={{ padding: "3.5rem 2rem", textAlign: "center", background: "#1e293b", borderRadius: "16px", border: "2px dashed #475569", margin: "1rem 0" }}>
               <Grid style={{ width: "48px", height: "48px", color: "#64748b", margin: "0 auto 1rem" }} />
               <h3 style={{ fontSize: "1.125rem", fontWeight: 800, color: "#ffffff", marginBottom: "0.5rem" }}>
-                Horario del Semestre {periodoFiltro} ({periodoFiltro === "A" ? "1.Âº, 3.Âº, 5.Âº" : "2.Âº, 4.Âº, 6.Âº"}) aÃºn no generado
+                Horario del Semestre {periodoFiltro} ({periodoFiltro === "A" ? "1.º, 3.º, 5.º" : "2.º, 4.º, 6.º"}) aún no generado
               </h3>
               <p style={{ fontSize: "0.875rem", color: "#94a3b8", maxWidth: "520px", margin: "0 auto 1.5rem", lineHeight: 1.5 }}>
-                El horario que visualizas en la plataforma fue generado para el <strong>Semestre {periodoFiltro === "A" ? "B" : "A"}</strong>. Para generar el horario oficial de los grupos del Semestre {periodoFiltro}, dirÃ­jase al Asistente de ConfiguraciÃ³n.
+                El horario que visualizas en la plataforma fue generado para el <strong>Semestre {periodoFiltro === "A" ? "B" : "A"}</strong>. Para generar el horario oficial de los grupos del Semestre {periodoFiltro}, diríjase al Asistente de Configuración.
               </p>
               <button
                 type="button"
                 onClick={onVolverAWizard}
                 style={{ background: "#2563eb", color: "#ffffff", padding: "0.75rem 1.5rem", borderRadius: "10px", fontWeight: 700, fontSize: "0.875rem", border: "none", cursor: "pointer" }}
               >
-                âš™ï¸ Ir al Wizard de ConfiguraciÃ³n (Semestre {periodoFiltro})
+                ⚙️ Ir al Wizard de Configuración (Semestre {periodoFiltro})
               </button>
             </div>
           ) : (
@@ -1363,7 +1363,7 @@ export default function EditorHorarios({
                             <button
                               type="button"
                               onClick={() => toggleBloquearDiaCompleto(diaNum)}
-                              title={diaCompletoBloqueado ? `DÃ­a ${d} bloqueado. Clic para desbloquear.` : `Clic para bloquear todo el dÃ­a ${d} (${periodosVisibles.length} horas)`}
+                              title={diaCompletoBloqueado ? `Día ${d} bloqueado. Clic para desbloquear.` : `Clic para bloquear todo el día ${d} (${periodosVisibles.length} horas)`}
                               style={{
                                 background: diaCompletoBloqueado ? "#f59e0b" : "#0f172a",
                                 color: diaCompletoBloqueado ? "#000000" : "#94a3b8",
@@ -1385,7 +1385,7 @@ export default function EditorHorarios({
                                 </>
                               ) : (
                                 <>
-                                  <Lock style={{ width: "10px", height: "10px", opacity: 0.6 }} /> Bloquear DÃ­a
+                                  <Lock style={{ width: "10px", height: "10px", opacity: 0.6 }} /> Bloquear Día
                                 </>
                               )}
                             </button>
@@ -1477,11 +1477,11 @@ export default function EditorHorarios({
                                     {uacNombre}
                                   </p>
                                   <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
-                                    {/* BotÃ³n Candado (Fijar materia) */}
+                                    {/* Botón Candado (Fijar materia) */}
                                     <button
                                       type="button"
                                       onClick={(e) => toggleBloquearCelda(celda, e)}
-                                      title={celda.esBloqueado ? "ðŸ”’ Materia fijada con candado (La IA y el Solver no la moverÃ¡n). Clic para desbloquear." : "ðŸ”“ Clic para fijar materia con candado"}
+                                      title={celda.esBloqueado ? "🔒 Materia fijada con candado (La IA y el Solver no la moverán). Clic para desbloquear." : "🔓 Clic para fijar materia con candado"}
                                       style={{
                                         background: celda.esBloqueado ? "#f59e0b" : "rgba(15, 23, 42, 0.6)",
                                         color: celda.esBloqueado ? "#000000" : "#94a3b8",
@@ -1507,7 +1507,7 @@ export default function EditorHorarios({
                                       )}
                                     </button>
 
-                                    {/* BotÃ³n Bloquear Hora (Liberar Slot con ReubicaciÃ³n) */}
+                                    {/* Botón Bloquear Hora (Liberar Slot con Reubicación) */}
                                     {(vistaTab === "DOCENTE" || vistaTab === "GRUPO") && (
                                       <button
                                         type="button"
@@ -1516,7 +1516,7 @@ export default function EditorHorarios({
                                           const filtroId = vistaTab === "DOCENTE" ? docenteSeleccionadoId : grupoSeleccionadoId;
                                           handleBloquearSlotOcupado(dia, p, filtroId, celda);
                                         }}
-                                        title="ðŸš« Bloquear esta hora para este docente/grupo (ReubicarÃ¡ la clase automÃ¡ticamente a otra hora libre)"
+                                        title="🚫 Bloquear esta hora para este docente/grupo (Reubicará la clase automáticamente a otra hora libre)"
                                         style={{
                                           background: "rgba(239, 68, 68, 0.15)",
                                           color: "#f87171",
@@ -1531,7 +1531,7 @@ export default function EditorHorarios({
                                           transition: "all 0.15s ease"
                                         }}
                                       >
-                                        ðŸš« Bloquear
+                                        🚫 Bloquear
                                       </button>
                                     )}
                                   </div>
@@ -1564,7 +1564,7 @@ export default function EditorHorarios({
                                   cursor: "pointer"
                                 }}
                                 onClick={() => toggleBloquearSlotLibre(dia, p, filtroId)}
-                                title={estaBloqueado ? "Hora libre bloqueada â€” clic para desbloquear" : "Clic para bloquear esta hora libre (la IA no colocarÃ¡ clases aquÃ­)"}
+                                title={estaBloqueado ? "Hora libre bloqueada — clic para desbloquear" : "Clic para bloquear esta hora libre (la IA no colocará clases aquí)"}
                               >
                                 {estaBloqueado ? (
                                   <>
@@ -1603,7 +1603,7 @@ export default function EditorHorarios({
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                 <button
                   onClick={handleLimpiarChat}
-                  title="Limpiar historial de conversaciÃ³n"
+                  title="Limpiar historial de conversación"
                   style={{
                     background: chatHistorial.length === 0 ? "#1e293b" : "rgba(239,68,68,0.15)",
                     border: "1px solid rgba(239,68,68,0.3)",
@@ -1634,7 +1634,7 @@ export default function EditorHorarios({
             {/* Historial de Mensajes */}
             <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.75rem", paddingRight: "0.25rem" }}>
               <div style={{ background: "rgba(30, 41, 59, 0.8)", padding: "0.75rem", borderRadius: "10px", border: "1px solid #334155", fontSize: "0.75rem", color: "#cbd5e1" }}>
-                ðŸ’¡ <strong>Directiva:</strong> Pide cualquier ajuste en lenguaje natural. Ej: <em>"Mueve la clase de QuÃ­mica del lunes 1Âª hora al martes 3Âª hora"</em> o <em>"Deja libre los viernes al profesor arminda"</em>. Las celdas con candado ðŸ”’ se mantendrÃ¡n protegidas.
+                💡 <strong>Directiva:</strong> Pide cualquier ajuste en lenguaje natural. Ej: <em>"Mueve la clase de Química del lunes 1ª hora al martes 3ª hora"</em> o <em>"Deja libre los viernes al profesor arminda"</em>. Las celdas con candado 🔒 se mantendrán protegidas.
               </div>
 
               {chatHistorial.map((msg: any, i: number) => (
@@ -1660,7 +1660,7 @@ export default function EditorHorarios({
             <form onSubmit={handleEnviarMensajeIA} style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}>
               <textarea
                 rows={1}
-                placeholder="Escribe una instrucciÃ³n para la IA..."
+                placeholder="Escribe una instrucción para la IA..."
                 value={mensajeChat}
                 onChange={(e) => {
                   setMensajeChat(e.target.value);
@@ -1713,13 +1713,13 @@ export default function EditorHorarios({
         )}
       </div>
 
-      {/* MODAL DE EXPORTACIÃ“N AVANZADA */}
+      {/* MODAL DE EXPORTACIÓN AVANZADA */}
       {mostrarModalExportar && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.85)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "1rem" }}>
           <div style={{ background: "#0f172a", borderRadius: "16px", padding: "1.75rem", maxWidth: "620px", width: "100%", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)", border: "1px solid #334155", maxHeight: "90vh", overflowY: "auto" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #334155", paddingBottom: "1rem", marginBottom: "1.25rem" }}>
               <h3 style={{ fontSize: "1.125rem", fontWeight: 800, color: "#ffffff", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
-                <FileText style={{ width: "22px", height: "22px", color: "#38bdf8" }} /> Opciones de ExportaciÃ³n Oficial
+                <FileText style={{ width: "22px", height: "22px", color: "#38bdf8" }} /> Opciones de Exportación Oficial
               </h3>
               <button onClick={() => setMostrarModalExportar(false)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer" }}>
                 <X style={{ width: "20px", height: "20px" }} />
@@ -1731,11 +1731,11 @@ export default function EditorHorarios({
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-              {/* OpciÃ³n 1: Vista Actual */}
+              {/* Opción 1: Vista Actual */}
               <div style={{ border: "1px solid #334155", borderRadius: "10px", padding: "0.85rem 1rem", display: "flex", flexDirection: "column", gap: "0.6rem", background: "#1e293b" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div>
-                    <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#ffffff" }}>ðŸ“„ Vista Actual en Pantalla</div>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#ffffff" }}>📄 Vista Actual en Pantalla</div>
                     <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>Exporta exactamente el filtro visible ({vistaTab})</div>
                   </div>
                   <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
@@ -1748,7 +1748,7 @@ export default function EditorHorarios({
                 {/* Formatos Redes Sociales / WhatsApp */}
                 <div style={{ borderTop: "1px solid #334155", paddingTop: "0.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
                   <div style={{ fontSize: "0.72rem", color: "#22d3ee", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.3rem" }}>
-                    <Smartphone style={{ width: "14px", height: "14px" }} /> Imagen Redes / WhatsApp (NeÃ³n):
+                    <Smartphone style={{ width: "14px", height: "14px" }} /> Imagen Redes / WhatsApp (Neón):
                   </div>
                   <div style={{ display: "flex", gap: "0.35rem" }}>
                     <button
@@ -1768,7 +1768,7 @@ export default function EditorHorarios({
                       }}
                       title="Post Cuadrado 1080x1080px (Ideal para WhatsApp, Instagram, Telegram)"
                     >
-                      ðŸ“± Cuadrado (1:1)
+                      📱 Cuadrado (1:1)
                     </button>
                     <button
                       onClick={() => ejecutarExportacion("VISTA_ACTUAL", "WHATSAPP_STORY")}
@@ -1787,17 +1787,17 @@ export default function EditorHorarios({
                       }}
                       title="Historia Vertical 1080x1920px (Ideal para Estados de WhatsApp, Stories de Instagram)"
                     >
-                      ðŸ“± Historia (9:16)
+                      📱 Historia (9:16)
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* OpciÃ³n 2: Paquete Completo por Docente */}
+              {/* Opción 2: Paquete Completo por Docente */}
               <div style={{ border: "1px solid #334155", borderRadius: "10px", padding: "0.85rem 1rem", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#1e293b" }}>
                 <div>
                   <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#ffffff", display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                    <Package style={{ width: "16px", height: "16px", color: "#fbbf24" }} /> Paquete por Docente (Multi-pÃ¡gina)
+                    <Package style={{ width: "16px", height: "16px", color: "#fbbf24" }} /> Paquete por Docente (Multi-página)
                   </div>
                   <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>1 hoja individual por cada maestro del plantel</div>
                 </div>
@@ -1807,11 +1807,11 @@ export default function EditorHorarios({
                 </div>
               </div>
 
-              {/* OpciÃ³n 3: Paquete Completo por Grupo */}
+              {/* Opción 3: Paquete Completo por Grupo */}
               <div style={{ border: "1px solid #334155", borderRadius: "10px", padding: "0.85rem 1rem", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#1e293b" }}>
                 <div>
                   <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#ffffff", display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                    <Package style={{ width: "16px", height: "16px", color: "#fbbf24" }} /> Paquete por Grupo (Multi-pÃ¡gina)
+                    <Package style={{ width: "16px", height: "16px", color: "#fbbf24" }} /> Paquete por Grupo (Multi-página)
                   </div>
                   <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>1 hoja individual por cada grupo para alumnos</div>
                 </div>
@@ -1823,13 +1823,13 @@ export default function EditorHorarios({
 
               {/* Separador */}
               <div style={{ borderTop: "1px dashed #334155", paddingTop: "0.85rem" }}>
-                <div style={{ fontSize: "0.8rem", fontWeight: 800, color: "#94a3b8", marginBottom: "0.6rem" }}>ðŸ“Š Exportaciones Compactas (una sola tabla)</div>
+                <div style={{ fontSize: "0.8rem", fontWeight: 800, color: "#94a3b8", marginBottom: "0.6rem" }}>📊 Exportaciones Compactas (una sola tabla)</div>
 
                 {/* Sumario Maestro */}
                 <div style={{ border: "1px solid #4f46e5", borderRadius: "10px", padding: "0.85rem 1rem", display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(79, 70, 229, 0.15)", marginBottom: "0.6rem" }}>
                   <div>
-                    <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#c7d2fe" }}>ðŸ‘¨â€ðŸ« Sumario Maestro</div>
-                    <div style={{ fontSize: "0.72rem", color: "#a5b4fc" }}>Todos los docentes en filas Â· Lun/H1 â€¦ Vie/H6 en columnas</div>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#c7d2fe" }}>👨‍🏫 Sumario Maestro</div>
+                    <div style={{ fontSize: "0.72rem", color: "#a5b4fc" }}>Todos los docentes en filas · Lun/H1 … Vie/H6 en columnas</div>
                   </div>
                   <button onClick={() => ejecutarExportacion("SUMARIO_MAESTRO", "EXCEL")} style={{ background: "#4f46e5", color: "white", border: "none", padding: "0.4rem 0.85rem", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>
                     Excel
@@ -1839,8 +1839,8 @@ export default function EditorHorarios({
                 {/* Sumario Grupo */}
                 <div style={{ border: "1px solid #059669", borderRadius: "10px", padding: "0.85rem 1rem", display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(5, 150, 105, 0.15)" }}>
                   <div>
-                    <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#a7f3d0" }}>ðŸ« Sumario por Grupo</div>
-                    <div style={{ fontSize: "0.72rem", color: "#6ee7b7" }}>Todos los grupos en filas Â· Lun/H1 â€¦ Vie/H6 en columnas</div>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "#a7f3d0" }}>🏫 Sumario por Grupo</div>
+                    <div style={{ fontSize: "0.72rem", color: "#6ee7b7" }}>Todos los grupos en filas · Lun/H1 … Vie/H6 en columnas</div>
                   </div>
                   <button onClick={() => ejecutarExportacion("SUMARIO_GRUPO", "EXCEL")} style={{ background: "#059669", color: "white", border: "none", padding: "0.4rem 0.85rem", borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>
                     Excel
@@ -1852,7 +1852,7 @@ export default function EditorHorarios({
         </div>
       )}
 
-      {/* Overlay de Carga durante ReoptimizaciÃ³n Global */}
+      {/* Overlay de Carga durante Reoptimización Global */}
       {regenerandoHorario && (
         <div
           style={{
@@ -1897,10 +1897,10 @@ export default function EditorHorarios({
               <RefreshCw style={{ width: "28px", height: "28px", color: "#ffffff", animation: "spin 1.2s linear infinite" }} />
             </div>
             <h3 style={{ fontSize: "1.25rem", fontWeight: 900, color: "#ffffff", marginBottom: "0.5rem" }}>
-              âš¡ Reoptimizando Horario Escolar
+              ⚡ Reoptimizando Horario Escolar
             </h3>
             <p style={{ fontSize: "0.875rem", color: "#94a3b8", lineHeight: 1.5, marginBottom: "1.25rem" }}>
-              El Solver Global estÃ¡ procesando las <strong>255 horas lectivas</strong>, verificando las restricciones de los <strong>11 docentes</strong> y respetando todos los dÃ­as y horas bloqueadas...
+              El Solver Global está procesando las <strong>255 horas lectivas</strong>, verificando las restricciones de los <strong>11 docentes</strong> y respetando todos los días y horas bloqueadas...
             </p>
             <div
               style={{
@@ -1918,7 +1918,7 @@ export default function EditorHorarios({
               }}
             >
               <Sparkles style={{ width: "14px", height: "14px" }} />
-              Garantizando 0 empalmes y mÃ¡xima distribuciÃ³n pedagÃ³gica
+              Garantizando 0 empalmes y máxima distribución pedagógica
             </div>
           </div>
         </div>
@@ -1926,4 +1926,3 @@ export default function EditorHorarios({
     </div>
   );
 }
-

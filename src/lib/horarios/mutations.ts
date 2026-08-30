@@ -1,4 +1,4 @@
-﻿import { reacomodarHorarioConRipple, CeldaHorario, GrupoLimiteInfo } from "./ripple-solver";
+import { reacomodarHorarioConRipple, CeldaHorario, GrupoLimiteInfo } from "./ripple-solver";
 
 export interface MoverCeldaParams {
   asignatura?: string;
@@ -29,7 +29,7 @@ export interface BloquearLibreParams {
 }
 
 /**
- * Mueve quirÃºrgicamente una celda usando el motor Ripple (cascada con backtracking).
+ * Mueve quirúrgicamente una celda usando el motor Ripple (cascada con backtracking).
  */
 export function moverCelda(
   celdas: CeldaHorario[],
@@ -54,7 +54,7 @@ export function moverCelda(
   });
 
   if (!celdaTarget) {
-    return { success: false, celdas, error: "No se encontrÃ³ la clase especificada para mover." };
+    return { success: false, celdas, error: "No se encontró la clase especificada para mover." };
   }
 
   const res = reacomodarHorarioConRipple(
@@ -75,7 +75,7 @@ export function moverCelda(
 }
 
 /**
- * Intercambia dos posiciones entre sÃ­ de forma directa o mediante cascada.
+ * Intercambia dos posiciones entre sí de forma directa o mediante cascada.
  */
 export function intercambiarCeldas(
   celdas: CeldaHorario[],
@@ -88,11 +88,11 @@ export function intercambiarCeldas(
   const c2 = celdas.find((c) => c.diaSemana === params.destino.dia && c.periodo === params.destino.periodo && (!params.destino.grupoId || c.grupoId === params.destino.grupoId));
 
   if (!c1 && !c2) {
-    return { success: false, celdas, error: "Ambas posiciones estÃ¡n vacÃ­as." };
+    return { success: false, celdas, error: "Ambas posiciones están vacías." };
   }
 
   if (c1?.esBloqueado || c2?.esBloqueado) {
-    return { success: false, celdas, error: "Una de las celdas estÃ¡ fijada con candado." };
+    return { success: false, celdas, error: "Una de las celdas está fijada con candado." };
   }
 
   if (c1 && !c2) {
@@ -126,7 +126,7 @@ export function intercambiarCeldas(
 }
 
 /**
- * Bloquea dÃ­as u horas libres para un docente o grupo y reubica las clases existentes a otros dÃ­as sin destruir el resto del horario.
+ * Bloquea días u horas libres para un docente o grupo y reubica las clases existentes a otros días sin destruir el resto del horario.
  */
 export function bloquearLibre(
   celdas: CeldaHorario[],
@@ -165,11 +165,11 @@ export function bloquearLibre(
       return false;
     });
 
-    // Reubicar cada celda afectada a un dÃ­a/hora disponible usando el motor Ripple
+    // Reubicar cada celda afectada a un día/hora disponible usando el motor Ripple
     for (const celdaAfectada of celdasAfectadas) {
       let reubicada = false;
 
-      // Buscar slots disponibles en dÃ­as no bloqueados
+      // Buscar slots disponibles en días no bloqueados
       const diasPermitidos = Array.from({ length: diasLectivos }, (_, i) => i + 1).filter(
         (d) => !params.dias || !params.dias.includes(d)
       );
@@ -178,7 +178,7 @@ export function bloquearLibre(
         for (let p = 1; p <= horasPorDia; p++) {
           if (nuevosSlots.has(`${d}_${p}_${docId}`)) continue;
 
-          // Probar si el ripple puede colocarla aquÃ­
+          // Probar si el ripple puede colocarla aquí
           const intento = reacomodarHorarioConRipple(
             celdasModificadas,
             celdaAfectada,
@@ -199,12 +199,12 @@ export function bloquearLibre(
       }
 
       if (!reubicada) {
-        // Si no se pudo mover quirÃºrgicamente una por una, devolver fallo para que el asistente recurra al solver global
+        // Si no se pudo mover quirúrgicamente una por una, devolver fallo para que el asistente recurra al solver global
         return {
           success: false,
           celdas,
           slotsActualizados: slotsLibresBloqueados,
-          error: "No se encontraron huecos libres para reubicar todas las clases del docente sin recurrir a una regeneraciÃ³n global."
+          error: "No se encontraron huecos libres para reubicar todas las clases del docente sin recurrir a una regeneración global."
         };
       }
     }
@@ -212,4 +212,3 @@ export function bloquearLibre(
 
   return { success: true, celdas: celdasModificadas, slotsActualizados: nuevosSlots };
 }
-

@@ -1,4 +1,4 @@
-﻿import { CeldaHorario, GrupoLimiteInfo } from "./ripple-solver";
+import { CeldaHorario, GrupoLimiteInfo } from "./ripple-solver";
 
 export interface SwapMove {
   cellFromIndex: number;
@@ -21,7 +21,7 @@ export const normalizarId = (val: any): string => {
   return String(val).trim();
 };
 
-// OcupaciÃ³n global O(1) para validaciones instantÃ¡neas
+// Ocupación global O(1) para validaciones instantáneas
 function buildOccupancy(celdas: CeldaHorario[]) {
   const grupo = new Set<string>();
   const docente = new Set<string>();
@@ -68,7 +68,7 @@ function slotValido(
 }
 
 /**
- * Algoritmo BFS/DFS de BÃºsqueda de Cadena de Swaps (Cadena de ReubicaciÃ³n Multi-Paso).
+ * Algoritmo BFS/DFS de Búsqueda de Cadena de Swaps (Cadena de Reubicación Multi-Paso).
  * Analiza combinaciones de movimientos en cascada para reubicar clases en el horario escolar
  * sin generar empalmes y respetando candados y horas libres.
  */
@@ -96,12 +96,12 @@ export function buscarCadenaSwap(
   );
 
   if (idxDesplazada === -1) {
-    return { success: false, moves: [], celdasResult: celdasBase, profundidad: 0, error: "No se encontrÃ³ la celda objetivo." };
+    return { success: false, moves: [], celdasResult: celdasBase, profundidad: 0, error: "No se encontró la celda objetivo." };
   }
 
-  // Paso 1: Intentar movimiento directo a slot vacÃ­o
+  // Paso 1: Intentar movimiento directo a slot vacío
   const occ = buildOccupancy(celdasBase);
-  // Remover temporalmente la celda desplazada de la ocupaciÃ³n
+  // Remover temporalmente la celda desplazada de la ocupación
   occ.grupo.delete(`${slotOrigenOriginal.dia}_${slotOrigenOriginal.periodo}_${targetGid}`);
   occ.docente.delete(`${slotOrigenOriginal.dia}_${slotOrigenOriginal.periodo}_${targetDocId}`);
 
@@ -124,7 +124,7 @@ export function buscarCadenaSwap(
     }
   }
 
-  // Paso 2: BÃºsqueda DFS de cadena de swaps con profundidad de 2 a maxDepth
+  // Paso 2: Búsqueda DFS de cadena de swaps con profundidad de 2 a maxDepth
   function dfsChain(
     celdasActuales: CeldaHorario[],
     currDisplacedIdx: number,
@@ -138,7 +138,7 @@ export function buscarCadenaSwap(
     occCur.grupo.delete(`${disp.diaSemana}_${disp.periodo}_${normalizarId(disp.grupoId)}`);
     occCur.docente.delete(`${disp.diaSemana}_${disp.periodo}_${normalizarId(disp.docenteId)}`);
 
-    // Intentar slot vacÃ­o directo
+    // Intentar slot vacío directo
     for (let d = 1; d <= 5; d++) {
       const maxP =
         gruposInfo?.find((g) => normalizarId(g.id) === normalizarId(disp.grupoId))?.horasPorDia ??
@@ -164,10 +164,10 @@ export function buscarCadenaSwap(
       const sig = `${currDisplacedIdx}->${j}@${otra.diaSemana}_${otra.periodo}`;
       if (visited.has(sig)) continue;
 
-      // Â¿La celda desplazada cabe en el slot de 'otra'?
+      // ¿La celda desplazada cabe en el slot de 'otra'?
       if (!slotValido(otra.diaSemana, otra.periodo, disp, occCur, slotsLibresBloqueados, gruposInfo, numHorasPorDia)) continue;
 
-      // Si es cross-group (distinto grupo), verificar que el slot tambiÃ©n estÃ© libre para el GRUPO de la celda desplazada
+      // Si es cross-group (distinto grupo), verificar que el slot también esté libre para el GRUPO de la celda desplazada
       if (!esMismoGrupo) {
         const keyGrpDisp = `${otra.diaSemana}_${otra.periodo}_${normalizarId(disp.grupoId)}`;
         if (occCur.grupo.has(keyGrpDisp)) continue;
@@ -181,7 +181,7 @@ export function buscarCadenaSwap(
       celdasTmp[currDisplacedIdx].diaSemana = otra.diaSemana;
       celdasTmp[currDisplacedIdx].periodo = otra.periodo;
 
-      // Ahora 'otra' queda desplazada de su posiciÃ³n original
+      // Ahora 'otra' queda desplazada de su posición original
       const occTmp = buildOccupancy(celdasTmp);
       occTmp.grupo.delete(`${otra.diaSemana}_${otra.periodo}_${normalizarId(otra.grupoId)}`);
       occTmp.docente.delete(`${otra.diaSemana}_${otra.periodo}_${normalizarId(otra.docenteId)}`);
@@ -229,6 +229,5 @@ export function buscarCadenaSwap(
     };
   }
 
-  return { success: false, moves: [], celdasResult: celdasBase, profundidad: 0, error: "No se encontrÃ³ una cadena de reubicaciÃ³n vÃ¡lida." };
+  return { success: false, moves: [], celdasResult: celdasBase, profundidad: 0, error: "No se encontró una cadena de reubicación válida." };
 }
-

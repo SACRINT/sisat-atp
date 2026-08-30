@@ -1,18 +1,18 @@
-﻿/**
+/**
  * Motor de Reordenamiento Inteligente para Horarios Escolares.
  *
- * Estrategia de resoluciÃ³n con 3 niveles:
- *   Nivel 1 â€” Movimiento directo a slot vacÃ­o (1 celda).
- *   Nivel 2 â€” Intercambio directo entre 2 celdas (swap 1-a-1).
- *   Nivel 3 â€” Reacomodo en cascada con backtracking (mÃ¡x 5 saltos).
+ * Estrategia de resolución con 3 niveles:
+ *   Nivel 1 — Movimiento directo a slot vacío (1 celda).
+ *   Nivel 2 — Intercambio directo entre 2 celdas (swap 1-a-1).
+ *   Nivel 3 — Reacomodo en cascada con backtracking (máx 5 saltos).
  *
- * Reglas duras (las ÃšNICAS que bloquean un movimiento):
- *   1. Celda con candado (esBloqueado) â†’ inmovible.
- *   2. Slot destino dentro de slotsLibresBloqueados â†’ prohibido.
- *   3. Jornada del grupo excedida â†’ prohibido.
- *   4. Empalme real entre docentes DISTINTOS â†’ rechazado o resuelto por cascada.
+ * Reglas duras (las ÚNICAS que bloquean un movimiento):
+ *   1. Celda con candado (esBloqueado) → inmovible.
+ *   2. Slot destino dentro de slotsLibresBloqueados → prohibido.
+ *   3. Jornada del grupo excedida → prohibido.
+ *   4. Empalme real entre docentes DISTINTOS → rechazado o resuelto por cascada.
  *
- * Intercambios entre el MISMO docente o del MISMO grupo â†’ SIEMPRE permitidos.
+ * Intercambios entre el MISMO docente o del MISMO grupo → SIEMPRE permitidos.
  */
 
 export interface CeldaHorario {
@@ -38,7 +38,7 @@ export interface GrupoLimiteInfo {
   nombre?: string;
 }
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function normId(val: any): string {
   if (val == null) return "";
@@ -123,7 +123,7 @@ function grupoOcupadoEn(
   );
 }
 
-// â”€â”€â”€ Resultado â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Resultado ──────────────────────────────────────────────────────────────
 
 export interface RippleResult {
   success: boolean;
@@ -132,7 +132,7 @@ export interface RippleResult {
   error?: string;
 }
 
-// â”€â”€â”€ FunciÃ³n Principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Función Principal ──────────────────────────────────────────────────────
 
 export function reacomodarHorarioConRipple(
   celdasOriginales: CeldaHorario[],
@@ -144,39 +144,39 @@ export function reacomodarHorarioConRipple(
   gruposInfo?: GrupoLimiteInfo[]
 ): RippleResult {
   if (!celdaAMover) {
-    return { success: false, error: "No se especificÃ³ la celda a mover." };
+    return { success: false, error: "No se especificó la celda a mover." };
   }
 
   if (celdaAMover.esBloqueado) {
-    return { success: false, error: "ðŸ”’ Esta celda estÃ¡ fijada con candado. DesbloquÃ©ela antes de moverla." };
+    return { success: false, error: "🔒 Esta celda está fijada con candado. Desbloquéela antes de moverla." };
   }
 
   const origDia = celdaAMover.diaSemana;
   const origPeriodo = celdaAMover.periodo;
 
-  // Misma posiciÃ³n â†’ no-op
+  // Misma posición → no-op
   if (origDia === targetDia && origPeriodo === targetPeriodo) {
     return { success: true, celdasActualizadas: celdasOriginales, numMovidas: 0 };
   }
 
-  // â”€â”€ ValidaciÃ³n de jornada â”€â”€
+  // ── Validación de jornada ──
   const maxPeriodos = getMaxPeriodosGrupo(celdaAMover.grupoId, gruposInfo, celdasOriginales, numHorasPorDia);
   if (targetPeriodo > maxPeriodos) {
     return {
       success: false,
-      error: `âš ï¸ Este grupo tiene jornada de ${maxPeriodos} horas. No se puede colocar en la Hora ${targetPeriodo}.`
+      error: `⚠️ Este grupo tiene jornada de ${maxPeriodos} horas. No se puede colocar en la Hora ${targetPeriodo}.`
     };
   }
 
-  // â”€â”€ ValidaciÃ³n de hora libre bloqueada â”€â”€
+  // ── Validación de hora libre bloqueada ──
   if (isSlotBloqueado(targetDia, targetPeriodo, celdaAMover, slotsLibresBloqueados)) {
-    return { success: false, error: "ðŸ”’ La casilla destino estÃ¡ fijada como hora libre para este docente o grupo." };
+    return { success: false, error: "🔒 La casilla destino está fijada como hora libre para este docente o grupo." };
   }
 
   // Clonar para trabajo inmutable
   const cells: CeldaHorario[] = celdasOriginales.map((c) => ({ ...c }));
 
-  // Encontrar Ã­ndice de la celda a mover
+  // Encontrar índice de la celda a mover
   const srcIdx = cells.findIndex(
     (c) =>
       (c.id && celdaAMover.id && c.id === celdaAMover.id) ||
@@ -187,27 +187,27 @@ export function reacomodarHorarioConRipple(
   );
 
   if (srcIdx === -1) {
-    return { success: false, error: "No se encontrÃ³ la celda seleccionada en el horario." };
+    return { success: false, error: "No se encontró la celda seleccionada en el horario." };
   }
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-  // NIVEL 1 â€” Slot destino VACÃO para el grupo â†’ movimiento directo
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════════════════════════════════
+  // NIVEL 1 — Slot destino VACÍO para el grupo → movimiento directo
+  // ══════════════════════════════════════════════════════════════════════════
   const destinoLibreGrupo = !cells.some(
     (c, i) => i !== srcIdx && normId(c.grupoId) === normId(celdaAMover.grupoId) && c.diaSemana === targetDia && c.periodo === targetPeriodo
   );
 
   if (destinoLibreGrupo) {
-    // Verificar que el docente no estÃ© ocupado con OTRO grupo en el destino
+    // Verificar que el docente no esté ocupado con OTRO grupo en el destino
     if (!docenteOcupadoEn(cells, celdaAMover.docenteId, targetDia, targetPeriodo, celdaAMover.grupoId, srcIdx)) {
       cells[srcIdx] = { ...cells[srcIdx], diaSemana: targetDia, periodo: targetPeriodo };
       return { success: true, celdasActualizadas: cells, numMovidas: 1 };
     }
   }
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-  // NIVEL 2 â€” Intercambio directo 1-a-1 (MISMO grupo o MISMO docente)
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════════════════════════════════
+  // NIVEL 2 — Intercambio directo 1-a-1 (MISMO grupo o MISMO docente)
+  // ══════════════════════════════════════════════════════════════════════════
   const dstIdx = cells.findIndex(
     (c, i) =>
       i !== srcIdx &&
@@ -247,27 +247,27 @@ export function reacomodarHorarioConRipple(
     }
   }
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-  // NIVEL 2b â€” Swap con celda de OTRO grupo (docente Distinto)
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════════════════════════════════
+  // NIVEL 2b — Swap con celda de OTRO grupo (docente Distinto)
+  // ══════════════════════════════════════════════════════════════════════════
   if (dstIdx !== -1 && !cells[dstIdx].esBloqueado) {
     const srcDoc = normId(celdaAMover.docenteId);
     const dstDoc = normId(cells[dstIdx].docenteId);
     const srcGrp = normId(celdaAMover.grupoId);
     const dstGrp = normId(cells[dstIdx].grupoId);
 
-    // Â¿El docente origen puede ir al slot destino? (no tiene otra clase ahÃ­ con otro grupo)
+    // ¿El docente origen puede ir al slot destino? (no tiene otra clase ahí con otro grupo)
     const srcConflictTarget = cells.some(
       (c, i) => i !== srcIdx && i !== dstIdx && normId(c.docenteId) === srcDoc && c.diaSemana === targetDia && c.periodo === targetPeriodo
     );
-    // Â¿El docente destino puede ir al slot origen? (no tiene otra clase ahÃ­ con otro grupo)
+    // ¿El docente destino puede ir al slot origen? (no tiene otra clase ahí con otro grupo)
     const dstConflictOrigin = cells.some(
       (c, i) => i !== srcIdx && i !== dstIdx && normId(c.docenteId) === dstDoc && c.diaSemana === origDia && c.periodo === origPeriodo
     );
-    // Â¿Hay bloqueos?
+    // ¿Hay bloqueos?
     const srcBloq = isSlotBloqueado(targetDia, targetPeriodo, cells[dstIdx], slotsLibresBloqueados);
     const dstBloq = isSlotBloqueado(origDia, origPeriodo, celdaAMover, slotsLibresBloqueados);
-    // Â¿El docente destino cabe en la jornada del grupo origen?
+    // ¿El docente destino cabe en la jornada del grupo origen?
     const dstMaxP = getMaxPeriodosGrupo(celdaAMover.grupoId, gruposInfo, celdasOriginales, numHorasPorDia);
     const dstCabeEnOrigen = origPeriodo <= dstMaxP;
 
@@ -280,13 +280,13 @@ export function reacomodarHorarioConRipple(
     }
   }
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-  // NIVEL 3 â€” Reacomodo en cascada (backtracking controlado, mÃ¡x 5 saltos)
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // ══════════════════════════════════════════════════════════════════════════
+  // NIVEL 3 — Reacomodo en cascada (backtracking controlado, máx 5 saltos)
+  // ══════════════════════════════════════════════════════════════════════════
   return resolverCascada(cells, srcIdx, targetDia, targetPeriodo, origDia, origPeriodo, numHorasPorDia, slotsLibresBloqueados, gruposInfo);
 }
 
-// â”€â”€â”€ Cascada con Backtracking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Cascada con Backtracking ───────────────────────────────────────────────
 
 function resolverCascada(
   cells: CeldaHorario[],
@@ -314,7 +314,7 @@ function resolverCascada(
   // Colocar la celda fuente en el destino temporalmente
   work[srcIdx] = { ...work[srcIdx], diaSemana: targetDia, periodo: targetPeriodo };
 
-  // Verificar que las celdas fijas no colisionen entre sÃ­
+  // Verificar que las celdas fijas no colisionen entre sí
   const fixedArr = Array.from(fixed);
   for (let a = 0; a < fixedArr.length; a++) {
     for (let b = a + 1; b < fixedArr.length; b++) {
@@ -322,16 +322,16 @@ function resolverCascada(
       const c2 = work[fixedArr[b]];
       if (c1.diaSemana === c2.diaSemana && c1.periodo === c2.periodo) {
         if (normId(c1.grupoId) === normId(c2.grupoId)) {
-          return { success: false, error: "ðŸ”’ Casilla ocupada por una clase fijada con candado en este grupo." };
+          return { success: false, error: "🔒 Casilla ocupada por una clase fijada con candado en este grupo." };
         }
         if (normId(c1.docenteId) === normId(c2.docenteId)) {
-          return { success: false, error: `ðŸ”’ El docente tiene otra clase fijada con candado en esta hora.` };
+          return { success: false, error: `🔒 El docente tiene otra clase fijada con candado en esta hora.` };
         }
       }
     }
   }
 
-  // Ãndices de celdas no fijas que necesitan reubicaciÃ³n
+  // Índices de celdas no fijas que necesitan reubicación
   const unfixed: number[] = [];
   for (let i = 0; i < work.length; i++) {
     if (!fixed.has(i)) unfixed.push(i);
@@ -356,7 +356,7 @@ function resolverCascada(
     return scoreB - scoreA;
   });
 
-  // Matrices de ocupaciÃ³n O(1)
+  // Matrices de ocupación O(1)
   const occGrp = new Set<string>();
   const occDoc = new Set<string>();
   for (const fi of fixed) {
@@ -406,7 +406,7 @@ function resolverCascada(
     const docNombre = work[srcIdx].docente?.nombre || "el docente";
     return {
       success: false,
-      error: `âš ï¸ No es posible reubicar esta clase: generarÃ­a colisiÃ³n con el horario del docente ${docNombre} o con horas bloqueadas.`
+      error: `⚠️ No es posible reubicar esta clase: generaría colisión con el horario del docente ${docNombre} o con horas bloqueadas.`
     };
   }
 
@@ -420,4 +420,3 @@ function resolverCascada(
 
   return { success: true, celdasActualizadas: work, numMovidas: Math.max(numMovidas, 1) };
 }
-

@@ -1,4 +1,4 @@
-﻿import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx';
 
 export interface CargaImportada {
   semestre: number;
@@ -33,14 +33,14 @@ function limpiarTexto(texto: string): string {
 }
 
 /**
- * Normaliza nombres de grupos como "1A", "1Â° A", "1-A", "GRUPO 1 A" a una forma canÃ³nica: "1Â° A"
+ * Normaliza nombres de grupos como "1A", "1° A", "1-A", "GRUPO 1 A" a una forma canónica: "1° A"
  */
 function normalizarNombreGrupo(raw: string): string {
   const t = limpiarTexto(raw).replace(/\s+/g, ' ');
-  // Capturar nÃºmeros 1 a 6 y letra A a J
-  const match = t.match(/([1-6])[\sÂ°Âº\-_]*([A-J])/i);
+  // Capturar números 1 a 6 y letra A a J
+  const match = t.match(/([1-6])[\s°º\-_]*([A-J])/i);
   if (match) {
-    return `${match[1]}Â° ${match[2].toUpperCase()}`;
+    return `${match[1]}° ${match[2].toUpperCase()}`;
   }
   return t;
 }
@@ -110,7 +110,7 @@ function coincideMateria(textoExcel: string, uacNombreOficial: string, uacTipo?:
   if (normExcel.includes('EDUCACION PARA LA SALUD') && normOficial.includes('SALUD')) return true;
   if (normExcel.includes('PRACTICA Y COLABORACION') && normOficial.includes('PRACTICA')) return true;
 
-  // FormaciÃ³n Laboral
+  // Formación Laboral
   if (normExcel.includes('LABORAL') && uacTipo?.includes('LABORAL')) {
     if (normExcel.includes('"A"') || normExcel.includes(' A') || normExcel.endsWith('A') || normExcel.includes('LABORAL A') || normExcel.includes('LABORAL 1') || normExcel.includes('1')) {
       if (uacTipo === 'LABORAL_A') return true;
@@ -138,7 +138,7 @@ function coincideMateria(textoExcel: string, uacNombreOficial: string, uacTipo?:
     if (uacTipo?.includes('FFE')) return true;
   }
 
-  // ComparaciÃ³n por contenciÃ³n de palabras clave
+  // Comparación por contención de palabras clave
   const palabrasExcel = normExcel.split(/\s+/).filter(p => p.length > 3);
   const palabrasOficial = normOficial.split(/\s+/).filter(p => p.length > 3);
   const coincidencias = palabrasExcel.filter(p => palabrasOficial.includes(p));
@@ -151,7 +151,7 @@ function coincideMateria(textoExcel: string, uacNombreOficial: string, uacTipo?:
 }
 
 /**
- * Busca al docente mÃ¡s coincidente en el catÃ¡logo de personal
+ * Busca al docente más coincidente en el catálogo de personal
  */
 function buscarDocenteCoincidente(
   textoDocente: string,
@@ -246,7 +246,7 @@ export async function parsearExcelMatriz(
   const cargasResultado: CargaImportada[] = [];
   const gruposDetectadosSet = new Set<string>();
 
-  // Recorrer todas las hojas de cÃ¡lculo del libro
+  // Recorrer todas las hojas de cálculo del libro
   for (const sheetName of workbook.SheetNames) {
     const sheet = workbook.Sheets[sheetName];
     if (!sheet) continue;
@@ -255,7 +255,7 @@ export async function parsearExcelMatriz(
     const data: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
     if (!data || data.length === 0) continue;
 
-    // Buscar filas de encabezado con columnas de grupos (ej. "1Â° A", "1A", "2A", "3A", etc.)
+    // Buscar filas de encabezado con columnas de grupos (ej. "1° A", "1A", "2A", "3A", etc.)
     for (let r = 0; r < data.length; r++) {
       const fila = data[r];
       if (!fila || fila.length === 0) continue;
@@ -291,7 +291,7 @@ export async function parsearExcelMatriz(
           const filaMateria = data[mRow];
           if (!filaMateria || filaMateria.length === 0) continue;
 
-          // Si nos topamos con un tÃ­tulo de otro semestre o encabezado explÃ­cito, detener este bloque
+          // Si nos topamos con un título de otro semestre o encabezado explícito, detener este bloque
           const celda0 = String(filaMateria[0] || '').trim();
           const esSeparadorSemestre = celda0.includes('---') || celda0.toUpperCase().includes('SEMESTRE');
           if (esSeparadorSemestre) {
@@ -309,10 +309,10 @@ export async function parsearExcelMatriz(
           for (const { colIdx, grupo } of columnasGrupos) {
             const uacsGrupo = getUACsGrupoFn(grupo);
 
-            // 1. Encontrar quÃ© UAC corresponde a esta fila por nombre o tipo directo
+            // 1. Encontrar qué UAC corresponde a esta fila por nombre o tipo directo
             let uacMatch = uacsGrupo.find(u => coincideMateria(textoMateria, u.uacName, u.tipo));
 
-            // 2. Si no coincide por nombre (por ser una UAC especÃ­fica de FormaciÃ³n Laboral o FFE de otro grupo):
+            // 2. Si no coincide por nombre (por ser una UAC específica de Formación Laboral o FFE de otro grupo):
             if (!uacMatch && uacBaseFila) {
               if (uacBaseFila.tipo) {
                 uacMatch = uacsGrupo.find(u => u.tipo === uacBaseFila.tipo);
@@ -350,7 +350,7 @@ export async function parsearExcelMatriz(
     }
   }
 
-  // Si no encontrÃ³ por estructura de tabla por columnas, intentar formato plano de lista
+  // Si no encontró por estructura de tabla por columnas, intentar formato plano de lista
   if (cargasResultado.length === 0) {
     const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows: any[] = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
@@ -389,7 +389,7 @@ export async function parsearExcelMatriz(
     }
   }
 
-  // Deduplicar cargas por clave Ãºnica grupoId + uacName
+  // Deduplicar cargas por clave única grupoId + uacName
   const cargasMap = new Map<string, CargaImportada>();
   for (const c of cargasResultado) {
     const key = `${c.grupoId}___${c.uacName}`;
@@ -470,7 +470,7 @@ export async function parsearLibroIntegralExcel(
     return n.includes('PERSONAL') || n.includes('DOCENTE') || n.includes('PLANTILLA') || n.includes('PROFESOR');
   });
 
-  // Si encontramos una hoja explÃ­cita de personal o la primera hoja contiene columnas de personal
+  // Si encontramos una hoja explícita de personal o la primera hoja contiene columnas de personal
   const sheetPersonalTarget = sheetPersonalName ? workbook.Sheets[sheetPersonalName] : (workbook.SheetNames.length === 1 ? workbook.Sheets[workbook.SheetNames[0]] : null);
 
   if (sheetPersonalTarget) {
@@ -529,7 +529,7 @@ export async function parsearLibroIntegralExcel(
     }
   }
 
-  // 2. Combinar personal existente + nuevos del Excel para la resoluciÃ³n de la Matriz
+  // 2. Combinar personal existente + nuevos del Excel para la resolución de la Matriz
   const personalCombinado = [...personalExistente];
   docentesImportados.filter(d => d.valido).forEach((d, idx) => {
     const yaExiste = personalCombinado.some(
@@ -576,7 +576,7 @@ export function descargarPlantillaIntegralHorarios(
   // HOJA 1: PLANTILLA DE PERSONAL (Docentes, Directivos, Administrativos)
   // -------------------------------------------------------------
   const filasPersonal: any[][] = [
-    ['Nombre(s)', 'Apellido Paterno', 'Apellido Materno', 'Cargo / Rol', 'Horas Base', 'Correo ElectrÃ³nico'],
+    ['Nombre(s)', 'Apellido Paterno', 'Apellido Materno', 'Cargo / Rol', 'Horas Base', 'Correo Electrónico'],
   ];
 
   if (docentesDisponibles.length > 0) {
@@ -604,13 +604,13 @@ export function descargarPlantillaIntegralHorarios(
   XLSX.utils.book_append_sheet(wb, wsPersonal, '1_Plantilla_Personal');
 
   // -------------------------------------------------------------
-  // HOJA 2: MATRIZ DE HORARIOS (Configurada segÃºn los grupos del Paso 1)
+  // HOJA 2: MATRIZ DE HORARIOS (Configurada según los grupos del Paso 1)
   // -------------------------------------------------------------
   const semestres = periodoActivo === 'A' ? [1, 3, 5] : [2, 4, 6];
   const filasMatriz: any[][] = [];
 
-  filasMatriz.push([`MATRIZ DE ASIGNACIÃ“N DOCENTE POR GRUPO - PERÃODO ${periodoActivo === 'A' ? 'A (1Âº, 3Âº, 5Âº)' : 'B (2Âº, 4Âº, 6Âº)'}`]);
-  filasMatriz.push(['Instrucciones: En cada columna de grupo, escriba el nombre o apellidos del docente que impartirÃ¡ la materia.']);
+  filasMatriz.push([`MATRIZ DE ASIGNACIÓN DOCENTE POR GRUPO - PERÍODO ${periodoActivo === 'A' ? 'A (1º, 3º, 5º)' : 'B (2º, 4º, 6º)'}`]);
+  filasMatriz.push(['Instrucciones: En cada columna de grupo, escriba el nombre o apellidos del docente que impartirá la materia.']);
   filasMatriz.push([]);
 
   for (const sem of semestres) {
@@ -622,7 +622,7 @@ export function descargarPlantillaIntegralHorarios(
       headerFila.push(g.nombre);
     });
 
-    filasMatriz.push([`--- ${sem}Â° SEMESTRE ---`]);
+    filasMatriz.push([`--- ${sem}° SEMESTRE ---`]);
     filasMatriz.push(headerFila);
 
     const uacsBase = getUACsGrupoFn(gruposSem[0]);
@@ -632,21 +632,21 @@ export function descargarPlantillaIntegralHorarios(
       if (uac.tipo === 'LABORAL_A') {
         const caps = Array.from(new Set(gruposSem.map(g => g.capacitacionNombre).filter(Boolean)));
         if (caps.length > 1) {
-          nombreUacMostrar = `FormaciÃ³n Laboral "A"`;
+          nombreUacMostrar = `Formación Laboral "A"`;
         }
       } else if (uac.tipo === 'LABORAL_B') {
         const caps = Array.from(new Set(gruposSem.map(g => g.capacitacionNombre).filter(Boolean)));
         if (caps.length > 1) {
-          nombreUacMostrar = `FormaciÃ³n Laboral "B"`;
+          nombreUacMostrar = `Formación Laboral "B"`;
         }
       } else if (uac.tipo === 'FFE_1') {
-        nombreUacMostrar = `FormaciÃ³n Fundamental Extendida (Optativa FFE 1)`;
+        nombreUacMostrar = `Formación Fundamental Extendida (Optativa FFE 1)`;
       } else if (uac.tipo === 'FFE_2') {
-        nombreUacMostrar = `FormaciÃ³n Fundamental Extendida (Optativa FFE 2)`;
+        nombreUacMostrar = `Formación Fundamental Extendida (Optativa FFE 2)`;
       } else if (uac.tipo === 'FFE_3') {
-        nombreUacMostrar = `FormaciÃ³n Fundamental Extendida (Optativa FFE 3)`;
+        nombreUacMostrar = `Formación Fundamental Extendida (Optativa FFE 3)`;
       } else if (uac.tipo === 'FFE_4') {
-        nombreUacMostrar = `FormaciÃ³n Fundamental Extendida (Optativa FFE 4)`;
+        nombreUacMostrar = `Formación Fundamental Extendida (Optativa FFE 4)`;
       }
 
       const filaMateria: any[] = [nombreUacMostrar, `${uac.horasSemanales || 3}h`];
@@ -672,22 +672,22 @@ export function descargarPlantillaIntegralHorarios(
   XLSX.utils.book_append_sheet(wb, wsMatriz, '2_Matriz_Horarios');
 
   // -------------------------------------------------------------
-  // HOJA 3: INSTRUCCIONES RÃPIDAS
+  // HOJA 3: INSTRUCCIONES RÁPIDAS
   // -------------------------------------------------------------
   const filasInstrucciones: any[][] = [
-    ['GUÃA DE USO DE LA PLANTILLA INTEGRAL DE HORARIOS'],
+    ['GUÍA DE USO DE LA PLANTILLA INTEGRAL DE HORARIOS'],
     [],
     ['1. HOJA "1_Plantilla_Personal":'],
     ['   - Registre o actualice los nombres y horas de su plantilla docente y directiva.'],
-    ['   - El sistema los guardarÃ¡ automÃ¡ticamente en el catÃ¡logo de su escuela.'],
+    ['   - El sistema los guardará automáticamente en el catálogo de su escuela.'],
     [],
     ['2. HOJA "2_Matriz_Horarios":'],
     ['   - Asigne las materias escribiendo el nombre o apellido del docente en la columna de cada grupo.'],
-    ['   - Los nombres pueden escribirse en mayÃºsculas, minÃºsculas o abreviados (ej. "JOSE ALAIN", "ROSELIA", "HERNANDEZ PEREZ").'],
+    ['   - Los nombres pueden escribirse en mayúsculas, minúsculas o abreviados (ej. "JOSE ALAIN", "ROSELIA", "HERNANDEZ PEREZ").'],
     [],
     ['3. CARGA EN LA PLATAFORMA:'],
     ['   - Suba este mismo archivo en el Paso 2 o en el Paso 3 del Generador de Horarios.'],
-    ['   - Â¡La plataforma importarÃ¡ el personal y llenarÃ¡ la matriz en un solo paso!'],
+    ['   - ¡La plataforma importará el personal y llenará la matriz en un solo paso!'],
   ];
 
   const wsInstrucciones = XLSX.utils.aoa_to_sheet(filasInstrucciones);
@@ -702,5 +702,4 @@ export function descargarPlantillaIntegralHorarios(
  * Alias retrocompatible
  */
 export const descargarPlantillaMatrizDocente = descargarPlantillaIntegralHorarios;
-
 

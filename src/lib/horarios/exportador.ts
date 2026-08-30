@@ -1,12 +1,12 @@
 /**
- * exportador.ts â€” Motor de ExportaciÃ³n Oficial de Horarios Escolares
+ * exportador.ts — Motor de Exportación Oficial de Horarios Escolares
  * Plataforma Inteligente de Horarios Escolares MCCEMS
  *
  * Formatos soportados:
- * 1. PDF Oficial (jsPDF + autoTable) â€” Landscape CARTA (Letter), membrete oficial sin placeholders, firmas de 3 columnas anti-colisiÃ³n.
- * 2. Word Editable (.docx) â€” Landscape CARTA (Letter) garantizado para Microsoft Word escritorio, tablas editables, paleta pastel y tipografÃ­a diferenciada.
- * 3. Excel Estilizado (.xlsx) â€” ExcelJS con celdas pastel, congelaciÃ³n de paneles y membrete dinÃ¡mico con Zona Escolar.
- * 4. Imagen WhatsApp / Redes Sociales â€” Motor Canvas 2D nativo ultra-fiable en 1080x1080 (Cuadrado) y 1080x1920 (Historia) con nombres completos y cero espacio muerto.
+ * 1. PDF Oficial (jsPDF + autoTable) — Landscape CARTA (Letter), membrete oficial sin placeholders, firmas de 3 columnas anti-colisión.
+ * 2. Word Editable (.docx) — Landscape CARTA (Letter) garantizado para Microsoft Word escritorio, tablas editables, paleta pastel y tipografía diferenciada.
+ * 3. Excel Estilizado (.xlsx) — ExcelJS con celdas pastel, congelación de paneles y membrete dinámico con Zona Escolar.
+ * 4. Imagen WhatsApp / Redes Sociales — Motor Canvas 2D nativo ultra-fiable en 1080x1080 (Cuadrado) y 1080x1920 (Historia) con nombres completos y cero espacio muerto.
  */
 
 import jsPDF from "jspdf";
@@ -82,10 +82,10 @@ export function getHashColor(texto: string): string {
 }
 
 // =========================================================================
-// 1. EXPORTACIÃ“N A PDF OFICIAL FORMAL (Landscape Carta / Letter Anti-ColisiÃ³n)
+// 1. EXPORTACIÓN A PDF OFICIAL FORMAL (Landscape Carta / Letter Anti-Colisión)
 // =========================================================================
 export function exportarHorarioPDF(datos: DatosExportacionHorario) {
-  // TamaÃ±o Carta Horizontal: 279.4 mm x 215.9 mm (EstÃ¡ndar MÃ©xico)
+  // Tamaño Carta Horizontal: 279.4 mm x 215.9 mm (Estándar México)
   const doc = new jsPDF({
     orientation: "landscape",
     unit: "mm",
@@ -107,24 +107,24 @@ export function exportarHorarioPDF(datos: DatosExportacionHorario) {
       doc.addPage("letter", "landscape");
     }
 
-    // â”€â”€ 1. Membrete Institucional Compacto y Elegante (Y=6.5 a 19 mm) â”€â”€
+    // ── 1. Membrete Institucional Compacto y Elegante (Y=6.5 a 19 mm) ──
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...NAVY_RGB);
     doc.setFontSize(9.5);
     doc.text("GOBIERNO DEL ESTADO DE PUEBLA", pageWidth / 2, 6.5, { align: "center" });
 
     doc.setFontSize(8);
-    doc.text("SECRETARÃA DE EDUCACIÃ“N PÃšBLICA", pageWidth / 2, 10, { align: "center" });
+    doc.text("SECRETARÍA DE EDUCACIÓN PÚBLICA", pageWidth / 2, 10, { align: "center" });
     doc.setFont("helvetica", "normal");
     doc.setTextColor(71, 85, 105);
     doc.setFontSize(7);
-    doc.text("SUBSECRETARÃA DE EDUCACIÃ“N MEDIA SUPERIOR Y SUPERIOR", pageWidth / 2, 13, { align: "center" });
+    doc.text("SUBSECRETARÍA DE EDUCACIÓN MEDIA SUPERIOR Y SUPERIOR", pageWidth / 2, 13, { align: "center" });
     doc.setFont("helvetica", "bold");
-    doc.text("DIRECCIÃ“N DE BACHILLERATOS GENERALES", pageWidth / 2, 16, { align: "center" });
+    doc.text("DIRECCIÓN DE BACHILLERATOS GENERALES", pageWidth / 2, 16, { align: "center" });
     doc.setFont("helvetica", "normal");
-    doc.text(`SUPERVISIÃ“N ESCOLAR ${zonaTexto}`, pageWidth / 2, 19, { align: "center" });
+    doc.text(`SUPERVISIÓN ESCOLAR ${zonaTexto}`, pageWidth / 2, 19, { align: "center" });
 
-    // â”€â”€ 2. Doble LÃ­nea Institucional (Azul Marino + Dorado) â”€â”€
+    // ── 2. Doble Línea Institucional (Azul Marino + Dorado) ──
     doc.setDrawColor(...NAVY_RGB);
     doc.setLineWidth(0.8);
     doc.line(14, 21, pageWidth - 14, 21);
@@ -132,15 +132,15 @@ export function exportarHorarioPDF(datos: DatosExportacionHorario) {
     doc.setLineWidth(0.3);
     doc.line(14, 22, pageWidth - 14, 22);
 
-    // â”€â”€ 3. Banda de TÃ­tulo Oficial Compacta (Y=23.5 a 29 mm) â”€â”€
+    // ── 3. Banda de Título Oficial Compacta (Y=23.5 a 29 mm) ──
     doc.setFillColor(...NAVY_RGB);
     doc.rect(14, 23.5, pageWidth - 28, 5.5, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8.5);
-    doc.text(`HORARIO OFICIAL DE CLASES â€” CICLO ESCOLAR ${datos.cicloEscolar || "2026-2027"}`, pageWidth / 2, 27.2, { align: "center" });
+    doc.text(`HORARIO OFICIAL DE CLASES — CICLO ESCOLAR ${datos.cicloEscolar || "2026-2027"}`, pageWidth / 2, 27.2, { align: "center" });
 
-    // â”€â”€ 4. Barra de Metadatos Ejecutiva (Y=30.5 a 38.5 mm) â”€â”€
+    // ── 4. Barra de Metadatos Ejecutiva (Y=30.5 a 38.5 mm) ──
     doc.setFillColor(241, 245, 249); // #F1F5F9
     doc.setDrawColor(...BORDER_RGB);
     doc.setLineWidth(0.25);
@@ -164,7 +164,7 @@ export function exportarHorarioPDF(datos: DatosExportacionHorario) {
 
     doc.setFont("helvetica", "normal");
     doc.setTextColor(71, 85, 105);
-    doc.text("SupervisiÃ³n:", 60, 37.2);
+    doc.text("Supervisión:", 60, 37.2);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(15, 23, 42);
     doc.text(zonaTexto, 76, 37.2);
@@ -173,7 +173,7 @@ export function exportarHorarioPDF(datos: DatosExportacionHorario) {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7.5);
     doc.setTextColor(...NAVY_RGB);
-    doc.text(`${fila.encabezado.toUpperCase()} ${fila.subtitulo ? " â€¢ " + fila.subtitulo : ""}`, pageWidth - 17, 34, { align: "right" });
+    doc.text(`${fila.encabezado.toUpperCase()} ${fila.subtitulo ? " • " + fila.subtitulo : ""}`, pageWidth - 17, 34, { align: "right" });
 
     let totalHorasFila = 0;
     const asignaturasContadas = new Set<string>();
@@ -192,8 +192,8 @@ export function exportarHorarioPDF(datos: DatosExportacionHorario) {
     doc.setTextColor(22, 101, 52); // Verde institucional
     doc.text(`Carga Total: ${totalHorasFila} hrs/semana (${asignaturasContadas.size} materias)`, pageWidth - 17, 37.2, { align: "right" });
 
-    // â”€â”€ 5. ConstrucciÃ³n de Tabla Oficial â”€â”€
-    const head = [["PERIODO", "LUNES", "MARTES", "MIÃ‰RCOLES", "JUEVES", "VIERNES"]];
+    // ── 5. Construcción de Tabla Oficial ──
+    const head = [["PERIODO", "LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES"]];
     const body: any[][] = [];
     const materiasGrid: (string | null)[][] = [];
 
@@ -278,7 +278,7 @@ export function exportarHorarioPDF(datos: DatosExportacionHorario) {
 
     const finalY = (doc as any).lastAutoTable?.finalY || 135;
 
-    // â”€â”€ 6. Bloque Formal de Firmas Institucionales (3 Columnas Anti-ColisiÃ³n) â”€â”€
+    // ── 6. Bloque Formal de Firmas Institucionales (3 Columnas Anti-Colisión) ──
     const yFirmas = Math.min(176, Math.max(finalY + 3.5, 136));
     const colWidth = (pageWidth - 28) / 3;
 
@@ -288,12 +288,12 @@ export function exportarHorarioPDF(datos: DatosExportacionHorario) {
         subtitulo: "Nombre y Firma"
       },
       {
-        titulo: "DIRECCIÃ“N DEL PLANTEL",
+        titulo: "DIRECCIÓN DEL PLANTEL",
         subtitulo: "Sello y Firma Oficial"
       },
       {
-        titulo: `SUPERVISIÃ“N ESCOLAR ${zonaTexto}`,
-        subtitulo: "Vo. Bo. SupervisiÃ³n Escolar"
+        titulo: `SUPERVISIÓN ESCOLAR ${zonaTexto}`,
+        subtitulo: "Vo. Bo. Supervisión Escolar"
       }
     ];
 
@@ -309,7 +309,7 @@ export function exportarHorarioPDF(datos: DatosExportacionHorario) {
       doc.rect(x + (colWidth / 2) - (boxW / 2), yFirmas, boxW, boxH);
       doc.setLineDashPattern([], 0);
 
-      // LÃ­nea sÃ³lida de firma
+      // Línea sólida de firma
       doc.setDrawColor(51, 65, 85);
       doc.setLineWidth(0.35);
       doc.line(x + 10, yFirmas + 13.5, x + colWidth - 10, yFirmas + 13.5);
@@ -326,7 +326,7 @@ export function exportarHorarioPDF(datos: DatosExportacionHorario) {
       doc.text(rf.subtitulo, x + (colWidth / 2), yFirmas + 20, { align: "center" });
     });
 
-    // â”€â”€ 7. Pie de PÃ¡gina con Trazabilidad y PaginaciÃ³n â”€â”€
+    // ── 7. Pie de Página con Trazabilidad y Paginación ──
     const pageNum = idxFila + 1;
     doc.setDrawColor(...NAVY_RGB);
     doc.setLineWidth(0.25);
@@ -335,7 +335,7 @@ export function exportarHorarioPDF(datos: DatosExportacionHorario) {
     doc.setFontSize(6.5);
     doc.setTextColor(148, 163, 184);
     doc.text(
-      `SIGPDA-EMS â€” Sistema Integral de GestiÃ³n de PlaneaciÃ³n DidÃ¡ctica Automatizada  |  Generado: ${new Date().toLocaleDateString("es-MX")}`,
+      `SIGPDA-EMS — Sistema Integral de Gestión de Planeación Didáctica Automatizada  |  Generado: ${new Date().toLocaleDateString("es-MX")}`,
       14,
       pageHeight - 5.5
     );
@@ -352,7 +352,7 @@ export function exportarHorarioPDF(datos: DatosExportacionHorario) {
 }
 
 // =========================================================================
-// 2. EXPORTACIÃ“N A WORD (.DOCX) â€” Horizontal (Landscape Carta / Letter Garantizado)
+// 2. EXPORTACIÓN A WORD (.DOCX) — Horizontal (Landscape Carta / Letter Garantizado)
 // =========================================================================
 export async function exportarHorarioDOCX(datos: DatosExportacionHorario) {
   const NAVY = "1E3A8A";
@@ -361,7 +361,7 @@ export async function exportarHorarioDOCX(datos: DatosExportacionHorario) {
 
   // Dimensiones Carta Horizontal en DXA (1 pulgada = 1440 DXA)
   // Ancho: 11 in * 1440 = 15840 DXA. Alto: 8.5 in * 1440 = 12240 DXA.
-  // MÃ¡rgenes: 720 DXA (0.5 in). Ancho Ãºtil = 14400 DXA.
+  // Márgenes: 720 DXA (0.5 in). Ancho útil = 14400 DXA.
   const COL_PERIODO_DXA = 2000;
   const COL_DIA_DXA = 2480; // 5 * 2480 = 12400 DXA. Total = 14400 DXA.
 
@@ -388,7 +388,7 @@ export async function exportarHorarioDOCX(datos: DatosExportacionHorario) {
         spacing: { after: 15 },
         children: [
           new TextRun({
-            text: "SECRETARÃA DE EDUCACIÃ“N PÃšBLICA",
+            text: "SECRETARÍA DE EDUCACIÓN PÚBLICA",
             bold: true,
             size: 17, // 8.5pt
             color: NAVY,
@@ -401,7 +401,7 @@ export async function exportarHorarioDOCX(datos: DatosExportacionHorario) {
         spacing: { after: 15 },
         children: [
           new TextRun({
-            text: "SUBSECRETARÃA DE EDUCACIÃ“N MEDIA SUPERIOR Y SUPERIOR",
+            text: "SUBSECRETARÍA DE EDUCACIÓN MEDIA SUPERIOR Y SUPERIOR",
             size: 14, // 7pt
             color: "475569",
             font: "Helvetica"
@@ -413,7 +413,7 @@ export async function exportarHorarioDOCX(datos: DatosExportacionHorario) {
         spacing: { after: 15 },
         children: [
           new TextRun({
-            text: "DIRECCIÃ“N DE BACHILLERATOS GENERALES",
+            text: "DIRECCIÓN DE BACHILLERATOS GENERALES",
             bold: true,
             size: 16, // 8pt
             color: "1e293b",
@@ -426,14 +426,14 @@ export async function exportarHorarioDOCX(datos: DatosExportacionHorario) {
         spacing: { after: 30 },
         children: [
           new TextRun({
-            text: `SUPERVISIÃ“N ESCOLAR ${zonaTexto}`,
+            text: `SUPERVISIÓN ESCOLAR ${zonaTexto}`,
             size: 15,
             color: "1e293b",
             font: "Helvetica"
           })
         ]
       }),
-      // LÃ­nea divisoria
+      // Línea divisoria
       new Paragraph({
         alignment: AlignmentType.CENTER,
         border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: NAVY } },
@@ -446,7 +446,7 @@ export async function exportarHorarioDOCX(datos: DatosExportacionHorario) {
         spacing: { after: 25 },
         children: [
           new TextRun({
-            text: `PLANTEL: ${datos.nombreEscuela.toUpperCase()}   â€¢   C.C.T.: ${datos.cct.toUpperCase()}   â€¢   SUPERVISIÃ“N: ${zonaTexto}`,
+            text: `PLANTEL: ${datos.nombreEscuela.toUpperCase()}   •   C.C.T.: ${datos.cct.toUpperCase()}   •   SUPERVISIÓN: ${zonaTexto}`,
             bold: true,
             size: 16,
             color: "0f172a",
@@ -459,7 +459,7 @@ export async function exportarHorarioDOCX(datos: DatosExportacionHorario) {
         spacing: { after: 80 },
         children: [
           new TextRun({
-            text: `HORARIO OFICIAL: ${fila.encabezado.toUpperCase()} ${fila.subtitulo ? " - " + fila.subtitulo : ""}   â€¢   CICLO ESCOLAR ${datos.cicloEscolar || "2026-2027"}`,
+            text: `HORARIO OFICIAL: ${fila.encabezado.toUpperCase()} ${fila.subtitulo ? " - " + fila.subtitulo : ""}   •   CICLO ESCOLAR ${datos.cicloEscolar || "2026-2027"}`,
             bold: true,
             size: 16,
             color: NAVY,
@@ -594,8 +594,8 @@ export async function exportarHorarioDOCX(datos: DatosExportacionHorario) {
     // 4. Tabla de Firmas en 3 Columnas Horizontal
     const rolesFirmas = [
       fila.encabezado.startsWith("DOCENTE") ? "Docente de la Asignatura" : "Asesor / Titular de Grupo",
-      "DirecciÃ³n del Plantel",
-      `SupervisiÃ³n Escolar ${zonaTexto}`
+      "Dirección del Plantel",
+      `Supervisión Escolar ${zonaTexto}`
     ];
 
     const tablaFirmas = new Table({
@@ -668,7 +668,7 @@ export async function exportarHorarioDOCX(datos: DatosExportacionHorario) {
 }
 
 // =========================================================================
-// 3. EXPORTACIÃ“N A EXCEL (.XLSX) â€” ExcelJS con formato condicional y membrete dinÃ¡mico
+// 3. EXPORTACIÓN A EXCEL (.XLSX) — ExcelJS con formato condicional y membrete dinámico
 // =========================================================================
 export async function exportarHorarioExcel(datos: DatosExportacionHorario) {
   const wb = new ExcelJS.Workbook();
@@ -685,13 +685,13 @@ export async function exportarHorarioExcel(datos: DatosExportacionHorario) {
     // 1. Membrete Institucional en Filas 1 a 4
     ws.mergeCells("A1:F1");
     const cellA1 = ws.getCell("A1");
-    cellA1.value = "GOBIERNO DEL ESTADO DE PUEBLA Â· SECRETARÃA DE EDUCACIÃ“N PÃšBLICA";
+    cellA1.value = "GOBIERNO DEL ESTADO DE PUEBLA · SECRETARÍA DE EDUCACIÓN PÚBLICA";
     cellA1.font = { bold: true, size: 11, color: { argb: "FF1E3A8A" } };
     cellA1.alignment = { horizontal: "center", vertical: "middle" };
 
     ws.mergeCells("A2:F2");
     const cellA2 = ws.getCell("A2");
-    cellA2.value = `SUBSECRETARÃA DE EDUCACIÃ“N MEDIA SUPERIOR Y SUPERIOR Â· SUPERVISIÃ“N ESCOLAR ${zonaTexto}`;
+    cellA2.value = `SUBSECRETARÍA DE EDUCACIÓN MEDIA SUPERIOR Y SUPERIOR · SUPERVISIÓN ESCOLAR ${zonaTexto}`;
     cellA2.font = { bold: true, size: 10, color: { argb: "FF1E3A8A" } };
     cellA2.alignment = { horizontal: "center", vertical: "middle" };
 
@@ -714,7 +714,7 @@ export async function exportarHorarioExcel(datos: DatosExportacionHorario) {
 
     // Fila 6: Encabezados de Columna
     const headerRow = ws.getRow(6);
-    headerRow.values = ["Periodo", "Lunes", "Martes", "MiÃ©rcoles", "Jueves", "Viernes"];
+    headerRow.values = ["Periodo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
     headerRow.height = 24;
     headerRow.eachCell((cell) => {
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A8A" } };
@@ -820,13 +820,13 @@ export async function exportarSumarioExcel(datos: DatosSumario, tipo: "DOCENTE" 
   // Membrete
   ws.mergeCells(1, 1, 1, totalCols);
   const c1 = ws.getCell(1, 1);
-  c1.value = `SECRETARÃA DE EDUCACIÃ“N PÃšBLICA Â· SUPERVISIÃ“N ESCOLAR ${zonaTexto} Â· PLANTEL: ${datos.nombreEscuela.toUpperCase()} (${datos.cct})`;
+  c1.value = `SECRETARÍA DE EDUCACIÓN PÚBLICA · SUPERVISIÓN ESCOLAR ${zonaTexto} · PLANTEL: ${datos.nombreEscuela.toUpperCase()} (${datos.cct})`;
   c1.font = { bold: true, size: 11, color: { argb: "FF1E3A8A" } };
   c1.alignment = { horizontal: "center" };
 
   ws.mergeCells(2, 1, 2, totalCols);
   const c2 = ws.getCell(2, 1);
-  c2.value = `SUMARIO ${tipo === "DOCENTE" ? "MAESTRO OFICIAL" : "POR GRUPOS"} Â· HORARIO SEMANAL COMPLETO`;
+  c2.value = `SUMARIO ${tipo === "DOCENTE" ? "MAESTRO OFICIAL" : "POR GRUPOS"} · HORARIO SEMANAL COMPLETO`;
   c2.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
   c2.font = { bold: true, size: 10, color: { argb: "FF334155" } };
   c2.alignment = { horizontal: "center" };
@@ -868,7 +868,7 @@ export async function exportarSumarioExcel(datos: DatosSumario, tipo: "DOCENTE" 
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${colors.pastelBg}` } };
           cell.font = { bold: true, color: { argb: `FF${colors.pastelText}` }, size: 8 };
         } else {
-          cell.value = "â€”";
+          cell.value = "—";
           cell.font = { color: { argb: "FF94A3B8" }, size: 8 };
         }
         cell.alignment = { wrapText: true, horizontal: "center", vertical: "middle" };
@@ -893,11 +893,11 @@ export async function exportarSumarioExcel(datos: DatosSumario, tipo: "DOCENTE" 
 }
 
 // =========================================================================
-// 4. EXPORTACIÃ“N A WHATSAPP / REDES SOCIALES â€” Canvas 2D Nombres Completos y Cero Espacio Muerto
+// 4. EXPORTACIÓN A WHATSAPP / REDES SOCIALES — Canvas 2D Nombres Completos y Cero Espacio Muerto
 // =========================================================================
 
 /**
- * FunciÃ³n auxiliar para dibujar texto multilÃ­nea sin truncar artificialmente
+ * Función auxiliar para dibujar texto multilínea sin truncar artificialmente
  */
 function wrapTextCanvas(
   ctx: CanvasRenderingContext2D,
@@ -940,7 +940,7 @@ function wrapTextCanvas(
 }
 
 /**
- * FunciÃ³n auxiliar para dibujar rectÃ¡ngulos redondeados en Canvas
+ * Función auxiliar para dibujar rectángulos redondeados en Canvas
  */
 function roundRect(
   ctx: CanvasRenderingContext2D,
@@ -965,7 +965,7 @@ function roundRect(
 
 /**
  * Exportador nativo ultra-robusto usando HTML5 Canvas 2D
- * Garantiza cero pantallas negras, rendering nÃ­tido, nombres completos y mÃ¡ximo aprovechamiento visual.
+ * Garantiza cero pantallas negras, rendering nítido, nombres completos y máximo aprovechamiento visual.
  */
 export async function exportarHorarioWhatsApp(
   datos: DatosExportacionHorario,
@@ -986,7 +986,7 @@ export async function exportarHorarioWhatsApp(
 
   const zonaTexto = datos.zonaEscolar ? (datos.zonaEscolar.toLowerCase().includes("zona") ? datos.zonaEscolar.toUpperCase() : `ZONA ${datos.zonaEscolar}`) : "ZONA 004";
 
-  // â”€â”€ 1. Fondo Oscuro Cyber Degradado â”€â”€
+  // ── 1. Fondo Oscuro Cyber Degradado ──
   const bgGrad = ctx.createLinearGradient(0, 0, width, height);
   bgGrad.addColorStop(0, "#060913");
   bgGrad.addColorStop(0.4, "#0b0f19");
@@ -1004,7 +1004,7 @@ export async function exportarHorarioWhatsApp(
   const padX = isStory ? 42 : 36;
   const padY = isStory ? 55 : 32;
 
-  // â”€â”€ 2. Header Institucional NeÃ³n â”€â”€
+  // ── 2. Header Institucional Neón ──
   const iconSize = isStory ? 56 : 46;
   ctx.fillStyle = "#1E293B";
   ctx.strokeStyle = "#38BDF8";
@@ -1015,7 +1015,7 @@ export async function exportarHorarioWhatsApp(
   ctx.font = `bold ${isStory ? "28px" : "24px"} system-ui, -apple-system, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("ðŸŽ“", padX + iconSize / 2, padY + iconSize / 2);
+  ctx.fillText("🎓", padX + iconSize / 2, padY + iconSize / 2);
 
   // Nombre de Escuela y CCT
   ctx.textAlign = "left";
@@ -1028,7 +1028,7 @@ export async function exportarHorarioWhatsApp(
   ctx.shadowBlur = 0;
   ctx.fillStyle = "#94A3B8";
   ctx.font = `600 ${isStory ? "14.5px" : "12.5px"} system-ui, -apple-system, sans-serif`;
-  ctx.fillText(`C.C.T.: ${datos.cct.toUpperCase()}   â€¢   CICLO: ${datos.cicloEscolar || "2026-2027"}`, padX + iconSize + 14, padY + (isStory ? 44 : 37));
+  ctx.fillText(`C.C.T.: ${datos.cct.toUpperCase()}   •   CICLO: ${datos.cicloEscolar || "2026-2027"}`, padX + iconSize + 14, padY + (isStory ? 44 : 37));
 
   // Badge Zona Escolar
   const badgeW = isStory ? 140 : 120;
@@ -1045,7 +1045,7 @@ export async function exportarHorarioWhatsApp(
   ctx.font = `800 ${isStory ? "13px" : "11.5px"} system-ui, -apple-system, sans-serif`;
   ctx.fillText(zonaTexto, badgeX + badgeW / 2, badgeY + badgeH / 2 + 1);
 
-  // LÃ­nea divisoria superior
+  // Línea divisoria superior
   const divY1 = padY + (isStory ? 74 : 58);
   ctx.strokeStyle = "#1E293B";
   ctx.lineWidth = 1.5;
@@ -1054,7 +1054,7 @@ export async function exportarHorarioWhatsApp(
   ctx.lineTo(width - padX, divY1);
   ctx.stroke();
 
-  // â”€â”€ 3. TÃ­tulo del Horario / Entidad â”€â”€
+  // ── 3. Título del Horario / Entidad ──
   const titleY = divY1 + (isStory ? 34 : 26);
   ctx.textAlign = "left";
   ctx.fillStyle = "#FFFFFF";
@@ -1064,11 +1064,11 @@ export async function exportarHorarioWhatsApp(
   ctx.fillText(fila.encabezado.toUpperCase(), padX, titleY);
 
   ctx.shadowBlur = 0;
-  ctx.fillStyle = "#A3E635"; // Verde lima neÃ³n
+  ctx.fillStyle = "#A3E635"; // Verde lima neón
   ctx.font = `bold ${isStory ? "15px" : "12.5px"} system-ui, -apple-system, sans-serif`;
-  ctx.fillText(`HORARIO OFICIAL DE CLASES â€¢ TURNO MATUTINO`, padX, titleY + (isStory ? 24 : 18));
+  ctx.fillText(`HORARIO OFICIAL DE CLASES • TURNO MATUTINO`, padX, titleY + (isStory ? 24 : 18));
 
-  // â”€â”€ 4. Matriz de Horario Semanal (5 Columnas) â”€â”€
+  // ── 4. Matriz de Horario Semanal (5 Columnas) ──
   const gridStartY = titleY + (isStory ? 42 : 30);
   const footerHeight = isStory ? 55 : 42;
   const gridEndY = height - padY - footerHeight;
@@ -1087,16 +1087,16 @@ export async function exportarHorarioWhatsApp(
 
   for (let d = 1; d <= numDias; d++) {
     const colX = padX + (d - 1) * (colW + colGap);
-    const diaNombre = datos.dias[d - 1] || `DÃ­a ${d}`;
+    const diaNombre = datos.dias[d - 1] || `Día ${d}`;
 
-    // Cabecera del dÃ­a
+    // Cabecera del día
     ctx.fillStyle = "rgba(30, 41, 59, 0.9)";
     ctx.strokeStyle = "#334155";
     ctx.lineWidth = 1;
     roundRect(ctx, colX, gridStartY, colW, headerColH, 8, true, true);
 
     ctx.textAlign = "center";
-    ctx.fillStyle = "#F472B6"; // Rosa NeÃ³n
+    ctx.fillStyle = "#F472B6"; // Rosa Neón
     ctx.font = `800 ${isStory ? "14px" : "12px"} system-ui, -apple-system, sans-serif`;
     ctx.shadowColor = "rgba(244, 114, 182, 0.5)";
     ctx.shadowBlur = 4;
@@ -1135,7 +1135,7 @@ export async function exportarHorarioWhatsApp(
         ctx.lineWidth = 1;
         roundRect(ctx, colX, cellY, colW, cellH, 8, true, true);
 
-        // Barra lateral neÃ³n de color
+        // Barra lateral neón de color
         ctx.fillStyle = colors.neon;
         ctx.shadowColor = colors.neonGlow;
         ctx.shadowBlur = 6;
@@ -1143,7 +1143,7 @@ export async function exportarHorarioWhatsApp(
         ctx.shadowBlur = 0;
 
         if (isStory) {
-          // â”€â”€ STORY (9:16) ULTRA-ENRIQUECIDO â€” Cero espacio muerto â”€â”€
+          // ── STORY (9:16) ULTRA-ENRIQUECIDO — Cero espacio muerto ──
           // Badge Periodo y Hora
           ctx.fillStyle = "rgba(30, 41, 59, 0.9)";
           ctx.strokeStyle = "#475569";
@@ -1167,7 +1167,7 @@ export async function exportarHorarioWhatsApp(
             }
           }
 
-          // Nombre de la Materia Completo (NeÃ³n)
+          // Nombre de la Materia Completo (Neón)
           ctx.textAlign = "left";
           ctx.fillStyle = colors.neon;
           ctx.font = "bold 14px system-ui, -apple-system, sans-serif";
@@ -1187,14 +1187,14 @@ export async function exportarHorarioWhatsApp(
 
             ctx.fillStyle = "#94A3B8";
             ctx.font = "700 9.5px system-ui, -apple-system, sans-serif";
-            ctx.fillText("ðŸ‘¨â€ðŸ« DOCENTE:", colX + 10, docBoxY + 13);
+            ctx.fillText("👨‍🏫 DOCENTE:", colX + 10, docBoxY + 13);
 
             ctx.fillStyle = "#FFFFFF";
             ctx.font = "bold 11px system-ui, -apple-system, sans-serif";
             wrapTextCanvas(ctx, doc, colX + 10, docBoxY + 28, colW - 20, 12, 1);
           }
         } else {
-          // â”€â”€ SQUARE (1:1) â€” Nombres Completos y Ã“ptima JerarquÃ­a â”€â”€
+          // ── SQUARE (1:1) — Nombres Completos y Óptima Jerarquía ──
           // Badge de Periodo
           ctx.textAlign = "left";
           ctx.fillStyle = "#94A3B8";
@@ -1230,7 +1230,7 @@ export async function exportarHorarioWhatsApp(
     }
   }
 
-  // â”€â”€ 5. Footer NeÃ³n â”€â”€
+  // ── 5. Footer Neón ──
   const footY = height - padY;
   ctx.strokeStyle = "#1E293B";
   ctx.lineWidth = 1.2;
@@ -1258,13 +1258,12 @@ export async function exportarHorarioWhatsApp(
   ctx.textAlign = "center";
   ctx.fillStyle = "#34D399";
   ctx.font = `bold ${isStory ? "11.5px" : "10px"} system-ui, -apple-system, sans-serif`;
-  ctx.fillText("ðŸ“± VÃ¡lido para WhatsApp & Redes", badgeSocialX + badgeSocialW / 2, badgeSocialY + badgeSocialH / 2 + 1);
+  ctx.fillText("📱 Válido para WhatsApp & Redes", badgeSocialX + badgeSocialW / 2, badgeSocialY + badgeSocialH / 2 + 1);
 
-  // â”€â”€ 6. Descarga del PNG â”€â”€
+  // ── 6. Descarga del PNG ──
   const dataUrl = canvas.toDataURL("image/png");
   const a = document.createElement("a");
   a.href = dataUrl;
   a.download = `Horario_WhatsApp_${datos.cct}_${fila.encabezado.replace(/\s+/g, "_")}.png`;
   a.click();
 }
-

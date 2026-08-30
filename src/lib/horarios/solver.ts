@@ -1,10 +1,10 @@
-﻿/**
- * Motor Solver de Restricciones para GeneraciÃ³n de Horarios Escolares
- * SIGPDA-EMS â€” Motor HÃ­brido: Group-Permutation Min-Conflicts + Tabu Search + Adaptive Stagnation Perturbation + Multi-Start
- * Inspirado en la arquitectura de UniTime/CPSolver, QuACS y algoritmos de optimizaciÃ³n combinatoria para CSPs densos.
+/**
+ * Motor Solver de Restricciones para Generación de Horarios Escolares
+ * SIGPDA-EMS — Motor Híbrido: Group-Permutation Min-Conflicts + Tabu Search + Adaptive Stagnation Perturbation + Multi-Start
+ * Inspirado en la arquitectura de UniTime/CPSolver, QuACS y algoritmos de optimización combinatoria para CSPs densos.
  * 
- * Resuelve problemas complejos de horarios escolares de educaciÃ³n media superior (255+ horas) con candados,
- * dÃ­as libres completos y restricciones docentes con 0 empalmes en < 300 ms.
+ * Resuelve problemas complejos de horarios escolares de educación media superior (255+ horas) con candados,
+ * días libres completos y restricciones docentes con 0 empalmes en < 300 ms.
  */
 
 export interface GrupoInput {
@@ -50,7 +50,7 @@ export interface CeldaFijaInput {
 
 export interface RestriccionDocenteInput {
   docenteId: string;
-  diasIndisponibles?: number[]; // ej. [3] para MiÃ©rcoles, [4] para Jueves
+  diasIndisponibles?: number[]; // ej. [3] para Miércoles, [4] para Jueves
   periodosIndisponibles?: { dia: number; periodo: number }[];
 }
 
@@ -134,7 +134,7 @@ export function resolverHorario(params: SolverParams): SolverResult {
     return {
       exito: false,
       celdas: [],
-      conflictos: ["No se especificaron cargas acadÃ©micas."],
+      conflictos: ["No se especificaron cargas académicas."],
       metricas: { totalClasesProgramadas: 0, totalClasesRequeridas: 0, huecosDocentes: 0, huecosGrupos: 0 }
     };
   }
@@ -170,21 +170,21 @@ export function resolverHorario(params: SolverParams): SolverResult {
     }
   }
 
-  // 2. IndexaciÃ³n de ranuras (Slot 0..29)
+  // 2. Indexación de ranuras (Slot 0..29)
   const slotIndex = (dia: number, periodo: number) => (dia - 1) * horasPorDia + (periodo - 1);
   const slotFromIndex = (idx: number) => ({
     dia: Math.floor(idx / horasPorDia) + 1,
     periodo: (idx % horasPorDia) + 1
   });
 
-  // 3. Sanitizar celdas fijas que colisionen con dÃ­as bloqueados
+  // 3. Sanitizar celdas fijas que colisionen con días bloqueados
   const celdasFijasValidas = celdasFijas.filter((f) => {
     const docId = normalizarId(f.docenteId);
     const grpId = normalizarId(f.grupoId);
     const kDoc = `${f.diaSemana}_${f.periodo}_${docId}`;
     const kGrp = `${f.diaSemana}_${f.periodo}_${grpId}`;
     if (slotLibreBloqueadoSet.has(kDoc) || slotLibreBloqueadoSet.has(kGrp) || docenteIndisponibleSet.has(kDoc)) {
-      return false; // Ignorar candado si colisiona con dÃ­a/hora bloqueada
+      return false; // Ignorar candado si colisiona con día/hora bloqueada
     }
     return true;
   });
@@ -227,7 +227,7 @@ export function resolverHorario(params: SolverParams): SolverResult {
       totalRequeridas++;
     }
 
-    // Insertar cargas acadÃ©micas restantes
+    // Insertar cargas académicas restantes
     for (const c of grpCargas) {
       const docId = normalizarId(c.docenteId);
       const fijadas = fijasGrp.filter(
@@ -235,7 +235,7 @@ export function resolverHorario(params: SolverParams): SolverResult {
       ).length;
       const countRestante = Math.max(0, c.horasSemanales - fijadas);
 
-      // Ranuras vÃ¡lidas para este docente (sin bloqueos ni indisponibilidades)
+      // Ranuras válidas para este docente (sin bloqueos ni indisponibilidades)
       const validSlotsDoc = validGroupSlots.filter(sIdx => {
         const s = slotFromIndex(sIdx);
         const kDoc = `${s.dia}_${s.periodo}_${docId}`;
@@ -268,7 +268,7 @@ export function resolverHorario(params: SolverParams): SolverResult {
 
   const docIds = Array.from(new Set(allUnits.map(u => u.docenteId)));
 
-  // 5. Motor Solver Permutacional Min-Conflicts + Tabu Search + PerturbaciÃ³n + Multi-Start
+  // 5. Motor Solver Permutacional Min-Conflicts + Tabu Search + Perturbación + Multi-Start
   function runPermutationSolver(): { success: boolean; assignment: Int32Array; conflicts: number } {
     const t0 = Date.now();
     const assignment = new Int32Array(allUnits.length).fill(-1);
@@ -279,7 +279,7 @@ export function resolverHorario(params: SolverParams): SolverResult {
       docGrid.set(d, new Int32Array(diasLectivos * horasPorDia));
     }
 
-    // 5.1 AsignaciÃ³n inicial greedy con desempate aleatorizado
+    // 5.1 Asignación inicial greedy con desempate aleatorizado
     for (const [gid, gUnits] of groupMap.entries()) {
       const gObj = grupos.find(g => normalizarId(g.id) === gid);
       const maxP = gObj?.horasPorDia || (gObj?.semestre === 1 ? 5 : horasPorDia);
@@ -305,7 +305,7 @@ export function resolverHorario(params: SolverParams): SolverResult {
         }
       }
 
-      // Ordenar variables no fijas por MRV (menor cantidad de slots vÃ¡lidos primero)
+      // Ordenar variables no fijas por MRV (menor cantidad de slots válidos primero)
       const nonFixed = gUnits.filter(u => !u.esFija).sort((a, b) => {
         const diff = a.validSlots.length - b.validSlots.length;
         if (diff !== 0) return diff;
@@ -377,7 +377,7 @@ export function resolverHorario(params: SolverParams): SolverResult {
         stagnationCounter++;
       }
 
-      // PerturbaciÃ³n cuando se detecta estancamiento en un mÃ­nimo local
+      // Perturbación cuando se detecta estancamiento en un mínimo local
       if (stagnationCounter > 400) {
         stagnationCounter = 0;
         const gKeys = Array.from(groupMap.keys());
@@ -408,7 +408,7 @@ export function resolverHorario(params: SolverParams): SolverResult {
         continue;
       }
 
-      // Identificar unidades en conflicto (empalme docente o slot invÃ¡lido)
+      // Identificar unidades en conflicto (empalme docente o slot inválido)
       const conflictedUnits: UnitInternal[] = [];
       for (const u of allUnits) {
         if (u.esFija) continue;
@@ -456,7 +456,7 @@ export function resolverHorario(params: SolverParams): SolverResult {
           if (docB[sA] >= 1) delta += 1;
         }
 
-        // PenalizaciÃ³n pedagÃ³gica suave: mÃ¡s de 2 horas de la misma materia el mismo dÃ­a
+        // Penalización pedagógica suave: más de 2 horas de la misma materia el mismo día
         const dayA = Math.floor(sA / horasPorDia);
         const dayB = Math.floor(sB / horasPorDia);
         if (dayA !== dayB) {
@@ -538,10 +538,10 @@ export function resolverHorario(params: SolverParams): SolverResult {
   }
 
   if (solverRun.conflicts > 0) {
-    conflictos.push(`El solver terminÃ³ con ${solverRun.conflicts} conflictos no resueltos por restricciones de capacidad.`);
+    conflictos.push(`El solver terminó con ${solverRun.conflicts} conflictos no resueltos por restricciones de capacidad.`);
   }
 
-  // 8. CÃ¡lculo de MÃ©tricas de Calidad
+  // 8. Cálculo de Métricas de Calidad
   let huecosDocentes = 0;
   for (const doc of docentes) {
     const docId = normalizarId(doc.id);
@@ -594,4 +594,3 @@ export function resolverHorario(params: SolverParams): SolverResult {
     }
   };
 }
-

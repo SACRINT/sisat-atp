@@ -1,4 +1,4 @@
-﻿import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx';
 
 export interface DocenteImportado {
   nombre: string;
@@ -117,7 +117,7 @@ export async function parsearExcelPersonal(file: File): Promise<DocenteImportado
         : 'Falta el apellido paterno'
       : undefined;
 
-    // Solo agregar si la fila tiene al menos algÃºn dato
+    // Solo agregar si la fila tiene al menos algún dato
     if (nombre || apellidoPaterno || email || cargoRaw || horasRaw) {
       resultados.push({
         nombre,
@@ -137,12 +137,12 @@ export async function parsearExcelPersonal(file: File): Promise<DocenteImportado
 
 export function descargarPlantillaExcelDocentes() {
   const encabezados = [
-    ['Nombre(s)', 'Apellido Paterno', 'Apellido Materno', 'Cargo / Rol', 'Horas Base', 'Correo ElectrÃ³nico'],
-    ['Juan Carlos', 'PÃ©rez', 'GonzÃ¡lez', 'Docente', 20, 'juan.perez@escuela.edu.mx'],
-    ['MarÃ­a Elena', 'HernÃ¡ndez', 'LÃ³pez', 'Docente', 30, 'maria.hernandez@escuela.edu.mx'],
-    ['Carlos Alberto', 'RodrÃ­guez', 'SÃ¡nchez', 'Docente', 15, 'carlos.rodriguez@escuela.edu.mx'],
-    ['Rosa MarÃ­a', 'MartÃ­nez', 'Torres', 'Directivo', 0, 'directora@escuela.edu.mx'],
-    ['Fernando', 'GÃ³mez', 'RamÃ­rez', 'Administrativo', 0, 'admin@escuela.edu.mx'],
+    ['Nombre(s)', 'Apellido Paterno', 'Apellido Materno', 'Cargo / Rol', 'Horas Base', 'Correo Electrónico'],
+    ['Juan Carlos', 'Pérez', 'González', 'Docente', 20, 'juan.perez@escuela.edu.mx'],
+    ['María Elena', 'Hernández', 'López', 'Docente', 30, 'maria.hernandez@escuela.edu.mx'],
+    ['Carlos Alberto', 'Rodríguez', 'Sánchez', 'Docente', 15, 'carlos.rodriguez@escuela.edu.mx'],
+    ['Rosa María', 'Martínez', 'Torres', 'Directivo', 0, 'directora@escuela.edu.mx'],
+    ['Fernando', 'Gómez', 'Ramírez', 'Administrativo', 0, 'admin@escuela.edu.mx'],
   ];
 
   const ws = XLSX.utils.aoa_to_sheet(encabezados);
@@ -161,4 +161,3 @@ export function descargarPlantillaExcelDocentes() {
   XLSX.utils.book_append_sheet(wb, ws, 'Plantilla Personal');
   XLSX.writeFile(wb, 'Plantilla_Personal_Docente.xlsx');
 }
-
