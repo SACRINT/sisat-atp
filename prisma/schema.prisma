@@ -101,6 +101,9 @@ model Escuela {
 
   // ─── Vigilancia Proactiva y Centro de Alertas ───
   alertasProactivas AlertaProactiva[]
+
+  // ─── Cédulas Móviles de Supervisión ───
+  cedulasSupervision CedulaSupervision[]
 }
 
 model CicloEscolar {
@@ -1876,3 +1879,27 @@ model BecaConvocatoriaInformativa {
   @@index([tenantId])
   @@index([tenantId, activo])
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cédulas Móviles de Supervisión con Dictado de Voz (Fase 7B)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model CedulaSupervision {
+  id               String   @id @default(cuid())
+  escuelaId        String
+  escuela          Escuela  @relation(fields: [escuelaId], references: [id])
+  supervisadoPor   String   // email del ATP
+  tipoCedula       String   // OBSERVACION_CLASE, INFRAESTRUCTURA, DIAGNOSTICO_PLANTEL, INCIDENCIAS
+  estado           String   @default("BORRADOR") // BORRADOR, ENVIADA, REVISADA
+  campos           Json     // respuestas del formulario dinámico
+  audioUrl         String?  // URL del audio grabado (Cloudinary)
+  transcripcion    String?  // texto transcrito por IA
+  hallazgos        Json?    // IA clasificó los hallazgos en categorías
+  observacionesATP String?  // notas libres del ATP
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([escuelaId])
+  @@index([supervisadoPor])
+}
+

@@ -80,7 +80,8 @@ import CteSesionesPanel from "./_componentes/CteSesionesPanel";
 import UsicammPanel from "./_componentes/UsicammPanel";
 import ComitesPanel from "./_componentes/ComitesPanel";
 import BecasPanel from "./_componentes/BecasPanel";
-import { FileSpreadsheet, Award } from "lucide-react";
+import CedulasSupervisionPanel from "./_componentes/CedulasSupervisionPanel";
+import { FileSpreadsheet, Award, Mic } from "lucide-react";
 
 // Componentes exclusivos para Supervisor
 import EntregasListado from "../director/_componentes/EntregasListado";
@@ -136,7 +137,7 @@ export default function AdminDashboard({
         showEstadistica911?: boolean;
     };
 }) {
-    const [vista, setVista] = useState<"general" | "avances" | "ranking" | "escuelas" | "programas" | "gestion-escuelas" | "gestion-programas" | "gestion-fechas" | "recursos" | "gestion-atps" | "eventos" | "circular05" | "olimpiada" | "paec" | "capems" | "expedientes" | "documentos" | "normativas" | "gestion-ciclos" | "herramientas-ia" | "reportes-nivel" | "mis-entregas" | "ajustes-api" | "mis-expedientes" | "planeaciones-ia" | "auditoria-inteligente" | "oficios" | "plantillas-sparh" | "estadistica-911" | "errores" | "cte" | "usicamm" | "comites" | "becas">(dbRole === "SUPERVISION" && supervisionEscuela ? "mis-entregas" : "general");
+    const [vista, setVista] = useState<"general" | "avances" | "ranking" | "escuelas" | "programas" | "gestion-escuelas" | "gestion-programas" | "gestion-fechas" | "recursos" | "gestion-atps" | "eventos" | "circular05" | "olimpiada" | "paec" | "capems" | "expedientes" | "documentos" | "normativas" | "gestion-ciclos" | "herramientas-ia" | "reportes-nivel" | "mis-entregas" | "ajustes-api" | "mis-expedientes" | "planeaciones-ia" | "auditoria-inteligente" | "oficios" | "plantillas-sparh" | "estadistica-911" | "errores" | "cte" | "usicamm" | "comites" | "becas" | "cedulas-supervision">(dbRole === "SUPERVISION" && supervisionEscuela ? "mis-entregas" : "general");
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [groupOpen, setGroupOpen] = useState<Record<string, boolean>>({
         monitoreo: true,
@@ -152,6 +153,7 @@ export default function AdminDashboard({
             case "general": return "general";
             case "avances": return "avances";
             case "ranking": return "avances"; // Using "avances" permission for ranking
+            case "cedulas-supervision": return "cedulas_supervision";
             case "reportes-nivel": return "reportesNivel";
             case "auditoria-inteligente": return "auditoria_atp";
             case "oficios": return "auditoria_atp";
@@ -847,6 +849,15 @@ export default function AdminDashboard({
                                         NUEVO
                                     </span>
                                 </a>
+                                {hasAccess("cedulas_supervision", "read") && (
+                                    <button className={`sidebar-link ${vista === "cedulas-supervision" ? "active" : ""}`} onClick={() => navigate("cedulas-supervision")}>
+                                        <Mic size={17} />
+                                        <span>Cédulas en Campo</span>
+                                        <span className="sidebar-badge" style={{ marginLeft: "auto", background: "linear-gradient(135deg, #2563eb, #3b82f6)", color: "white", fontSize: "0.6rem" }}>
+                                            VOZ IA
+                                        </span>
+                                    </button>
+                                )}
                                 {hasAccess("reportesNivel", "read") && (
                                     <button className={`sidebar-link ${vista === "reportes-nivel" ? "active" : ""}`} onClick={() => navigate("reportes-nivel")}>
                                         <Mail size={17} />
@@ -1609,6 +1620,11 @@ export default function AdminDashboard({
                 {/* ========= VISTA: ERRORES DEL SERVIDOR (P4) ========= */}
                 {vista === "errores" && (
                     <ErroresServidorPanel />
+                )}
+
+                {/* ========= VISTA: CÉDULAS DE SUPERVISIÓN EN CAMPO (FASE 7B) ========= */}
+                {vista === "cedulas-supervision" && (
+                    <CedulasSupervisionPanel escuelas={escuelas} userEmail={userName} />
                 )}
             </main >
 

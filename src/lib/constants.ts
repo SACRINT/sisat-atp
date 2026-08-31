@@ -173,6 +173,7 @@ export const SECCIONES_PERMISOS = [
             { key: "auditoria_gap", label: "Matriz GAP" }
         ]
     },
+    { key: "cedulas_supervision", label: "Cédulas de Supervisión (Voz & Campo)" },
 ];
 
 export const DEFAULT_PERMISOS: Record<string, string> = {
@@ -210,4 +211,6 @@ export const DEFAULT_PERMISOS: Record<string, string> = {
     auditoria_procesos: "NINGUNO",
     auditoria_plan: "NINGUNO",
     auditoria_gap: "NINGUNO",
+    cedulas_supervision: "ESCRITURA",
 };
+
