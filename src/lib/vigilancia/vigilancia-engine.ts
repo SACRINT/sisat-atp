@@ -475,6 +475,69 @@ export async function ejecutarVigilanciaProactiva(tenantIdParam?: string): Promi
         },
       });
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // REGLA 8 (Fase 8A.2): Cédulas de Supervisión Pendientes de Vo.Bo.
+    // ─────────────────────────────────────────────────────────────────────────
+    try {
+      const cedulasPendientes = await prisma.cedulaSupervision.findMany({
+
+        where: { estado: "ENVIADA" },
+        include: { escuela: true },
+      });
+
+      for (const ced of cedulasPendientes) {
+        await registrarAlerta({
+          reglaCodigo: "cedula_pendiente_review",
+          criticidad: "INFORMATIVA",
+          escuelaId: ced.escuelaId,
+          escuelaNombre: ced.escuela?.nombre || undefined,
+          escuelaCCT: ced.escuela?.cct || undefined,
+          titulo: `📋 Cédula de Visita Pendiente de Revisión: ${ced.escuela?.nombre}`,
+          descripcion: `El ATP (${ced.supervisadoPor}) ha completado y enviado la cédula (${ced.tipoCedula}). Se requiere Vo.Bo. y revisión de la Supervisión.`,
+          metadata: {
+            cedulaId: ced.id,
+            tipoCedula: ced.tipoCedula,
+            supervisadoPor: ced.supervisadoPor,
+          },
+        });
+      }
+    } catch (cedErr) {
+      console.warn("[vigilancia-engine] Aviso al evaluar cedulas pendientes:", cedErr);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // REGLA 9 (Fase 8A.2): Oficios Institucionales a 48h de Vencer
+    // ─────────────────────────────────────────────────────────────────────────
+    try {
+      const en48Horas = new Date(ahora.getTime() + 48 * 60 * 60 * 1000);
+      const oficiosPorVencer = await prisma.oficio.findMany({
+        where: {
+          tenantId,
+          fechaLimite: { gte: ahora, lte: en48Horas },
+          estado: { notIn: ["ACUSADO", "CANCELADO"] },
+        },
+      });
+
+      for (const ofi of oficiosPorVencer) {
+        if (!ofi.fechaLimite) continue;
+        const horasRestantes = Math.max(1, Math.round((ofi.fechaLimite.getTime() - ahora.getTime()) / (1000 * 60 * 60)));
+        await registrarAlerta({
+          reglaCodigo: "oficio_por_vencer",
+          criticidad: horasRestantes <= 24 ? "CRITICA" : "ADVERTENCIA",
+          titulo: `⚠️ Oficio Próximo a Vencer (${horasRestantes}h): ${ofi.numeroOficio}`,
+          descripcion: `El oficio "${ofi.asunto}" tiene fecha límite el ${ofi.fechaLimite.toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}.`,
+          metadata: {
+            oficioId: ofi.id,
+            numeroOficio: ofi.numeroOficio,
+            horasRestantes,
+            fechaLimite: ofi.fechaLimite.toISOString(),
+          },
+        });
+      }
+    } catch (ofiErr) {
+      console.warn("[vigilancia-engine] Aviso al evaluar oficios por vencer:", ofiErr);
+    }
   } catch (error: any) {
     console.error("[vigilancia-engine] Error en ejecución de vigilancia proactiva:", error);
     resultado.errores.push(error?.message || String(error));
@@ -482,3 +545,4 @@ export async function ejecutarVigilanciaProactiva(tenantIdParam?: string): Promi
 
   return resultado;
 }
+

@@ -104,7 +104,11 @@ model Escuela {
 
   // ─── Cédulas Móviles de Supervisión ───
   cedulasSupervision CedulaSupervision[]
+
+  // ─── OCR de Boletas y Documentos Históricos ───
+  ocrBoletas OcrBoleta[]
 }
+
 
 model CicloEscolar {
   id     String   @id @default(cuid())
@@ -1902,4 +1906,27 @@ model CedulaSupervision {
   @@index([escuelaId])
   @@index([supervisadoPor])
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OCR de Boletas y Documentos Históricos de Zona (Fase 8C)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model OcrBoleta {
+  id             String   @id @default(cuid())
+  escuelaId      String
+  escuela        Escuela  @relation(fields: [escuelaId], references: [id])
+  cicloEscolar   String   // Ej. "2024-2025", "2023-2024"
+  semestre       Int?     // 1 al 6
+  grupo          String?  // Ej. "A", "B"
+  datosExtraidos Json     // { alumnos: [...], materias: [...], promedios: [...] }
+  confidence     Float    @default(0.9)
+  archivoUrl     String?  // URL del escaneo PDF/Imagen
+  procesadoPor   String?  // Email del usuario que subió/ejecutó el OCR
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([escuelaId])
+  @@index([cicloEscolar])
+}
+
 

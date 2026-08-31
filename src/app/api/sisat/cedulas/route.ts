@@ -92,6 +92,30 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Si se envía directamente, crear alerta proactiva para la supervisión
+    if (estado === 'ENVIADA') {
+      try {
+        const tenantId = process.env.TENANT_ID || 'zona004';
+        await prisma.alertaProactiva.create({
+          data: {
+            tenantId,
+            reglaCodigo: 'cedula_pendiente_review',
+            criticidad: 'INFORMATIVA',
+            escuelaId: cedula.escuelaId,
+            titulo: `📋 Cédula de Visita Pendiente de Revisión: ${cedula.escuela.nombre}`,
+            descripcion: `El ATP (${cedula.supervisadoPor}) ha enviado la cédula (${cedula.tipoCedula}) para revisión institucional.`,
+            metadata: {
+              cedulaId: cedula.id,
+              tipoCedula: cedula.tipoCedula,
+              supervisadoPor: cedula.supervisadoPor,
+            },
+          },
+        });
+      } catch (alertErr) {
+        console.warn('[API cedulas POST] Error creando alerta proactiva:', alertErr);
+      }
+    }
+
     return NextResponse.json({ cedula }, { status: 201 });
   } catch (error: any) {
     console.error('[API cedulas POST error]:', error);
@@ -134,6 +158,30 @@ export async function PUT(request: NextRequest) {
       },
     });
 
+    // Si el nuevo estado es ENVIADA, notificar a la supervisión
+    if (estado === 'ENVIADA') {
+      try {
+        const tenantId = process.env.TENANT_ID || 'zona004';
+        await prisma.alertaProactiva.create({
+          data: {
+            tenantId,
+            reglaCodigo: 'cedula_pendiente_review',
+            criticidad: 'INFORMATIVA',
+            escuelaId: updated.escuelaId,
+            titulo: `📋 Cédula de Visita Pendiente de Revisión: ${updated.escuela.nombre}`,
+            descripcion: `El ATP (${updated.supervisadoPor}) ha enviado la cédula (${updated.tipoCedula}) para revisión institucional.`,
+            metadata: {
+              cedulaId: updated.id,
+              tipoCedula: updated.tipoCedula,
+              supervisadoPor: updated.supervisadoPor,
+            },
+          },
+        });
+      } catch (alertErr) {
+        console.warn('[API cedulas PUT] Error creando alerta proactiva:', alertErr);
+      }
+    }
+
     return NextResponse.json({ cedula: updated });
   } catch (error: any) {
     console.error('[API cedulas PUT error]:', error);
@@ -143,3 +191,4 @@ export async function PUT(request: NextRequest) {
     );
   }
 }
+
