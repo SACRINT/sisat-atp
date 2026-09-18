@@ -889,7 +889,50 @@ El generador de horarios (`WizardConfiguracion.tsx`) estaba limitado únicamente
 
 ---
 
-*Versión actualizada: Agosto 2026 — v5.0*
+### 9.17 Motores Cuantitativos Deterministas y Quality Gates Oficiales (Homologación SACRINT v6.0)
+
+A partir de la versión 6.0, se implementó la **Homologación Integral de Auditoría y Evaluación IA** entre **SIGPDA-EMS** (portal docente/directivo) y **SISAT-ATP** (portal de supervisión y asesoría técnico-pedagógica).
+
+#### 1. Principio Arquitectónico: Separación Determinista
+Anteriormente, el LLM estimaba puntos y porcentajes de manera heurística y mediante llamadas secuenciales no estructuradas. La nueva arquitectura divide estrictamente las responsabilidades:
+- **LLM (Google Gemini / Gemini 2.5 Flash)**: Extrae evidencias contextuales y califica cumplimiento normativo cualitativo (`pass` / `warning` / `fail` o `SI` / `PARCIAL` / `NO`). Se propaga `escuelaId` para utilizar llaves de API específicas de los planteles cuando estén configuradas.
+- **TypeScript Core**: Aplica ponderaciones matemáticas exactas, acumula puntos brutos, calcula porcentajes dimensionales, evalúa reglas de descalificación y emite el dictamen institucional oficial con estricto determinismo.
+
+#### 2. Catálogo de los 4 Quality Gates Homologados
+
+1. **Control y Auditoría de Planeaciones Didácticas (`src/lib/planeaciones-evaluator.ts`)**:
+   - **Semestres 1° a 4° (MCCEMS Propósitos Formativos)**: 17 criterios normativos distribuidos en Rubro I (90 pts), Rubro II (70 pts) y Rubro III (140 pts) = **300 pts máximos**.
+   - **Semestres 5° y 6° (MCCEMS Progresiones)**: 13 criterios normativos distribuidos en Rubro I (90 pts), Rubro II (70 pts) y Rubro III (140 pts) = **300 pts máximos**.
+   - **Formación Laboral (Guía Laboral DBEPA)**: 7 criterios normativos de saberes técnicos, seguridad e insumos = **200 pts máximos**.
+   - **Extracción de Texto Digital**: En `/api/director/planeaciones/route.ts`, se extrae el texto de DOCX y PDF previo al envío al evaluador, incluyendo la descarga y extracción del PAEC escolar para validar la transversalidad curricular.
+   - **Umbrales**: $\ge 88\%$ `COMPLETO`, $\ge 65\%$ `PARCIAL`, $< 65\%$ `REQUIERE_CORRECCION`.
+
+2. **Quality Gate PAEC-PEC (`src/lib/quality-gates/paec-evaluator.ts`)**:
+   - **8 Dimensiones Normativas**: Diagnóstico Comunitario (16 pts), Justificación (12 pts), Mapeo Curricular (12 pts), Cronograma (8 pts), Progresiones (8 pts), Plan Territorial (16 pts), Implementación (8 pts) y Gobernanza (12 pts).
+   - **23 Criterios Oficiales**: Escala 1-4 pts por criterio ($23 \times 4 = \mathbf{92\text{ pts brutos}}$ normalizados al 100%).
+   - **Umbrales**: $\ge 85\%$ `aprobado_excelente`, $\ge 70\%$ `aprobado`, $< 70\%$ `requiere_ajustes`.
+   - **Generador de Reporte**: Markdown institucional completo con desglose dimensional, sellos y firmas.
+
+3. **Quality Gate PMC e Informe Final (`src/lib/quality-gates/pmc-evaluator.ts`)**:
+   - **PMC (Planeación Inicial)**: 5 dimensiones normativas (Identificación, Diagnóstico e Indicadores, FODA y Priorización, Plan de Acción y Metas, Corresponsabilidad del Personal) distribuidas en **10 criterios oficiales** = **100 pts brutos**. Detección de evidencias no conformes.
+   - **Informe Final de Cierre (Rendición de Cuentas)**: 5 dimensiones evaluadas (100 pts) con contraste directo contra el texto del PMC original planeado en el ciclo lectivo (`pmcEntrega`), premiando la justificación reflexiva y honesta de metas no cumplidas.
+   - **Umbrales**: $\ge 85\%$ `EXCELENTE`, $\ge 70\%$ `SATISFACTORIO`, $\ge 50\%$ `EN_DESARROLLO`, $< 50\%$ `REQUIERE_REVISION`.
+
+4. **Quality Gate PIPS / Cartografía Territorial (`src/lib/quality-gates/pips-evaluator.ts`)**:
+   - **6 Dimensiones Zonales**: Identificación Zonal (10 pts), Reflexión y Diagnóstico (25 pts), Censo de Planteles (15 pts), Objetivos y Metas (20 pts), Cronograma (15 pts) y Monitoreo/Instrumentos (15 pts).
+   - **7 Criterios Normativos**: Total exacto de **100 pts brutos**.
+   - **Umbrales**: $\ge 85\%$ `EXCELENTE` (0 criterios en fail), $\ge 70\%$ `SATISFACTORIO`, $\ge 50\%$ `EN_DESARROLLO`, $< 50\%$ `REQUIERE_REVISION`.
+   - **Integración**: Integrado en `src/lib/pre-revision.ts` (L15, L859) reemplazando la última llamada secuencial de 3 partes de Gemini.
+
+#### 3. Batería de Pruebas Automatizadas
+El sistema cuenta con scripts dedicados en `scripts/`:
+- `test-paec-evaluator.ts`: Valida 23 criterios, 8 dimensiones, 92 pts brutos y fallbacks.
+- `test-pmc-evaluator.ts`: Valida 10 criterios de PMC, 5 dimensiones de Informe Final, 100 pts y reportes.
+- `test-pips-evaluator.ts`: Valida 7 criterios, 6 dimensiones, 100 pts y estructura del dictamen zonal.
+
+---
+
+*Versión actualizada: Septiembre 2026 — v6.0 (Homologación Integral Ecosistema SACRINT)*
 
 
 

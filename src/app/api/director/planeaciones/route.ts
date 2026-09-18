@@ -8,6 +8,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { uploadFileToCloudinary } from "@/lib/cloudinary";
 import { evaluarPlaneacion, determinarTipoEvaluacion } from "@/lib/planeaciones-evaluator";
+import { extractTextFromDocx, extractTextFromPdf, downloadFile } from "@/lib/pre-revision";
 
 export const maxDuration = 60;
 
@@ -225,16 +226,43 @@ export async function revisarPlaneacionEnBackground(
     }
 ) {
     try {
-        // Descargar el PDF de planeación para pasarlo a la IA (inline fetch)
+        // Descargar el archivo de planeación (PDF o DOCX) para pasarlo a la IA
         let pdfBuffer: Buffer | undefined;
         let textoPlanificacion = "";
         try {
-            const dlRes = await fetch(params.archivoUrl);
-            if (dlRes.ok) {
-                const arrBuf = await dlRes.arrayBuffer();
-                pdfBuffer = Buffer.from(arrBuf);
+            pdfBuffer = await downloadFile(params.archivoUrl);
+        } catch {
+            try {
+                const dlRes = await fetch(params.archivoUrl);
+                if (dlRes.ok) {
+                    const arrBuf = await dlRes.arrayBuffer();
+                    pdfBuffer = Buffer.from(arrBuf);
+                }
+            } catch (dlErr) {
+                console.warn("[planeaciones] Error al descargar archivo para IA:", dlErr);
             }
-        } catch { /* si falla el download, continuamos con texto vacío */ }
+        }
+
+        // Extracción de texto digital previa según formato del archivo (ERROR 1 RESUELTO)
+        if (pdfBuffer) {
+            const isDocx = params.archivoTipo === "DOCX" || params.archivoUrl.toLowerCase().endsWith(".docx");
+            if (isDocx) {
+                try {
+                    textoPlanificacion = await extractTextFromDocx(pdfBuffer);
+                    console.log(`[planeaciones] Texto extraído exitosamente de DOCX (${textoPlanificacion.length} caracteres).`);
+                } catch (docxErr) {
+                    console.warn("[planeaciones] No se pudo extraer texto del DOCX:", docxErr);
+                }
+            } else {
+                try {
+                    const pdfRes = await extractTextFromPdf(pdfBuffer);
+                    textoPlanificacion = pdfRes.text;
+                    console.log(`[planeaciones] Texto extraído exitosamente de PDF (${textoPlanificacion.length} caracteres).`);
+                } catch (pdfErr) {
+                    console.warn("[planeaciones] No se pudo extraer texto del PDF:", pdfErr);
+                }
+            }
+        }
 
         // Extraer texto del PAEC-PEC (si existe)
         let textoPaecPec = "No disponible — la escuela no ha subido su PAEC-PEC.";
@@ -246,8 +274,22 @@ export async function revisarPlaneacionEnBackground(
                     take: 1,
                 });
                 if (archivos[0]?.driveUrl) {
-                    // Nota: el texto del PAEC se incluirá en el prompt textual
-                    textoPaecPec = `[Archivo PAEC-PEC disponible en: ${archivos[0].driveUrl}]`;
+                    try {
+                        const paecBuffer = await downloadFile(archivos[0].driveUrl);
+                        if (paecBuffer) {
+                            const isDocx = archivos[0].driveUrl.toLowerCase().endsWith(".docx");
+                            if (isDocx) {
+                                textoPaecPec = await extractTextFromDocx(paecBuffer);
+                            } else {
+                                const pdfRes = await extractTextFromPdf(paecBuffer);
+                                textoPaecPec = pdfRes.text;
+                            }
+                            console.log(`[planeaciones] Texto PAEC extraído exitosamente (${textoPaecPec.length} caracteres).`);
+                        }
+                    } catch (paecErr) {
+                        console.warn("[planeaciones] No se pudo extraer texto del PAEC:", paecErr);
+                        textoPaecPec = `[Archivo PAEC-PEC disponible en: ${archivos[0].driveUrl}]`;
+                    }
                 }
             } catch { /* usa el fallback */ }
         }
@@ -255,7 +297,7 @@ export async function revisarPlaneacionEnBackground(
         // Determinar tipo de evaluación
         const tipoEvaluacion = determinarTipoEvaluacion(params.semestre, params.tipoAsignatura);
 
-        // Llamar al evaluador — pasa el buffer del PDF si está disponible
+        // Llamar al evaluador con texto extraído y escuelaId propagado (ERROR 2 RESUELTO)
         const resultado = await evaluarPlaneacion({
             tipoEvaluacion,
             asignatura: params.asignatura,
@@ -266,6 +308,7 @@ export async function revisarPlaneacionEnBackground(
             textoPlanificacion,
             textoPaecPec,
             pdfBuffer,
+            escuelaId: params.escuelaId,
         });
 
         // Guardar resultados en BD

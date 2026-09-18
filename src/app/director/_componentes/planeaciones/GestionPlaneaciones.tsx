@@ -393,13 +393,57 @@ export default function GestionPlaneaciones({ escuela: inicialEscuela, readOnly 
         }
     };
 
+    // Total de planeaciones requeridas según la estructura curricular activa del plantel
+    const totalPlaneacionesEsperadas = useMemo(() => {
+        let total = 0;
+        gruposGenerados.forEach(grupo => {
+            const letraGrupo = grupo.nombre.split(" ")[1];
+            const hGrupo3 = gruposDB.find((g: any) => g.nombre === `3° ${letraGrupo}` || g.nombre === `3º ${letraGrupo}`);
+            const hGrupo5 = gruposDB.find((g: any) => g.nombre === `5° ${letraGrupo}` || g.nombre === `5º ${letraGrupo}`);
+            const hGrupo = gruposDB.find((g: any) => g.nombre === grupo.nombre)
+                || (grupo.semestre === 4 ? hGrupo3 : grupo.semestre === 6 ? hGrupo5 : undefined);
+
+            const capNombre = hGrupo?.capacitacionNombre || hGrupo3?.capacitacionNombre || hGrupo5?.capacitacionNombre || "Administracion";
+            const ffeOpts = (Array.isArray(hGrupo?.ffeOptativas) && hGrupo.ffeOptativas.length === 4)
+                ? hGrupo.ffeOptativas
+                : (Array.isArray(hGrupo5?.ffeOptativas) && hGrupo5.ffeOptativas.length === 4)
+                    ? hGrupo5.ffeOptativas
+                    : [];
+
+            const socio3 = hGrupo3?.ffeoSocioemocional;
+            const socio5 = hGrupo5?.ffeoSocioemocional || (grupo.semestre === 5 ? hGrupo?.ffeoSocioemocional : undefined);
+            const socioObj = resolverSocioemocionalGrupo(socio3, socio5);
+            const socioNombreGrupo = grupo.semestre === 3 ? socioObj.sem3 : grupo.semestre === 4 ? socioObj.sem4 : grupo.semestre === 5 ? socioObj.sem5 : socioObj.sem6;
+
+            const asignaturasSemestre = obtenerAsignaturasParaGrupo(grupo.semestre, capNombre, ffeOpts, socioNombreGrupo);
+            total += asignaturasSemestre.length;
+        });
+        if (total > 0) return total;
+        // Fallback: calcular según estructura de la escuela
+        const g1 = escuelaData.gruposPrimerAno || 1;
+        const g2 = escuelaData.gruposSegundoAno || 1;
+        const g3 = escuelaData.gruposTercerAno || 1;
+        return (g1 * 8) + (g2 * 9) + (g3 * 10);
+    }, [gruposGenerados, gruposDB, escuelaData]);
+
+    // Promedio dinámico considerando puntaje base
+    const promedioCalc = useMemo(() => {
+        const revisadas = planeaciones.filter(p => p.puntajeObtenido !== undefined && p.puntajeObtenido !== null);
+        if (revisadas.length === 0) return { promedio: 0, maxBase: 300, porcentaje: 0 };
+        const suma = revisadas.reduce((acc, p) => acc + (p.puntajeObtenido ?? 0), 0);
+        const maxBase = revisadas[0]?.puntajeMaximo || 300;
+        const promedio = Math.round(suma / revisadas.length);
+        const porcentaje = Math.round((promedio / maxBase) * 100);
+        return { promedio, maxBase, porcentaje };
+    }, [planeaciones]);
+
     // Abrir Modal para subir planeación pre-llenada por grupo y materia
     const abrirModalSubida = (grupoNombre: string, semestre: number, asignatura: string) => {
         const key = `${grupoNombre}__${asignatura}`;
         const asignado = asignacionesDocentesMap[key];
 
         setFormSubida({
-            docenteNombre: asignado ? asignado.docenteNombre : "",
+            docenteNombre: asignado ? asignado.docenteNombre : "Docente Titular",
             docenteId: asignado ? asignado.personalId : "",
             grupoNombre,
             semestre,
@@ -418,16 +462,13 @@ export default function GestionPlaneaciones({ escuela: inicialEscuela, readOnly 
             toast.error("Debes seleccionar un archivo PDF o DOCX");
             return;
         }
-        if (!formSubida.docenteNombre.trim()) {
-            toast.error("Debes ingresar el nombre del docente");
-            return;
-        }
+        const docenteFinal = formSubida.docenteNombre.trim() || "Docente Titular";
 
         setSubiendo(true);
         try {
             const formData = new FormData();
             formData.append("archivo", formSubida.archivo);
-            formData.append("docenteNombre", formSubida.docenteNombre);
+            formData.append("docenteNombre", docenteFinal);
             formData.append("grupoNombre", formSubida.grupoNombre);
             formData.append("tipoSemestrePeriodo", periodoSemestral);
             formData.append("asignatura", formSubida.asignatura);
@@ -536,7 +577,7 @@ export default function GestionPlaneaciones({ escuela: inicialEscuela, readOnly 
 
                         </div>
                         <h2 style={{ margin: "0.5rem 0 0.25rem", fontSize: "1.5rem", fontWeight: 800 }}>
-                            Revisión y Control de Planeaciones Didácticas IA
+                            Control y Auditoría de Planeaciones Didácticas
                         </h2>
                         <p style={{ margin: 0, fontSize: "0.85rem", color: "#94a3b8" }}>
                             {escuelaData.nombre} • CCT: {escuelaData.cct}
@@ -594,7 +635,7 @@ export default function GestionPlaneaciones({ escuela: inicialEscuela, readOnly 
                     <div style={{ background: "rgba(255,255,255,0.05)", padding: "1rem", borderRadius: "10px" }}>
                         <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>Planeaciones Subidas</div>
                         <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#38bdf8", marginTop: "0.2rem" }}>
-                            {planeaciones.length} Entregadas
+                            {planeaciones.length} / {totalPlaneacionesEsperadas} ({Math.min(100, Math.round((planeaciones.length / (totalPlaneacionesEsperadas || 1)) * 100))}%)
                         </div>
                     </div>
 
@@ -608,8 +649,36 @@ export default function GestionPlaneaciones({ escuela: inicialEscuela, readOnly 
                     <div style={{ background: "rgba(255,255,255,0.05)", padding: "1rem", borderRadius: "10px" }}>
                         <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>Promedio de Cumplimiento</div>
                         <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#facc15", marginTop: "0.2rem" }}>
-                            {Math.round(planeaciones.reduce((acc, p) => acc + (p.puntajeObtenido ?? 0), 0) / (planeaciones.filter(p => p.puntajeObtenido !== undefined).length || 1))} / 300 pts
+                            {promedioCalc.promedio} / {promedioCalc.maxBase} pts ({promedioCalc.porcentaje}%)
                         </div>
+                    </div>
+                </div>
+
+                {/* Barra de Progreso Global del Plantel */}
+                <div style={{ marginTop: "1.25rem", background: "rgba(255,255,255,0.06)", padding: "1rem", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.1)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "white" }}>
+                                📊 Avance Global de Carga de Planes de Clase:
+                            </span>
+                            <span style={{ fontSize: "0.95rem", fontWeight: 800, color: planeaciones.length >= totalPlaneacionesEsperadas ? "#4ade80" : "#60a5fa" }}>
+                                {planeaciones.length} / {totalPlaneacionesEsperadas} Planeaciones Cargadas
+                            </span>
+                        </div>
+                        <span style={{ fontSize: "0.85rem", fontWeight: 800, color: planeaciones.length >= totalPlaneacionesEsperadas ? "#4ade80" : "#94a3b8" }}>
+                            {Math.min(100, Math.round((planeaciones.length / (totalPlaneacionesEsperadas || 1)) * 100))}% Completado
+                        </span>
+                    </div>
+                    <div style={{ width: "100%", height: "8px", background: "rgba(255,255,255,0.1)", borderRadius: "4px", overflow: "hidden" }}>
+                        <div
+                            style={{
+                                width: `${Math.min(100, Math.round((planeaciones.length / (totalPlaneacionesEsperadas || 1)) * 100))}%`,
+                                height: "100%",
+                                background: planeaciones.length >= totalPlaneacionesEsperadas ? "#22c55e" : "linear-gradient(90deg, #3b82f6, #60a5fa)",
+                                borderRadius: "4px",
+                                transition: "width 0.4s ease-in-out"
+                            }}
+                        />
                     </div>
                 </div>
             </div>

@@ -5,6 +5,14 @@ import { callGemini } from "./gemini";
 import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import { v2 as cloudinary } from "cloudinary";
+import { evaluarPaecEntrega, generarReportePaecMarkdown } from "./quality-gates/paec-evaluator";
+import {
+    evaluarPmcEntrega,
+    evaluarInformeFinalPMC,
+    generarReportePmcMarkdown,
+    generarReporteInformeFinalMarkdown
+} from "./quality-gates/pmc-evaluator";
+import { evaluarPipsEntrega, generarReportePipsMarkdown } from "./quality-gates/pips-evaluator";
 
 function parseCloudinaryUrl(url: string) {
     const decoded = decodeURIComponent(url);
@@ -157,6 +165,14 @@ export interface PreRevisionResult {
     tipoSiniestroReportado?: string;
     tienePolizaReferenciada?: boolean;
     tieneEvidenciaSoporte?: boolean;
+    // Campos estructurados de Quality Gates / Auditoría Homologada
+    scoreNumerico?: number;
+    totalPuntosBrutos?: string;
+    estatusOficial?: string;
+    dimensionesDesglose?: any;
+    criteriosEvaluados?: any[];
+    fortalezas?: string[];
+    recomendaciones?: string[];
 }
 
 function parsePercentage(scoreStr: string): number {
@@ -761,87 +777,117 @@ Responde únicamente en formato JSON con la siguiente estructura:
                             borradorCorreo: `# Documento Ilegible o Escaneado sin OCR\n\nEl sistema de validación de la plataforma SISAT-ATP ha detectado que el archivo entregado no contiene texto digital extraíble.\n\n### Posibles causas:\n1. El archivo PDF es una imagen escaneada directamente sin haberle aplicado reconocimiento óptico de caracteres (OCR).\n2. El archivo de Word o PDF está vacío o corrupto.\n\n### ¿Cómo solucionarlo?\nPor favor, genere el documento PDF directamente desde su procesador de textos (ej. Microsoft Word haciendo clic en "Guardar como PDF") y evite escanear la hoja impresa, para que la plataforma pueda validar su contenido de manera automática.`,
                             tieneIncidencias: true
                         };
-                    } else {
-                        const prompts = obtenerPartesEvaluacion(modulo, templateContent, escuelaNombre, escuelaCct, textoOriginalPMC, extractedText);
-                        const systemInstruction = "Eres un Asesor Técnico Pedagógico (ATP) experto en evaluación y planeación escolar.";
-                        const responseSchema = {
-                            type: "OBJECT",
-                            properties: {
-                                aprobado: { type: "BOOLEAN" },
-                                puntuacion: { type: "STRING" },
-                                observaciones: { type: "STRING" },
-                                estadoRecomendado: { type: "STRING", enum: ["APROBADO", "REQUIERE_CORRECCION"] }
-                            },
-                            required: ["aprobado", "puntuacion", "observaciones", "estadoRecomendado"]
-                        };
-
-                        console.log(`[pre-revision] Starting multi-part SEQUENTIAL evaluation with Gemini (3 parts)...`);
-
-                        // Execute sequentially to avoid exhausting the Gemini API key pool via concurrent 429 rate-limit errors
-                        const results: any[] = [];
-                        for (let idx = 0; idx < prompts.length; idx++) {
-                            const pPrompt = prompts[idx];
-                            let rawRes = "";
-                            if (extractedText) {
-                                console.log(`[pre-revision] Calling Gemini for Part ${idx + 1}/3 with EXTRACTED TEXT (${pPrompt.length} chars).`);
-                                 rawRes = await callGemini(systemInstruction, pPrompt, undefined, undefined, responseSchema, false, entrega.escuelaId);
-                            } else {
-                                if (!buffer) {
-                                    console.log(`[pre-revision] Downloading file for binary fallback (Part ${idx + 1}): ${file.nombre}...`);
-                                    buffer = await downloadFile(file.driveUrl!);
-                                }
-                                console.log(`[pre-revision] Calling Gemini for Part ${idx + 1}/3 with BINARY PDF BUFFER and prompt (${pPrompt.length} chars).`);
-                                rawRes = await callGemini(systemInstruction, pPrompt, buffer, "application/pdf", responseSchema, false, entrega.escuelaId);
-                            }
-                            console.log(`[pre-revision] Gemini response for Part ${idx + 1}/3 received. Length: ${rawRes.length} chars.`);
-                            results.push(cleanAndParseGeminiJson(rawRes));
-                            // Small pause between calls to reduce key pool pressure
-                            if (idx < prompts.length - 1) {
-                                await new Promise(resolve => setTimeout(resolve, 800));
-                            }
-                        }
-
-                        const [part1, part2, part3] = results;
-
-                        // Combine results
-                        const aprobadoFinal = part1.aprobado && part2.aprobado && part3.aprobado;
-                        const estadoRecomendadoFinal = (part1.estadoRecomendado === "REQUIERE_CORRECCION" || part2.estadoRecomendado === "REQUIERE_CORRECCION" || part3.estadoRecomendado === "REQUIERE_CORRECCION")
-                            ? "REQUIERE_CORRECCION"
-                            : "APROBADO";
-
-                        const score1 = parsePercentage(part1.puntuacion || "0%");
-                        const score2 = parsePercentage(part2.puntuacion || "0%");
-                        const score3 = parsePercentage(part3.puntuacion || "0%");
-                        const scoreAvg = Math.round((score1 + score2 + score3) / 3);
-                        const puntuacionFinal = `${scoreAvg}%`;
-
-                        const tituloModulo = modulo === "PIPS"
-                            ? "Plan de Intervención Pedagógica de Supervisión Escolar (PIPS)"
-                            : modulo === "INFORME_FINAL"
-                                ? "Informe Final del PMC"
-                                : modulo === "PAEC"
-                                    ? "Proyecto Escolar Comunitario (PEC)"
-                                    : "Plan de Mejora Continua (PMC)";
-
-                        const observacionesFinal = `# Informe de Pre-Revisión del ${tituloModulo}
-
-Este informe presenta una evaluación exhaustiva y detallada del documento entregado por el plantel, con base en la rúbrica oficial de la supervisión.
-
-## I. Estructura General y Diagnóstico / Contexto
-${part1.observaciones}
-
-## II. Objetivos, Metas / Logros y Coherencia
-${part2.observaciones}
-
-## III. Plan de Acción / Evidencias y Recomendaciones
-${part3.observaciones}`;
+                    } else if (modulo === "PAEC") {
+                        console.log(`[pre-revision] Iniciando evaluación homologada PAEC-PEC para entrega ${entregaId} (${escuelaNombre})...`);
+                        const resultadoPaec = await evaluarPaecEntrega({
+                            textoDocumento: extractedText,
+                            escuelaId: entrega.escuelaId,
+                            cct: escuelaCct,
+                            escuelaNombre,
+                            pdfBuffer: buffer || undefined,
+                        });
 
                         resultado = {
+                            tipo: "PAEC",
+                            aprobado: resultadoPaec.overallStatus !== "requiere_ajustes",
+                            puntuacion: `${resultadoPaec.percentage}%`,
+                            explicacion: `Evaluación normativa DBEPA: ${resultadoPaec.passedCriteria}/23 criterios acreditados con excelencia (${resultadoPaec.percentage}% global)`,
+                            borradorCorreo: generarReportePaecMarkdown(resultadoPaec, { nombre: escuelaNombre, cct: escuelaCct }),
+                            tieneIncidencias: resultadoPaec.overallStatus === "requiere_ajustes",
+                            // Nuevos campos cuantitativos estructurados
+                            scoreNumerico: resultadoPaec.percentage,
+                            totalPuntosBrutos: `${resultadoPaec.totalScore}/92`,
+                            estatusOficial: resultadoPaec.overallStatus,
+                            dimensionesDesglose: resultadoPaec.dimensionScores,
+                            criteriosEvaluados: resultadoPaec.criteria,
+                            fortalezas: resultadoPaec.strengths,
+                            recomendaciones: resultadoPaec.criticalRecommendations,
+                        };
+                    } else if (modulo === "PMC") {
+                        console.log(`[pre-revision] Iniciando evaluación homologada PMC para entrega ${entregaId} (${escuelaNombre})...`);
+                        const resultadoPmc = await evaluarPmcEntrega({
+                            textoDocumento: extractedText,
+                            escuelaId: entrega.escuelaId,
+                            cct: escuelaCct,
+                            escuelaNombre,
+                            pdfBuffer: buffer || undefined,
+                        });
+
+                        resultado = {
+                            tipo: "PMC",
+                            aprobado: resultadoPmc.overallStatus === "EXCELENTE" || resultadoPmc.overallStatus === "SATISFACTORIO",
+                            puntuacion: `${resultadoPmc.percentage}%`,
+                            explicacion: `Evaluación normativa DBEPA: ${resultadoPmc.passedCriteria}/10 criterios acreditados (${resultadoPmc.percentage}% de cumplimiento global - ${resultadoPmc.overallStatus})`,
+                            borradorCorreo: generarReportePmcMarkdown(resultadoPmc, { nombre: escuelaNombre, cct: escuelaCct }),
+                            tieneIncidencias: resultadoPmc.overallStatus === "REQUIERE_REVISION" || resultadoPmc.overallStatus === "EN_DESARROLLO",
+                            scoreNumerico: resultadoPmc.percentage,
+                            totalPuntosBrutos: `${resultadoPmc.totalScore}/100`,
+                            estatusOficial: resultadoPmc.overallStatus,
+                            dimensionesDesglose: resultadoPmc.dimensionScores,
+                            criteriosEvaluados: resultadoPmc.criteria,
+                            fortalezas: resultadoPmc.strengths,
+                            recomendaciones: resultadoPmc.criticalRecommendations,
+                        };
+                    } else if (modulo === "INFORME_FINAL") {
+                        console.log(`[pre-revision] Iniciando evaluación homologada INFORME FINAL PMC para entrega ${entregaId} (${escuelaNombre})...`);
+                        const resultadoInforme = await evaluarInformeFinalPMC({
+                            textoInformeFinal: extractedText,
+                            textoPMCOriginal: textoOriginalPMC,
+                            escuelaId: entrega.escuelaId,
+                            cct: escuelaCct,
+                            escuelaNombre,
+                            pdfBuffer: buffer || undefined,
+                        });
+
+                        resultado = {
+                            tipo: "INFORME_FINAL",
+                            aprobado: resultadoInforme.overallStatus === "EXCELENTE" || resultadoInforme.overallStatus === "SATISFACTORIO",
+                            puntuacion: `${resultadoInforme.percentage}%`,
+                            explicacion: `Evaluación de Cierre de Ciclo: ${resultadoInforme.metasCumplidas}/${resultadoInforme.totalMetasEvaluadas} metas acreditadas (${resultadoInforme.percentage}% de efectividad - ${resultadoInforme.overallStatus})`,
+                            borradorCorreo: generarReporteInformeFinalMarkdown(resultadoInforme, { nombre: escuelaNombre, cct: escuelaCct }),
+                            tieneIncidencias: resultadoInforme.overallStatus === "REQUIERE_REVISION" || resultadoInforme.overallStatus === "EN_DESARROLLO",
+                            scoreNumerico: resultadoInforme.percentage,
+                            totalPuntosBrutos: `${resultadoInforme.totalScore}/100`,
+                            estatusOficial: resultadoInforme.overallStatus,
+                            dimensionesDesglose: resultadoInforme.dimensionScores,
+                            criteriosEvaluados: resultadoInforme.criteria,
+                            fortalezas: resultadoInforme.strengths,
+                            recomendaciones: resultadoInforme.criticalRecommendations,
+                        };
+                    } else if (modulo === "PIPS") {
+                        console.log(`[pre-revision] Iniciando evaluación homologada PIPS para entrega ${entregaId} (${escuelaNombre})...`);
+                        const resultadoPips = await evaluarPipsEntrega({
+                            textoDocumento: extractedText,
+                            escuelaId: entrega.escuelaId,
+                            cct: escuelaCct,
+                            escuelaNombre,
+                            pdfBuffer: buffer || undefined,
+                        });
+
+                        resultado = {
+                            tipo: "PIPS",
+                            aprobado: resultadoPips.overallStatus === "EXCELENTE" || resultadoPips.overallStatus === "SATISFACTORIO",
+                            puntuacion: `${resultadoPips.percentage}%`,
+                            explicacion: `Evaluación de Cartografía Territorial: ${resultadoPips.passedCriteria}/7 criterios acreditados (${resultadoPips.percentage}% global - ${resultadoPips.overallStatus})`,
+                            borradorCorreo: generarReportePipsMarkdown(resultadoPips, { nombre: escuelaNombre, cct: escuelaCct }),
+                            tieneIncidencias: resultadoPips.overallStatus === "REQUIERE_REVISION" || resultadoPips.overallStatus === "EN_DESARROLLO",
+                            scoreNumerico: resultadoPips.percentage,
+                            totalPuntosBrutos: `${resultadoPips.totalScore}/100`,
+                            estatusOficial: resultadoPips.overallStatus,
+                            dimensionesDesglose: resultadoPips.dimensionScores,
+                            criteriosEvaluados: resultadoPips.criteria,
+                            fortalezas: resultadoPips.strengths,
+                            recomendaciones: resultadoPips.criticalRecommendations,
+                        };
+                    } else {
+                        console.warn(`[pre-revision] Módulo general o no contemplado en evaluadores especializados: ${modulo}. Usando dictamen genérico.`);
+                        resultado = {
                             tipo: modulo,
-                            aprobado: aprobadoFinal,
-                            explicacion: `Puntuación obtenida: ${puntuacionFinal}. Ver detalles de observaciones en el panel de control.`,
-                            borradorCorreo: observacionesFinal,
-                            tieneIncidencias: estadoRecomendadoFinal === "REQUIERE_CORRECCION"
+                            aprobado: true,
+                            puntuacion: "100%",
+                            explicacion: `Documento registrado y aceptado bajo el módulo ${modulo}.`,
+                            borradorCorreo: `# Recepción Registrada\nEl documento entregado ha sido registrado bajo el módulo ${modulo}.`,
+                            tieneIncidencias: false
                         };
                     }
 
