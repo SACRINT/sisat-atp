@@ -478,7 +478,7 @@ def build_docx():
 
     # Save outputs
     out_path_1 = r"C:\NotebookLM\documentos_referencia\Horarios\Catalogo_Oficial_Asignaturas_Bachilleratos_Generales_2025-2026.docx"
-    out_path_2 = r"C:\Users\samue\.gemini\antigravity-ide\brain\7569d40a-c01f-4ce4-836e-6314c3c5f299\Catalogo_Oficial_Asignaturas_Bachilleratos_Generales_2025-2026.docx"
+    out_path_2 = r"C:\Users\samue\.gemini\sacrint\brain\7569d40a-c01f-4ce4-836e-6314c3c5f299\Catalogo_Oficial_Asignaturas_Bachilleratos_Generales_2025-2026.docx"
 
     doc.save(out_path_1)
     doc.save(out_path_2)
