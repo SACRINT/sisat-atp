@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronUp, ChevronDown, MessageSquare, Download, Eye, Loader2, FileCheck2, FilePlus2, Trash2, Upload, RefreshCw } from "lucide-react";
+import { ChevronUp, ChevronDown, MessageSquare, Download, Eye, Loader2, FileCheck2, FilePlus2, Trash2, Upload, RefreshCw, CheckCircle2, Clock, Activity, CalendarDays } from "lucide-react";
 import JSZip from "jszip";
 import { MESES, ESTADOS, ESTADO_LABELS, getNombrePeriodo } from "@/lib/constants";
 import { ProgramaAdmin } from "@/types";
@@ -356,53 +356,104 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
         return getNombrePeriodo(periodo, programaNombre);
     }
 
-    return (
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            <input
-                ref={fileInputRef}
-                type="file"
-                style={{ display: "none" }}
-                onChange={handleFileSelected}
-            />
-            {programas.map((prog) => {
-                const allEntregas = prog.periodos.flatMap((p) => p.entregas);
-                const statEntregas = allEntregas.filter(e => !e.escuela.esDePrueba && !e.escuela.esSupervision);
-                const entregasRequeridas = statEntregas.filter((e) => e.estado !== "EXENTO");
-                const totalProg = entregasRequeridas.length;
-                const entregadosProg = statEntregas.filter(e => ["APROBADO", "ENTREGADO_FISICO", "EN_REVISION", "REQUIERE_CORRECCION"].includes(e.estado)).length;
-                const aprobadasProg = entregasRequeridas.filter((e) => ["APROBADO", "ENTREGADO_FISICO"].includes(e.estado)).length;
-                const porc = totalProg > 0 ? Math.round((aprobadasProg / totalProg) * 100) : 100;
-                const isExpanded = expanded === prog.id;
+    // ── Clasificación de programas en Activos, Concluidos y Posteriores ──
+    const [filtroEstado, setFiltroEstado] = useState<"TODOS" | "ACTIVOS" | "CONCLUIDOS" | "POSTERIORES">("TODOS");
+    const [seccionesColapsadas, setSeccionesColapsadas] = useState<Record<string, boolean>>({
+        activos: false,
+        concluidos: false,
+        posteriores: false,
+    });
 
-                let progressColor = "var(--danger)";
-                let cardBgGradient = "linear-gradient(to right, var(--danger-bg) 0%, var(--surface) 150px)";
-                if (porc === 100) {
-                    progressColor = "var(--success)";
-                    cardBgGradient = "linear-gradient(to right, var(--success-bg) 0%, var(--surface) 150px)";
-                } else if (porc > 0) {
-                    progressColor = "var(--primary)";
-                    cardBgGradient = "linear-gradient(to right, var(--primary-bg) 0%, var(--surface) 150px)";
-                }
+    const toggleSeccion = (secKey: string) => {
+        setSeccionesColapsadas(prev => ({ ...prev, [secKey]: !prev[secKey] }));
+    };
 
-                // ¿Es DÍA NARANJA?
-                const isDiaNaranja = prog.nombre.toUpperCase().includes(DIA_NARANJA_NOMBRE);
+    const programasCategorizados = useMemo(() => {
+        const activos: ProgramaAdmin[] = [];
+        const concluidos: ProgramaAdmin[] = [];
+        const posteriores: ProgramaAdmin[] = [];
 
-                return (
-                    <div key={prog.id} className="card" style={{ padding: 0, borderLeft: `5px solid ${progressColor}`, background: cardBgGradient }}>
-                        {/* ── Cabecera del programa ── */}
-                        <button
-                            onClick={() => setExpanded(isExpanded ? null : prog.id)}
-                            style={{ width: "100%", background: "none", border: "none", cursor: "pointer", padding: "1rem", textAlign: "left" }}
-                        >
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <div>
-                                    <div style={{ fontWeight: 700 }}>{prog.nombre}</div>
-                                    <div style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>
-                                        {entregadosProg}/{totalProg} recibidas • {prog.periodos.filter((p) => p.activo).length} activo(s) / {prog.periodos.length} periodo(s)
-                                    </div>
-                                </div>
-                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                    <span style={{ fontWeight: 700, color: progressColor }}>{porc}%</span>
+        programas.forEach(prog => {
+            const allEntregas = prog.periodos.flatMap((p) => p.entregas);
+            const statEntregas = allEntregas.filter(e => !e.escuela.esDePrueba && !e.escuela.esSupervision);
+            const entregadosProg = statEntregas.filter(e => ["APROBADO", "ENTREGADO_FISICO", "EN_REVISION", "REQUIERE_CORRECCION"].includes(e.estado)).length;
+            const periodosActivos = prog.periodos.filter((p) => p.activo).length;
+
+            if (periodosActivos > 0) {
+                activos.push(prog);
+            } else if (entregadosProg > 0) {
+                concluidos.push(prog);
+            } else {
+                posteriores.push(prog);
+            }
+        });
+
+        return { activos, concluidos, posteriores };
+    }, [programas]);
+
+    const listaFiltrada = useMemo(() => {
+        if (filtroEstado === "ACTIVOS") return programasCategorizados.activos;
+        if (filtroEstado === "CONCLUIDOS") return programasCategorizados.concluidos;
+        if (filtroEstado === "POSTERIORES") return programasCategorizados.posteriores;
+        return programas;
+    }, [filtroEstado, programasCategorizados, programas]);
+
+    const renderProgramaCard = (prog: ProgramaAdmin) => {
+        const allEntregas = prog.periodos.flatMap((p) => p.entregas);
+        const statEntregas = allEntregas.filter(e => !e.escuela.esDePrueba && !e.escuela.esSupervision);
+        const entregasRequeridas = statEntregas.filter((e) => e.estado !== "EXENTO");
+        const totalProg = entregasRequeridas.length;
+        const entregadosProg = statEntregas.filter(e => ["APROBADO", "ENTREGADO_FISICO", "EN_REVISION", "REQUIERE_CORRECCION"].includes(e.estado)).length;
+        const aprobadasProg = entregasRequeridas.filter((e) => ["APROBADO", "ENTREGADO_FISICO"].includes(e.estado)).length;
+        const porc = totalProg > 0 ? Math.round((aprobadasProg / totalProg) * 100) : 100;
+        const isExpanded = expanded === prog.id;
+        const periodosActivos = prog.periodos.filter((p) => p.activo).length;
+
+        let progressColor = "var(--danger)";
+        let cardBgGradient = "linear-gradient(to right, var(--danger-bg) 0%, var(--surface) 150px)";
+        if (porc === 100) {
+            progressColor = "var(--success)";
+            cardBgGradient = "linear-gradient(to right, var(--success-bg) 0%, var(--surface) 150px)";
+        } else if (porc > 0) {
+            progressColor = "var(--primary)";
+            cardBgGradient = "linear-gradient(to right, var(--primary-bg) 0%, var(--surface) 150px)";
+        }
+
+        // ¿Es DÍA NARANJA?
+        const isDiaNaranja = prog.nombre.toUpperCase().includes(DIA_NARANJA_NOMBRE);
+
+        return (
+            <div key={prog.id} className="card" style={{ padding: 0, borderLeft: `5px solid ${progressColor}`, background: cardBgGradient }}>
+                {/* ── Cabecera del programa ── */}
+                <button
+                    onClick={() => setExpanded(isExpanded ? null : prog.id)}
+                    style={{ width: "100%", background: "none", border: "none", cursor: "pointer", padding: "1rem", textAlign: "left" }}
+                >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.2rem" }}>
+                                <span style={{ fontWeight: 700, fontSize: "0.9375rem" }}>{prog.nombre}</span>
+                                {periodosActivos > 0 ? (
+                                    <span style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem", background: "#dcfce7", color: "#15803d", padding: "0.15rem 0.5rem", borderRadius: "9999px", fontSize: "0.6875rem", fontWeight: 800, border: "1px solid #bbf7d0" }}>
+                                        <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#16a34a" }} />
+                                        Activo
+                                    </span>
+                                ) : entregadosProg > 0 ? (
+                                    <span style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem", background: "#e0f2fe", color: "#0369a1", padding: "0.15rem 0.5rem", borderRadius: "9999px", fontSize: "0.6875rem", fontWeight: 800, border: "1px solid #bae6fd" }}>
+                                        ✓ Concluido
+                                    </span>
+                                ) : (
+                                    <span style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem", background: "#fef3c7", color: "#92400e", padding: "0.15rem 0.5rem", borderRadius: "9999px", fontSize: "0.6875rem", fontWeight: 800, border: "1px solid #fde68a" }}>
+                                        ⏳ Fecha Posterior
+                                    </span>
+                                )}
+                            </div>
+                            <div style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>
+                                {entregadosProg}/{totalProg} recibidas • {periodosActivos} activo(s) / {prog.periodos.length} periodo(s)
+                            </div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <span style={{ fontWeight: 700, color: progressColor }}>{porc}%</span>
 
                                     {/* ── Botones de unificación PDF (solo Día Naranja) ── */}
                                     {isDiaNaranja && (
@@ -827,7 +878,246 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                         )}
                     </div>
                 );
-            })}
+            };
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+            <input
+                ref={fileInputRef}
+                type="file"
+                style={{ display: "none" }}
+                onChange={handleFileSelected}
+            />
+
+            {/* ── BARRA DE PESTAÑAS / FILTROS DE ESTADO ── */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.35rem" }}>
+                <button
+                    onClick={() => setFiltroEstado("TODOS")}
+                    type="button"
+                    style={{
+                        display: "inline-flex", alignItems: "center", gap: "0.4rem",
+                        padding: "0.45rem 0.85rem", borderRadius: "8px", fontSize: "0.8125rem", fontWeight: 700,
+                        cursor: "pointer", transition: "all 0.15s ease",
+                        background: filtroEstado === "TODOS" ? "var(--primary, #2563eb)" : "white",
+                        color: filtroEstado === "TODOS" ? "#ffffff" : "var(--text, #334155)",
+                        border: filtroEstado === "TODOS" ? "1px solid var(--primary, #2563eb)" : "1px solid var(--border, #cbd5e1)",
+                        boxShadow: filtroEstado === "TODOS" ? "0 2px 6px rgba(37,99,235,0.25)" : "0 1px 2px rgba(0,0,0,0.03)"
+                    }}
+                >
+                    <span>📋 Todos</span>
+                    <span style={{ fontSize: "0.6875rem", padding: "0.1rem 0.4rem", borderRadius: "10px", background: filtroEstado === "TODOS" ? "rgba(255,255,255,0.25)" : "#f1f5f9", color: filtroEstado === "TODOS" ? "#ffffff" : "#64748b" }}>
+                        {programas.length}
+                    </span>
+                </button>
+
+                <button
+                    onClick={() => setFiltroEstado("ACTIVOS")}
+                    type="button"
+                    style={{
+                        display: "inline-flex", alignItems: "center", gap: "0.4rem",
+                        padding: "0.45rem 0.85rem", borderRadius: "8px", fontSize: "0.8125rem", fontWeight: 700,
+                        cursor: "pointer", transition: "all 0.15s ease",
+                        background: filtroEstado === "ACTIVOS" ? "#059669" : "white",
+                        color: filtroEstado === "ACTIVOS" ? "#ffffff" : "#059669",
+                        border: filtroEstado === "ACTIVOS" ? "1px solid #059669" : "1px solid #a7f3d0",
+                        boxShadow: filtroEstado === "ACTIVOS" ? "0 2px 6px rgba(5,150,105,0.25)" : "0 1px 2px rgba(0,0,0,0.03)"
+                    }}
+                >
+                    <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", background: filtroEstado === "ACTIVOS" ? "#ffffff" : "#10b981" }} />
+                    <span>Activos en Curso</span>
+                    <span style={{ fontSize: "0.6875rem", padding: "0.1rem 0.4rem", borderRadius: "10px", background: filtroEstado === "ACTIVOS" ? "rgba(255,255,255,0.25)" : "#d1fae5", color: filtroEstado === "ACTIVOS" ? "#ffffff" : "#065f46" }}>
+                        {programasCategorizados.activos.length}
+                    </span>
+                </button>
+
+                <button
+                    onClick={() => setFiltroEstado("CONCLUIDOS")}
+                    type="button"
+                    style={{
+                        display: "inline-flex", alignItems: "center", gap: "0.4rem",
+                        padding: "0.45rem 0.85rem", borderRadius: "8px", fontSize: "0.8125rem", fontWeight: 700,
+                        cursor: "pointer", transition: "all 0.15s ease",
+                        background: filtroEstado === "CONCLUIDOS" ? "#0284c7" : "white",
+                        color: filtroEstado === "CONCLUIDOS" ? "#ffffff" : "#0284c7",
+                        border: filtroEstado === "CONCLUIDOS" ? "1px solid #0284c7" : "1px solid #bae6fd",
+                        boxShadow: filtroEstado === "CONCLUIDOS" ? "0 2px 6px rgba(2,132,199,0.25)" : "0 1px 2px rgba(0,0,0,0.03)"
+                    }}
+                >
+                    <span>✅ Concluidos / Ya Entregados</span>
+                    <span style={{ fontSize: "0.6875rem", padding: "0.1rem 0.4rem", borderRadius: "10px", background: filtroEstado === "CONCLUIDOS" ? "rgba(255,255,255,0.25)" : "#e0f2fe", color: filtroEstado === "CONCLUIDOS" ? "#ffffff" : "#0369a1" }}>
+                        {programasCategorizados.concluidos.length}
+                    </span>
+                </button>
+
+                <button
+                    onClick={() => setFiltroEstado("POSTERIORES")}
+                    type="button"
+                    style={{
+                        display: "inline-flex", alignItems: "center", gap: "0.4rem",
+                        padding: "0.45rem 0.85rem", borderRadius: "8px", fontSize: "0.8125rem", fontWeight: 700,
+                        cursor: "pointer", transition: "all 0.15s ease",
+                        background: filtroEstado === "POSTERIORES" ? "#d97706" : "white",
+                        color: filtroEstado === "POSTERIORES" ? "#ffffff" : "#d97706",
+                        border: filtroEstado === "POSTERIORES" ? "1px solid #d97706" : "1px solid #fde68a",
+                        boxShadow: filtroEstado === "POSTERIORES" ? "0 2px 6px rgba(217,119,6,0.25)" : "0 1px 2px rgba(0,0,0,0.03)"
+                    }}
+                >
+                    <span>⏳ Fechas Posteriores / Pendientes</span>
+                    <span style={{ fontSize: "0.6875rem", padding: "0.1rem 0.4rem", borderRadius: "10px", background: filtroEstado === "POSTERIORES" ? "rgba(255,255,255,0.25)" : "#fef3c7", color: filtroEstado === "POSTERIORES" ? "#ffffff" : "#92400e" }}>
+                        {programasCategorizados.posteriores.length}
+                    </span>
+                </button>
+            </div>
+
+            {/* ── CONTENIDO AGRUPADO (TODOS) O FILTRADO ESPECÍFICO ── */}
+            {filtroEstado === "TODOS" ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
+                    {/* SECCIÓN 1: ACTIVOS */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                        <div 
+                            onClick={() => toggleSeccion("activos")}
+                            style={{ 
+                                display: "flex", alignItems: "center", justifyContent: "space-between", 
+                                background: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.3)", 
+                                borderRadius: "10px", padding: "0.65rem 1rem", cursor: "pointer", userSelect: "none",
+                                transition: "all 0.2s"
+                            }}
+                        >
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "26px", height: "26px", borderRadius: "50%", background: "#10b981", color: "white" }}>
+                                    <Activity size={15} />
+                                </span>
+                                <div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                        <span style={{ fontWeight: 800, fontSize: "0.875rem", color: "#065f46" }}>
+                                            PROGRAMAS ACTIVOS EN CURSO
+                                        </span>
+                                        <span style={{ fontSize: "0.72rem", fontWeight: 700, background: "#d1fae5", color: "#065f46", padding: "0.15rem 0.45rem", borderRadius: "10px" }}>
+                                            {programasCategorizados.activos.length}
+                                        </span>
+                                    </div>
+                                    <div style={{ fontSize: "0.72rem", color: "#047857", marginTop: "0.1rem" }}>
+                                        Periodos abiertos actualmente para recepción de archivos de directores
+                                    </div>
+                                </div>
+                            </div>
+                            <div style={{ color: "#059669" }}>
+                                {seccionesColapsadas.activos ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
+                            </div>
+                        </div>
+
+                        {!seccionesColapsadas.activos && (
+                            programasCategorizados.activos.length > 0 ? (
+                                programasCategorizados.activos.map(renderProgramaCard)
+                            ) : (
+                                <div style={{ padding: "1.25rem", textAlign: "center", background: "#f8fafc", borderRadius: "8px", border: "1px dashed #cbd5e1", color: "var(--text-muted)", fontSize: "0.8125rem" }}>
+                                    No hay programas con periodos activos en este momento.
+                                </div>
+                            )
+                        )}
+                    </div>
+
+                    {/* SECCIÓN 2: CONCLUIDOS */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                        <div 
+                            onClick={() => toggleSeccion("concluidos")}
+                            style={{ 
+                                display: "flex", alignItems: "center", justifyContent: "space-between", 
+                                background: "rgba(2, 132, 199, 0.08)", border: "1px solid rgba(2, 132, 199, 0.3)", 
+                                borderRadius: "10px", padding: "0.65rem 1rem", cursor: "pointer", userSelect: "none",
+                                transition: "all 0.2s"
+                            }}
+                        >
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "26px", height: "26px", borderRadius: "50%", background: "#0284c7", color: "white" }}>
+                                    <CheckCircle2 size={15} />
+                                </span>
+                                <div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                        <span style={{ fontWeight: 800, fontSize: "0.875rem", color: "#075985" }}>
+                                            PROGRAMAS CONCLUIDOS / YA ENTREGADOS
+                                        </span>
+                                        <span style={{ fontSize: "0.72rem", fontWeight: 700, background: "#e0f2fe", color: "#0369a1", padding: "0.15rem 0.45rem", borderRadius: "10px" }}>
+                                            {programasCategorizados.concluidos.length}
+                                        </span>
+                                    </div>
+                                    <div style={{ fontSize: "0.72rem", color: "#0284c7", marginTop: "0.1rem" }}>
+                                        Programas concluidos que ya fueron enviados a supervisión y desactivados para directores
+                                    </div>
+                                </div>
+                            </div>
+                            <div style={{ color: "#0284c7" }}>
+                                {seccionesColapsadas.concluidos ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
+                            </div>
+                        </div>
+
+                        {!seccionesColapsadas.concluidos && (
+                            programasCategorizados.concluidos.length > 0 ? (
+                                programasCategorizados.concluidos.map(renderProgramaCard)
+                            ) : (
+                                <div style={{ padding: "1.25rem", textAlign: "center", background: "#f8fafc", borderRadius: "8px", border: "1px dashed #cbd5e1", color: "var(--text-muted)", fontSize: "0.8125rem" }}>
+                                    No hay programas concluidos desactivados.
+                                </div>
+                            )
+                        )}
+                    </div>
+
+                    {/* SECCIÓN 3: FECHAS POSTERIORES */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                        <div 
+                            onClick={() => toggleSeccion("posteriores")}
+                            style={{ 
+                                display: "flex", alignItems: "center", justifyContent: "space-between", 
+                                background: "rgba(217, 119, 6, 0.08)", border: "1px solid rgba(217, 119, 6, 0.3)", 
+                                borderRadius: "10px", padding: "0.65rem 1rem", cursor: "pointer", userSelect: "none",
+                                transition: "all 0.2s"
+                            }}
+                        >
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "26px", height: "26px", borderRadius: "50%", background: "#d97706", color: "white" }}>
+                                    <Clock size={15} />
+                                </span>
+                                <div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                        <span style={{ fontWeight: 800, fontSize: "0.875rem", color: "#92400e" }}>
+                                            PROGRAMAS INACTIVOS (FECHAS POSTERIORES / PENDIENTES)
+                                        </span>
+                                        <span style={{ fontSize: "0.72rem", fontWeight: 700, background: "#fef3c7", color: "#92400e", padding: "0.15rem 0.45rem", borderRadius: "10px" }}>
+                                            {programasCategorizados.posteriores.length}
+                                        </span>
+                                    </div>
+                                    <div style={{ fontSize: "0.72rem", color: "#b45309", marginTop: "0.1rem" }}>
+                                        Programas para bimestres o meses posteriores del ciclo escolar (aún no inician entregas)
+                                    </div>
+                                </div>
+                            </div>
+                            <div style={{ color: "#d97706" }}>
+                                {seccionesColapsadas.posteriores ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
+                            </div>
+                        </div>
+
+                        {!seccionesColapsadas.posteriores && (
+                            programasCategorizados.posteriores.length > 0 ? (
+                                programasCategorizados.posteriores.map(renderProgramaCard)
+                            ) : (
+                                <div style={{ padding: "1.25rem", textAlign: "center", background: "#f8fafc", borderRadius: "8px", border: "1px dashed #cbd5e1", color: "var(--text-muted)", fontSize: "0.8125rem" }}>
+                                    No hay programas pendientes para fechas posteriores.
+                                </div>
+                            )
+                        )}
+                    </div>
+                </div>
+            ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                    {listaFiltrada.length > 0 ? (
+                        listaFiltrada.map(renderProgramaCard)
+                    ) : (
+                        <div style={{ padding: "2.5rem", textAlign: "center", background: "#f8fafc", borderRadius: "12px", border: "1px dashed #cbd5e1", color: "var(--text-muted)" }}>
+                            <p style={{ fontWeight: 700, fontSize: "0.875rem", margin: 0 }}>No se encontraron programas en esta categoría.</p>
+                        </div>
+                    )}
+                </div>
+            )}
             <PdfViewerModal
                 isOpen={!!viewingPdf}
                 onClose={() => setViewingPdf(null)}

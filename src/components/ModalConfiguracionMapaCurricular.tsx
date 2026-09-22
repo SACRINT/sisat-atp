@@ -9,6 +9,7 @@ import {
   FFE_RECURSOS_SOCIOCOGNITIVOS,
   FFE_AREAS_CONOCIMIENTO,
   FORMACIONES_SOCIOEMOCIONALES,
+  resolverSocioemocionalGrupo,
   generarGruposPorEstructura,
   obtenerAsignaturasParaGrupo,
   GrupoDefinicion
@@ -181,8 +182,23 @@ export default function ModalConfiguracionMapaCurricular({
   const handleSave = async () => {
     setGuardando(true);
     try {
+      // Pre-calcular resolución de FFEO para cada track de letras
+      const letrasUnicas = Array.from(new Set(gruposGenerados.map(g => (g.nombre || "").split(" ")[1]).filter(Boolean)));
+      const tracksResueltos: Record<string, { sem3: string; sem4: string; sem5: string; sem6: string }> = {};
+      for (const letra of letrasUnicas) {
+        const cfg3 = mapaConfig[normalizarNombreGrupo(`3° ${letra}`)] || mapaConfig[`3° ${letra}`] || mapaConfig[`3º ${letra}`];
+        const cfg5 = mapaConfig[normalizarNombreGrupo(`5° ${letra}`)] || mapaConfig[`5° ${letra}`] || mapaConfig[`5º ${letra}`];
+        tracksResueltos[letra] = resolverSocioemocionalGrupo(cfg3?.ffeoSocioemocional, cfg5?.ffeoSocioemocional);
+      }
+
       // Construir array de gruposConfig
       const gruposConfig = gruposGenerados.map(g => {
+        const letra = (g.nombre || "").split(" ")[1] || "A";
+        const trackRes = tracksResueltos[letra];
+        const defaultSocio = g.semestre === 3
+          ? (trackRes?.sem3 || FORMACIONES_SOCIOEMOCIONALES[0])
+          : (trackRes?.sem5 || FORMACIONES_SOCIOEMOCIONALES[1]);
+
         const cfg = mapaConfig[g.nombre] || mapaConfig[g.nombre.replace("º", "°")] || mapaConfig[g.nombre.replace("°", "º")] || {
           capacitacionNombre: "Administracion",
           ffeOptativas: [
@@ -191,15 +207,19 @@ export default function ModalConfiguracionMapaCurricular({
             "Fundamentos de Administración I",
             "Lógica y Pensamiento Crítico"
           ],
-          ffeoSocioemocional: FORMACIONES_SOCIOEMOCIONALES[0]
+          ffeoSocioemocional: defaultSocio
         };
+
+        const socioFinal = g.semestre === 3
+          ? (trackRes?.sem3 || cfg.ffeoSocioemocional || FORMACIONES_SOCIOEMOCIONALES[0])
+          : (trackRes?.sem5 || cfg.ffeoSocioemocional || FORMACIONES_SOCIOEMOCIONALES[1]);
 
         return {
           grupoNombre: g.nombre,
           semestre: g.semestre,
           capacitacionNombre: cfg.capacitacionNombre,
           ffeOptativas: cfg.ffeOptativas,
-          ffeoSocioemocional: cfg.ffeoSocioemocional,
+          ffeoSocioemocional: socioFinal,
         };
       });
 

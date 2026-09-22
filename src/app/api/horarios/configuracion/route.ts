@@ -165,6 +165,35 @@ export async function POST(req: NextRequest) {
     // Mapa para asociar IDs temporales o nombres con IDs reales de DB
     const mapaGrupoIds: Record<string, string> = {};
 
+    // Sanitizar FFEO para evitar duplicados estrictos entre 3° y 5°
+    if (Array.isArray(grupos)) {
+      const FORMACIONES_SOCIOEMOCIONALES = [
+        "Educación para la Salud",
+        "Educación Integral en Sexualidad y Género",
+        "Práctica y Colaboración Ciudadana"
+      ];
+      const letras = Array.from(new Set(grupos.map((g: any) => (g.nombre || "").split(" ")[1]).filter(Boolean)));
+      for (const letra of letras) {
+        const g3 = grupos.find((g: any) => Number(g.semestre) === 3 && (g.nombre || "").trim().endsWith(letra));
+        const g5 = grupos.find((g: any) => Number(g.semestre) === 5 && (g.nombre || "").trim().endsWith(letra));
+        if (g3 && g5) {
+          const s3 = g3.ffeoSocioemocional || FORMACIONES_SOCIOEMOCIONALES[0];
+          let s5 = g5.ffeoSocioemocional || FORMACIONES_SOCIOEMOCIONALES[1];
+          if (s5 === s3) {
+            s5 = FORMACIONES_SOCIOEMOCIONALES.find(s => s !== s3) || FORMACIONES_SOCIOEMOCIONALES[1];
+          }
+          g3.ffeoSocioemocional = s3;
+          g5.ffeoSocioemocional = s5;
+
+          const restante = FORMACIONES_SOCIOEMOCIONALES.find(s => s !== s3 && s !== s5) || FORMACIONES_SOCIOEMOCIONALES[2];
+          const g4 = grupos.find((g: any) => Number(g.semestre) === 4 && (g.nombre || "").trim().endsWith(letra));
+          const g6 = grupos.find((g: any) => Number(g.semestre) === 6 && (g.nombre || "").trim().endsWith(letra));
+          if (g4) g4.ffeoSocioemocional = restante;
+          if (g6) g6.ffeoSocioemocional = restante;
+        }
+      }
+    }
+
     // 2. Guardar/Sincronizar Grupos usando la restricción única (escuelaId, nombre)
     if (Array.isArray(grupos)) {
       for (const g of grupos) {

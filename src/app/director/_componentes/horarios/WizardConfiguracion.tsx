@@ -325,19 +325,19 @@ export default function WizardConfiguracion({
           try { ffeOpts = JSON.parse(ffeOpts); } catch { ffeOpts = null; }
         }
 
-        const g3Socio = (gruposIniciales || []).find((g: any) => normalizarNombreGrupo(g.nombre) === `3° ${letra}`)?.ffeoSocioemocional
-          || gruposActuales.find(g => normalizarNombreGrupo(g.nombre) === `3° ${letra}`)?.ffeoSocioemocional;
-        const g5Socio = (gruposIniciales || []).find((g: any) => normalizarNombreGrupo(g.nombre) === `5° ${letra}`)?.ffeoSocioemocional
-          || gruposActuales.find(g => normalizarNombreGrupo(g.nombre) === `5° ${letra}`)?.ffeoSocioemocional;
+        const g3Socio = gruposActuales.find(g => normalizarNombreGrupo(g.nombre) === `3° ${letra}`)?.ffeoSocioemocional
+          || (gruposIniciales || []).find((g: any) => normalizarNombreGrupo(g.nombre) === `3° ${letra}`)?.ffeoSocioemocional;
+        const g5Socio = gruposActuales.find(g => normalizarNombreGrupo(g.nombre) === `5° ${letra}`)?.ffeoSocioemocional
+          || (gruposIniciales || []).find((g: any) => normalizarNombreGrupo(g.nombre) === `5° ${letra}`)?.ffeoSocioemocional;
         const resolvedSocio = resolverSocioemocionalGrupo(g3Socio, g5Socio);
 
         let socioCalculado: string;
         if (sem === 3) {
-          socioCalculado = grupoDbOficial?.ffeoSocioemocional || resolvedSocio.sem3;
+          socioCalculado = resolvedSocio.sem3;
         } else if (sem === 4) {
           socioCalculado = resolvedSocio.sem4;
         } else if (sem === 5) {
-          socioCalculado = grupoDbOficial?.ffeoSocioemocional || resolvedSocio.sem5;
+          socioCalculado = resolvedSocio.sem5;
         } else if (sem === 6) {
           socioCalculado = resolvedSocio.sem6;
         } else {
@@ -501,23 +501,23 @@ export default function WizardConfiguracion({
 
     if (field === "ffeoSocioemocional") {
       const sem = copia[index].semestre;
-      const letraGrupo = copia[index].nombre.split(" ")[1];
+      const letraGrupo = copia[index].nombre.split(" ")[1] || "A";
 
       if (sem === 3 || sem === 5) {
-        const g3 = copia.find((g) => g.semestre === 3 && g.nombre.endsWith(letraGrupo));
-        const g5 = copia.find((g) => g.semestre === 5 && g.nombre.endsWith(letraGrupo));
+        const g3 = copia.find((g) => g.semestre === 3 && g.nombre.trim().endsWith(letraGrupo));
+        const g5 = copia.find((g) => g.semestre === 5 && g.nombre.trim().endsWith(letraGrupo));
 
-        const socio3 = g3?.ffeoSocioemocional;
-        const socio5 = g5?.ffeoSocioemocional;
+        const socio3 = sem === 3 ? value : g3?.ffeoSocioemocional;
+        const socio5 = sem === 5 ? value : g5?.ffeoSocioemocional;
         const resolved = resolverSocioemocionalGrupo(socio3, socio5);
 
         if (g3) g3.ffeoSocioemocional = resolved.sem3;
         if (g5) g5.ffeoSocioemocional = resolved.sem5;
 
-        const g4 = copia.find((g) => g.semestre === 4 && g.nombre.endsWith(letraGrupo));
+        const g4 = copia.find((g) => g.semestre === 4 && g.nombre.trim().endsWith(letraGrupo));
         if (g4) g4.ffeoSocioemocional = resolved.sem4;
 
-        const g6 = copia.find((g) => g.semestre === 6 && g.nombre.endsWith(letraGrupo));
+        const g6 = copia.find((g) => g.semestre === 6 && g.nombre.trim().endsWith(letraGrupo));
         if (g6) g6.ffeoSocioemocional = resolved.sem6;
       }
     }
@@ -898,13 +898,31 @@ export default function WizardConfiguracion({
   };
 
   const handleAvanzarPaso1 = () => {
-    generarGruposSegunEstructura(g1, g2, g3);
+    // Asegurar resolución consistente de FFEO para cada track de grupos antes de avanzar
+    const copiaGrupos = [...grupos];
+    const letrasTrack = Array.from(new Set(copiaGrupos.map(g => (g.nombre || "").split(" ")[1]).filter(Boolean)));
+    for (const letra of letrasTrack) {
+      const g3 = copiaGrupos.find(g => g.semestre === 3 && g.nombre.trim().endsWith(letra));
+      const g5 = copiaGrupos.find(g => g.semestre === 5 && g.nombre.trim().endsWith(letra));
+      const g4 = copiaGrupos.find(g => g.semestre === 4 && g.nombre.trim().endsWith(letra));
+      const g6 = copiaGrupos.find(g => g.semestre === 6 && g.nombre.trim().endsWith(letra));
+
+      const resolved = resolverSocioemocionalGrupo(g3?.ffeoSocioemocional, g5?.ffeoSocioemocional);
+      if (g3) g3.ffeoSocioemocional = resolved.sem3;
+      if (g5) g5.ffeoSocioemocional = resolved.sem5;
+      if (g4) g4.ffeoSocioemocional = resolved.sem4;
+      if (g6) g6.ffeoSocioemocional = resolved.sem6;
+    }
+    setGrupos(copiaGrupos);
+    guardarProgresoLocal();
+
     try {
       fetch("/api/horarios/configuracion", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           escuelaId,
+          grupos: copiaGrupos,
           config: {
             diasLectivos: 5,
             horasPorDia: numPeriodos,
@@ -1078,13 +1096,17 @@ export default function WizardConfiguracion({
         { name: `Asignatura 1 de ${capNombre}`, abrev: "LAB-1" },
         { name: `Asignatura 2 de ${capNombre}`, abrev: "LAB-2" }
       ];
+      const letraGrupo = (grupo.nombre || "").split(" ")[1] || "A";
+      const g5 = grupos.find(g => g.semestre === 5 && normalizarNombreGrupo(g.nombre) === `5° ${letraGrupo}`);
+      const resolved = resolverSocioemocionalGrupo(grupo.ffeoSocioemocional, g5?.ffeoSocioemocional);
+      const socioFinal = resolved.sem3;
 
       return [
         { id: `uac_3_1`, uacName: "Ciencias Naturales, Experimentales y Tecnología III", abrev: "CNEyT-III", tipo: "UNIVERSAL", horasSemanales: 4 },
         { id: `uac_3_2`, uacName: "Pensamiento Matemático III", abrev: "PENS-MAT-III", tipo: "UNIVERSAL", horasSemanales: 4 },
         { id: `uac_3_3`, uacName: "Humanidades III", abrev: "HUM-III", tipo: "UNIVERSAL", horasSemanales: 5 },
         { id: `uac_3_4`, uacName: "Taller de Ciencias II", abrev: "TALL-CIEN-II", tipo: "UNIVERSAL", horasSemanales: 3 },
-        { id: `uac_3_5`, uacName: grupo.ffeoSocioemocional || FORMACIONES_SOCIOEMOCIONALES[0], abrev: "CURR-AMP-3", tipo: "AMPLIADO", horasSemanales: 2 },
+        { id: `uac_3_5`, uacName: socioFinal, abrev: "CURR-AMP-3", tipo: "AMPLIADO", horasSemanales: 2 },
         { id: `uac_3_6`, uacName: "Lengua y Comunicación III", abrev: "LENG-COM-III", tipo: "UNIVERSAL", horasSemanales: 3 },
         { id: `uac_3_7`, uacName: "Inglés III", abrev: "ING-III", tipo: "UNIVERSAL", horasSemanales: 3 },
         { id: `uac_3_lab_a`, uacName: uacsLabInfo[0].name, abrev: uacsLabInfo[0].abrev, capNombre, tipo: "LABORAL_A", horasSemanales: 3 },
@@ -1104,6 +1126,10 @@ export default function WizardConfiguracion({
         FFE_OPTATIVAS_CATALOGO[7],
         FFE_OPTATIVAS_CATALOGO[8]
       ];
+      const letraGrupo = (grupo.nombre || "").split(" ")[1] || "A";
+      const g3 = grupos.find(g => g.semestre === 3 && normalizarNombreGrupo(g.nombre) === `3° ${letraGrupo}`);
+      const resolved = resolverSocioemocionalGrupo(g3?.ffeoSocioemocional, grupo.ffeoSocioemocional);
+      const socioFinal = resolved.sem5;
 
       return [
         { id: `uac_5_1`, uacName: "La Energía en los Procesos de la Vida Diaria", abrev: "ENERG-VIDA", tipo: "UNIVERSAL", horasSemanales: 4 },
@@ -1113,7 +1139,7 @@ export default function WizardConfiguracion({
         { id: `uac_5_ffe_2`, uacName: opts[1] || FFE_OPTATIVAS_CATALOGO[1], abrev: "FFE-2", tipo: "FFE_2", horasSemanales: 3 },
         { id: `uac_5_ffe_3`, uacName: opts[2] || FFE_OPTATIVAS_CATALOGO[7], abrev: "FFE-3", tipo: "FFE_3", horasSemanales: 3 },
         { id: `uac_5_ffe_4`, uacName: opts[3] || FFE_OPTATIVAS_CATALOGO[8], abrev: "FFE-4", tipo: "FFE_4", horasSemanales: 3 },
-        { id: `uac_5_5`, uacName: grupo.ffeoSocioemocional || FORMACIONES_SOCIOEMOCIONALES[1], abrev: "CURR-AMP-5", tipo: "AMPLIADO", horasSemanales: 2 },
+        { id: `uac_5_5`, uacName: socioFinal, abrev: "CURR-AMP-5", tipo: "AMPLIADO", horasSemanales: 2 },
         { id: `uac_5_lab_a`, uacName: uacsLabInfo[0].name, abrev: uacsLabInfo[0].abrev, capNombre, tipo: "LABORAL_A", horasSemanales: 3 },
         { id: `uac_5_lab_b`, uacName: uacsLabInfo[1].name, abrev: uacsLabInfo[1].abrev, capNombre, tipo: "LABORAL_B", horasSemanales: 3 }
       ];
@@ -1137,13 +1163,18 @@ export default function WizardConfiguracion({
     if (sem === 4) {
       const capNombre = grupo.capacitacionNombre || FORMACIONES_LABORALES[0];
       const uacsLabInfo = UACS_LABORALES_MAPA[capNombre]?.sem4 || UACS_LABORALES_MAPA["Administracion"].sem4;
+      const letraGrupo = (grupo.nombre || "").split(" ")[1] || "A";
+      const g3 = grupos.find(g => g.semestre === 3 && normalizarNombreGrupo(g.nombre) === `3° ${letraGrupo}`);
+      const g5 = grupos.find(g => g.semestre === 5 && normalizarNombreGrupo(g.nombre) === `5° ${letraGrupo}`);
+      const resolved = resolverSocioemocionalGrupo(g3?.ffeoSocioemocional, g5?.ffeoSocioemocional);
+      const socioFinal = resolved.sem4;
 
       return [
         { id: `uac_4_1`, uacName: "Ciencias Naturales, Experimentales y Tecnología IV", abrev: "CNEyT-IV", tipo: "UNIVERSAL", horasSemanales: 4 },
         { id: `uac_4_2`, uacName: "Pensamiento Matemático IV", abrev: "PENS-MAT-IV", tipo: "UNIVERSAL", horasSemanales: 4 },
         { id: `uac_4_3`, uacName: "Humanidades IV", abrev: "HUM-IV", tipo: "UNIVERSAL", horasSemanales: 5 },
         { id: `uac_4_4`, uacName: "Taller de Ciencias III", abrev: "TALL-CIEN-III", tipo: "UNIVERSAL", horasSemanales: 3 },
-        { id: `uac_4_5`, uacName: grupo.ffeoSocioemocional || FORMACIONES_SOCIOEMOCIONALES[0], abrev: "CURR-AMP-4", tipo: "AMPLIADO", horasSemanales: 2 },
+        { id: `uac_4_5`, uacName: socioFinal, abrev: "CURR-AMP-4", tipo: "AMPLIADO", horasSemanales: 2 },
         { id: `uac_4_6`, uacName: "Lengua y Comunicación IV", abrev: "LENG-COM-IV", tipo: "UNIVERSAL", horasSemanales: 3 },
         { id: `uac_4_7`, uacName: "Inglés IV", abrev: "ING-IV", tipo: "UNIVERSAL", horasSemanales: 3 },
         { id: `uac_4_lab_a`, uacName: uacsLabInfo[0].name, abrev: uacsLabInfo[0].abrev, capNombre, tipo: "LABORAL_A", horasSemanales: 3 },
@@ -1161,6 +1192,11 @@ export default function WizardConfiguracion({
         FFE_OPTATIVAS_CATALOGO[8]
       ];
       const opts6 = opts5.map((f: string) => obtenerFfeSemestre6(f));
+      const letraGrupo = (grupo.nombre || "").split(" ")[1] || "A";
+      const g3 = grupos.find(g => g.semestre === 3 && normalizarNombreGrupo(g.nombre) === `3° ${letraGrupo}`);
+      const g5 = grupos.find(g => g.semestre === 5 && normalizarNombreGrupo(g.nombre) === `5° ${letraGrupo}`);
+      const resolved = resolverSocioemocionalGrupo(g3?.ffeoSocioemocional, g5?.ffeoSocioemocional);
+      const socioFinal = resolved.sem6;
 
       return [
         { id: `uac_6_1`, uacName: "La Energía en los Procesos de la Vida Diaria II", abrev: "ENERG-VIDA-II", tipo: "UNIVERSAL", horasSemanales: 4 },
@@ -1170,7 +1206,7 @@ export default function WizardConfiguracion({
         { id: `uac_6_ffe_2`, uacName: opts6[1], abrev: "FFE-2-CONT", tipo: "FFE_2", horasSemanales: 3 },
         { id: `uac_6_ffe_3`, uacName: opts6[2], abrev: "FFE-3-CONT", tipo: "FFE_3", horasSemanales: 3 },
         { id: `uac_6_ffe_4`, uacName: opts6[3], abrev: "FFE-4-CONT", tipo: "FFE_4", horasSemanales: 3 },
-        { id: `uac_6_5`, uacName: grupo.ffeoSocioemocional || FORMACIONES_SOCIOEMOCIONALES[1], abrev: "CURR-AMP-6", tipo: "AMPLIADO", horasSemanales: 2 },
+        { id: `uac_6_5`, uacName: socioFinal, abrev: "CURR-AMP-6", tipo: "AMPLIADO", horasSemanales: 2 },
         { id: `uac_6_lab_a`, uacName: uacsLabInfo[0].name, abrev: uacsLabInfo[0].abrev, capNombre, tipo: "LABORAL_A", horasSemanales: 3 },
         { id: `uac_6_lab_b`, uacName: uacsLabInfo[1].name, abrev: uacsLabInfo[1].abrev, capNombre, tipo: "LABORAL_B", horasSemanales: 3 }
       ];
@@ -1657,12 +1693,26 @@ export default function WizardConfiguracion({
                               {g.semestre >= 3 && (() => {
                                 const letraGrupo = g.nombre.split(" ")[1] || "A";
                                 const g3 = grupos.find(grp => normalizarNombreGrupo(grp.nombre) === `3° ${letraGrupo}`);
-                                const socio3 = g3?.ffeoSocioemocional;
-                                const opcionesDisponibles = (g.semestre === 5 && socio3)
+                                const socio3 = g3?.ffeoSocioemocional || FORMACIONES_SOCIOEMOCIONALES[0];
+                                const opcionesDisponibles = (g.semestre === 5)
                                   ? FORMACIONES_SOCIOEMOCIONALES.filter(s => s !== socio3)
                                   : FORMACIONES_SOCIOEMOCIONALES;
 
                                 const esAuto = g.semestre === 4 || g.semestre === 6;
+
+                                // Garantizar que 5.° semestre no tenga asignado por error la misma materia de 3.er semestre
+                                let valorSeleccionado = g.ffeoSocioemocional;
+                                if (g.semestre === 5) {
+                                  if (!valorSeleccionado || valorSeleccionado === socio3 || !opcionesDisponibles.includes(valorSeleccionado)) {
+                                    valorSeleccionado = opcionesDisponibles[0] || FORMACIONES_SOCIOEMOCIONALES[1];
+                                  }
+                                } else if (g.semestre === 3) {
+                                  if (!valorSeleccionado) valorSeleccionado = FORMACIONES_SOCIOEMOCIONALES[0];
+                                } else if (esAuto) {
+                                  const g5 = grupos.find(grp => normalizarNombreGrupo(grp.nombre) === `5° ${letraGrupo}`);
+                                  const resolved = resolverSocioemocionalGrupo(socio3, g5?.ffeoSocioemocional);
+                                  valorSeleccionado = resolved.sem4;
+                                }
 
                                 return (
                                   <div style={{ marginBottom: "0.65rem" }}>
@@ -1671,7 +1721,7 @@ export default function WizardConfiguracion({
                                     </label>
                                     <select
                                       disabled={esAuto}
-                                      value={g.ffeoSocioemocional || (g.semestre === 3 ? FORMACIONES_SOCIOEMOCIONALES[0] : FORMACIONES_SOCIOEMOCIONALES[1])}
+                                      value={valorSeleccionado}
                                       onChange={(e) => handleActualizarConfigGrupo(idx, "ffeoSocioemocional", e.target.value)}
                                       style={{ width: "100%", padding: "0.4rem 0.5rem", borderRadius: "6px", border: "1px solid #475569", background: "#0f172a", fontSize: "0.72rem", fontWeight: 700, color: "#ffffff", opacity: esAuto ? 0.8 : 1 }}
                                     >
