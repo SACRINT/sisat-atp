@@ -932,11 +932,33 @@ El sistema cuenta con scripts dedicados en `scripts/`:
 
 ---
 
-*Versión actualizada: Septiembre 2026 — v6.0 (Homologación Integral Ecosistema SACRINT)*
+### 9.18 Unificador Universal de Concentrados PDF por CCT (Módulo Avance de Entregas)
 
+A partir de la actualización de Septiembre 2026, se eliminó la restricción rígida que limitaba la unificación zonal de archivos PDF únicamente a *"DÍA NARANJA"*, habilitando un **mecanismo dinámico y universal** para todos los programas educativos de la supervisión.
 
+#### 1. Principio y Motivación Institucional
+El Asesor Técnico Pedagógico (ATP) y la Supervisión Escolar requieren remitir concentrados consolidados a dependencias de la SEP (ej. Plataformas de Dirección General, formularios del programa *El ABC de las Emociones*, CEDAVIM, etc.), donde las evidencias de las escuelas deben presentarse en un único archivo PDF ordenado alfabéticamente por Clave de Centro de Trabajo (CCT).
 
+#### 2. Componentes y Arquitectura
+- **Ubicación**: `src/app/admin/_componentes/ListadoProgramas.tsx` y `src/lib/merge-pdfs.ts`.
+- **Generación Dinámica de Botones (`obtenerBotonesUnificacion`)**:
+  - **Programas de 1 Documento (`numArchivos <= 1`)**: Aplica a *El ABC de las Emociones*, *PMC*, *PAEC-PEC*, *Seguridad y Paz*, etc. Genera un botón `[🔗 Unificar Evidencias]` con `etiquetaMatch: null`, garantizando la inclusión del archivo entregado incluso si la etiqueta es `null` o genérica.
+  - **Programas de 2 o más Documentos (`numArchivos >= 2`)**: Mapea dinámicamente cada etiqueta a su propio botón (`[🔗 Unificar Registros]`, `[🔗 Unificar Evidencias]`, o el nombre del documento).
+  - **Fallback sin etiquetas**: Si un programa requiere $N$ archivos pero no tiene etiquetas configuradas en BD, genera `Unificar Archivo 1`, `Unificar Archivo 2`...
+- **Deduplicación y Ordenamiento Estricto**:
+  - Deduplica por CCT (1 documento representativo por bachillerato).
+  - Ordena alfabéticamente mediante `items.sort((a, b) => a.cct.localeCompare(b.cct))`.
+- **Concurrencia Aislada y No Bloqueante**:
+  - El estado de procesamiento está desacoplado por clave de unificación individual: `mergingKeys: Record<string, boolean>` con formato `${prog.id}_${periodoId}_${config.tipo}`.
+  - El progreso de descarga y unión se reporta por programa (`mergeProgressByProg: Record<string, MergeProgress>`), permitiendo al usuario procesar múltiples programas o periodos en paralelo.
+- **Prefijo Configurable y Nomenclatura Institucional**:
+  - Editor en línea de prefijo (✎) con preview reactiva: `${mergePrefix}_${progNombreLimpio}${periodoSuffix}_${config.tipo}.PDF`.
+- **Unificación por Periodo / Mes**:
+  - En programas mensuales o semestrales, cada fila de periodo expandido expone su propio botón para consolidar exclusivamente las entregas de ese mes.
 
+#### 3. Validación y Pruebas
+- Script de validación automatizada: `scripts/test-unificador-universal.ts` (valida los 4 casos de generación de botones, fallback, deduplicación y orden alfabético por CCT).
 
+---
 
-
+*Versión actualizada: Septiembre 2026 — v6.1 (Unificador Universal de PDFs por CCT & Homologación SACRINT)*
