@@ -2,9 +2,9 @@
 
 import { useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronUp, ChevronDown, MessageSquare, Download, Eye, Loader2, FileCheck2, FilePlus2, Trash2, Upload, RefreshCw, CheckCircle2, Clock, Activity, CalendarDays } from "lucide-react";
+import { ChevronUp, ChevronDown, MessageSquare, Download, Eye, Loader2, FileCheck2, FilePlus2, Trash2, Upload, RefreshCw, CheckCircle2, Clock, Activity } from "lucide-react";
 import JSZip from "jszip";
-import { MESES, ESTADOS, ESTADO_LABELS, getNombrePeriodo } from "@/lib/constants";
+import { ESTADOS, ESTADO_LABELS, getNombrePeriodo } from "@/lib/constants";
 import { ProgramaAdmin } from "@/types";
 import { getDownloadUrl } from "@/lib/download-url";
 import PdfViewerModal from "@/app/_componentes/PdfViewerModal";
