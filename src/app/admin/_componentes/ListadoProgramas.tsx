@@ -722,9 +722,9 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                                                                         {botonesUnificacion.map((btn) => {
                                                                             const btnKey = `${prog.id}_${periodo.id}_${btn.tipo}`;
                                                                             const isThisMerging = mergingKey === btnKey;
-                                                                            const btnText = botonesUnificacion.length > 1
-                                                                                ? (btn.tipo === "REGISTROS" ? "Unificar Registros" : btn.tipo === "EVIDENCIAS" ? "Unificar Evidencias" : btn.label)
-                                                                                : "Unificar Mes";
+                                                                            const btnText = btn.tipo === "REGISTROS" ? "Unificar Registros"
+                                                                                : btn.tipo === "EVIDENCIAS" ? "Unificar Evidencias"
+                                                                                : btn.label;
 
                                                                             return (
                                                                                 <button
