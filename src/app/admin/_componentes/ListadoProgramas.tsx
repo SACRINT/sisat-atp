@@ -430,8 +430,9 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                 type: "success",
                 text: `✅ ${fileName} listo: ${mergedCount} bachillerato${mergedCount > 1 ? "s" : ""} unidos en orden de CCT.`,
             });
-        } catch (e: any) {
-            onSetMessage({ type: "error", text: `❌ ${e.message || "Error al unificar los PDFs."}` });
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : String(e);
+            onSetMessage({ type: "error", text: `❌ ${msg || "Error al unificar los PDFs."}` });
         } finally {
             setMergingKey(null);
             setMergingProgId(null);
