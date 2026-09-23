@@ -15,6 +15,13 @@ import {
   GrupoDefinicion
 } from "@/lib/escuela-grupos";
 
+const FFE_OPTATIVAS_DEFAULT = [
+  FFE_OPTATIVAS_CATALOGO[0],
+  FFE_OPTATIVAS_CATALOGO[1],
+  FFE_OPTATIVAS_CATALOGO[7],
+  FFE_OPTATIVAS_CATALOGO[8]
+];
+
 interface Props {
   escuela: {
     id: string;
@@ -70,12 +77,7 @@ export default function ModalConfiguracionMapaCurricular({
             try { opts = JSON.parse(opts); } catch { opts = []; }
           }
 
-          const parsedOpts = Array.isArray(opts) && opts.length === 4 ? opts : [
-            FFE_RECURSOS_SOCIOCOGNITIVOS[0],
-            FFE_RECURSOS_SOCIOCOGNITIVOS[1],
-            FFE_AREAS_CONOCIMIENTO[0],
-            FFE_AREAS_CONOCIMIENTO[1]
-          ];
+          const parsedOpts = Array.isArray(opts) && opts.length === 4 ? opts : FFE_OPTATIVAS_DEFAULT;
 
           const itemData = {
             capacitacionNombre: g.capacitacionNombre || "Administracion",
@@ -114,12 +116,7 @@ export default function ModalConfiguracionMapaCurricular({
     setMapaConfig(prev => {
       const actual = prev[nNorm] || prev[grupoNombre] || prev[nAlt] || {
         capacitacionNombre: "Administracion",
-        ffeOptativas: [
-          FFE_RECURSOS_SOCIOCOGNITIVOS[0],
-          FFE_RECURSOS_SOCIOCOGNITIVOS[1],
-          FFE_AREAS_CONOCIMIENTO[0],
-          FFE_AREAS_CONOCIMIENTO[1]
-        ],
+        ffeOptativas: FFE_OPTATIVAS_DEFAULT,
         ffeoSocioemocional: FORMACIONES_SOCIOEMOCIONALES[0]
       };
 
@@ -143,7 +140,7 @@ export default function ModalConfiguracionMapaCurricular({
           const key5Alt = `5º ${letra}`;
           const config5 = prev[key5Norm] || prev[key5Alt] || {
             capacitacionNombre: "Administracion",
-            ffeOptativas: [FFE_RECURSOS_SOCIOCOGNITIVOS[0], FFE_RECURSOS_SOCIOCOGNITIVOS[1], FFE_AREAS_CONOCIMIENTO[0], FFE_AREAS_CONOCIMIENTO[1]],
+            ffeOptativas: FFE_OPTATIVAS_DEFAULT,
             ffeoSocioemocional: FORMACIONES_SOCIOEMOCIONALES[1]
           };
           if (config5.ffeoSocioemocional === value) {
@@ -157,12 +154,7 @@ export default function ModalConfiguracionMapaCurricular({
           const key3Alt = `3º ${letra}`;
           const config3 = prev[key3Norm] || prev[key3Alt] || {
             capacitacionNombre: "Administracion",
-            ffeOptativas: [
-              FFE_RECURSOS_SOCIOCOGNITIVOS[0],
-              FFE_RECURSOS_SOCIOCOGNITIVOS[1],
-              FFE_AREAS_CONOCIMIENTO[0],
-              FFE_AREAS_CONOCIMIENTO[1]
-            ],
+            ffeOptativas: FFE_OPTATIVAS_DEFAULT,
             ffeoSocioemocional: FORMACIONES_SOCIOEMOCIONALES[0]
           };
           if (config3.ffeoSocioemocional === value) {
@@ -449,12 +441,7 @@ export default function ModalConfiguracionMapaCurricular({
                   const rawCfg = mapaConfig[g.nombre] || mapaConfig[g.nombre.replace("º", "°")] || mapaConfig[g.nombre.replace("°", "º")];
                   const cfg = {
                     capacitacionNombre: rawCfg?.capacitacionNombre || "Administracion",
-                    ffeOptativas: Array.isArray(rawCfg?.ffeOptativas) && rawCfg.ffeOptativas.length === 4 ? rawCfg.ffeOptativas : [
-                      FFE_RECURSOS_SOCIOCOGNITIVOS[0],
-                      FFE_RECURSOS_SOCIOCOGNITIVOS[1],
-                      FFE_AREAS_CONOCIMIENTO[0],
-                      FFE_AREAS_CONOCIMIENTO[1]
-                    ],
+                    ffeOptativas: Array.isArray(rawCfg?.ffeOptativas) && rawCfg.ffeOptativas.length === 4 ? rawCfg.ffeOptativas : FFE_OPTATIVAS_DEFAULT,
                     ffeoSocioemocional: rawCfg?.ffeoSocioemocional || (g.semestre === 3 ? FORMACIONES_SOCIOEMOCIONALES[0] : FORMACIONES_SOCIOEMOCIONALES[1])
                   };
 
@@ -548,12 +535,7 @@ export default function ModalConfiguracionMapaCurricular({
                         const opcionesSocio5 = FORMACIONES_SOCIOEMOCIONALES.filter(soc => soc !== socio3);
                         const socio5Actual = opcionesSocio5.includes(cfg.ffeoSocioemocional) ? cfg.ffeoSocioemocional : opcionesSocio5[0];
                         const socio4y6 = FORMACIONES_SOCIOEMOCIONALES.find(soc => soc !== socio3 && soc !== socio5Actual) || FORMACIONES_SOCIOEMOCIONALES[2];
-                        const ffeOpts = cfg.ffeOptativas || [
-                          FFE_OPTATIVAS_CATALOGO[0],
-                          FFE_OPTATIVAS_CATALOGO[1],
-                          FFE_OPTATIVAS_CATALOGO[7],
-                          FFE_OPTATIVAS_CATALOGO[8]
-                        ];
+                        const ffeOpts = cfg.ffeOptativas || FFE_OPTATIVAS_DEFAULT;
 
                         return (
                           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>

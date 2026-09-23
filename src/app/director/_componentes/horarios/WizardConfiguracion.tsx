@@ -138,11 +138,11 @@ export default function WizardConfiguracion({
 
   // ─── PRIORIDAD ABSOLUTA BD: Los grupos de la BD recargan y generan los grupos completos ───
   useEffect(() => {
-    if (gruposIniciales && gruposIniciales.length > 0) {
+    if (gruposIniciales && gruposIniciales.length > 0 && !inicializadoDesdeBD) {
       generarGruposSegunEstructura(g1, g2, g3);
       setInicializadoDesdeBD(true);
     }
-  }, [gruposIniciales, escuelaId, g1, g2, g3]);
+  }, [gruposIniciales, escuelaId, g1, g2, g3, inicializadoDesdeBD]);
 
   // Modo de Configuración: Semiautomático (SEP General) vs Manual Libre (Tecnológicos)
   const [modoConfiguracion, setModoConfiguracion] = useState<"SEMIAUTOMATICO" | "MANUAL_TECNOLOGICO">("SEMIAUTOMATICO");
