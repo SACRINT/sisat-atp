@@ -653,7 +653,7 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                                         }}
                                     />
                                     <span style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>
-                                        → <strong>{mergePrefix.toUpperCase() || "PREFIX"}_{prog.nombre.trim().toUpperCase().replace(/[/\\?%*:|"<>]/g, '_').slice(0, 20)}_UNIFICADO.PDF</strong>
+                                        → <strong>{mergePrefix.toUpperCase() || "PREFIX"}_{prog.nombre.trim().toUpperCase().replace(/[/\\?%*:|"<>]/g, '_').slice(0, 20)}_{botonesUnificacion[0]?.tipo || "UNIFICADO"}.PDF</strong>
                                     </span>
                                 </div>
                             )}
