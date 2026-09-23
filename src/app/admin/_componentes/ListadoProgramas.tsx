@@ -158,11 +158,10 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
     }
 
     // ── Estado para la unificación universal de PDFs por CCT ──
-    const [mergePrefix, setMergePrefix]           = useState(DEFAULT_PREFIX);
-    const [mergingKey, setMergingKey]             = useState<string | null>(null);
-    const [mergingProgId, setMergingProgId]       = useState<string | null>(null);
-    const [mergeProgress, setMergeProgress]       = useState<MergeProgress | null>(null);
-    const [showPrefixProgId, setShowPrefixProgId] = useState<string | null>(null);
+    const [mergePrefix, setMergePrefix]                 = useState(DEFAULT_PREFIX);
+    const [mergingKeys, setMergingKeys]                 = useState<Record<string, boolean>>({});
+    const [mergeProgressByProg, setMergeProgressByProg] = useState<Record<string, MergeProgress>>({});
+    const [showPrefixProgId, setShowPrefixProgId]       = useState<string | null>(null);
 
     // ── Estado para la subida/eliminación administrativa de archivos ──
     const [deleting, setDeleting] = useState<string | null>(null);
@@ -328,7 +327,7 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
         periodoId?: string
     ) {
         const mergeKey = `${prog.id}_${periodoId || "ALL"}_${config.tipo}`;
-        if (mergingKey) return; // ya hay una unificación en curso
+        if (mergingKeys[mergeKey]) return; // ya hay una unificación en curso para este botón específico
 
         // Determinar qué periodos procesar
         let periodosAProcesar = prog.periodos;
@@ -415,16 +414,18 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
         const periodoSuffix = periodoLabel ? `_${periodoLabel.toUpperCase().replace(/[/\\?%*:|"<>]/g, '_').replace(/\s+/g, '_')}` : "";
         const fileName = `${mergePrefix.toUpperCase()}_${progNombreLimpio}${periodoSuffix}_${config.tipo}.PDF`;
 
-        setMergingKey(mergeKey);
-        setMergingProgId(prog.id);
-        setMergeProgress({ total: items.length, done: 0, failed: 0, failedCcts: [], stage: "downloading" });
+        setMergingKeys(prev => ({ ...prev, [mergeKey]: true }));
+        setMergeProgressByProg(prev => ({
+            ...prev,
+            [prog.id]: { total: items.length, done: 0, failed: 0, failedCcts: [], stage: "downloading" }
+        }));
         onSetMessage({ type: "success", text: `Unificando ${items.length} PDF${items.length > 1 ? "s" : ""} de ${config.label}...` });
 
         try {
             const { mergedCount } = await mergePdfsAndDownload(
                 items,
                 fileName,
-                (p) => setMergeProgress(p)
+                (p) => setMergeProgressByProg(prev => ({ ...prev, [prog.id]: p }))
             );
             onSetMessage({
                 type: "success",
@@ -434,9 +435,16 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
             const msg = e instanceof Error ? e.message : String(e);
             onSetMessage({ type: "error", text: `❌ ${msg || "Error al unificar los PDFs."}` });
         } finally {
-            setMergingKey(null);
-            setMergingProgId(null);
-            setMergeProgress(null);
+            setMergingKeys(prev => {
+                const next = { ...prev };
+                delete next[mergeKey];
+                return next;
+            });
+            setMergeProgressByProg(prev => {
+                const next = { ...prev };
+                delete next[prog.id];
+                return next;
+            });
         }
     }
 
@@ -574,7 +582,7 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                                         <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
                                             {botonesUnificacion.map((btn) => {
                                                 const btnKey = `${prog.id}_ALL_${btn.tipo}`;
-                                                const isThisMerging = mergingKey === btnKey;
+                                                const isThisMerging = Boolean(mergingKeys[btnKey]);
                                                 const esEvidencia = btn.tipo === "EVIDENCIAS";
                                                 const borderCol = esEvidencia ? "#059669" : "var(--primary)";
                                                 const textCol = esEvidencia ? "#059669" : "var(--primary)";
@@ -584,15 +592,15 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                                                     <button
                                                         key={btn.tipo}
                                                         onClick={() => handleMergePdfs(prog, btn)}
-                                                        disabled={mergingKey !== null}
+                                                        disabled={isThisMerging}
                                                         title={`Unificar todos los PDFs de ${btn.label} en un solo archivo (ordenados por CCT)`}
                                                         style={{
                                                             display: "inline-flex", alignItems: "center", gap: "0.25rem",
                                                             background: isThisMerging ? "var(--primary-bg)" : "white",
                                                             border: `1px solid ${borderCol}`, borderRadius: "5px",
                                                             color: textCol, padding: "0.2rem 0.45rem",
-                                                            fontSize: "0.7rem", fontWeight: 700, cursor: mergingKey ? "not-allowed" : "pointer",
-                                                            opacity: mergingKey && !isThisMerging ? 0.45 : 1,
+                                                            fontSize: "0.7rem", fontWeight: 700, cursor: isThisMerging ? "not-allowed" : "pointer",
+                                                            opacity: isThisMerging ? 0.7 : 1,
                                                             whiteSpace: "nowrap",
                                                         }}
                                                     >
@@ -659,29 +667,32 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                             )}
 
                             {/* ── Barra de progreso del merge ── */}
-                            {mergingProgId === prog.id && mergeProgress && (
-                                <div
-                                    style={{ marginTop: "0.4rem", display: "flex", alignItems: "center", gap: "0.5rem" }}
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <div style={{ flex: 1, height: "4px", background: "var(--border)", borderRadius: "2px", overflow: "hidden" }}>
-                                        <div style={{
-                                            height: "100%", background: "var(--primary)", borderRadius: "2px",
-                                            width: mergeProgress.total > 0
-                                                ? `${Math.round(((mergeProgress.done + mergeProgress.failed) / mergeProgress.total) * 100)}%`
-                                                : "0%",
-                                            transition: "width 0.3s ease",
-                                        }} />
+                            {mergeProgressByProg[prog.id] && (() => {
+                                const pProg = mergeProgressByProg[prog.id];
+                                return (
+                                    <div
+                                        style={{ marginTop: "0.4rem", display: "flex", alignItems: "center", gap: "0.5rem" }}
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <div style={{ flex: 1, height: "4px", background: "var(--border)", borderRadius: "2px", overflow: "hidden" }}>
+                                            <div style={{
+                                                height: "100%", background: "var(--primary)", borderRadius: "2px",
+                                                width: pProg.total > 0
+                                                    ? `${Math.round(((pProg.done + pProg.failed) / pProg.total) * 100)}%`
+                                                    : "0%",
+                                                transition: "width 0.3s ease",
+                                            }} />
+                                        </div>
+                                        <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                                            {pProg.stage === "merging"
+                                                ? "Uniendo PDFs..."
+                                                : `${pProg.done + pProg.failed} / ${pProg.total}`
+                                            }
+                                            {pProg.failed > 0 && ` (${pProg.failed} omitidos)`}
+                                        </span>
                                     </div>
-                                    <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
-                                        {mergeProgress.stage === "merging"
-                                            ? "Uniendo PDFs..."
-                                            : `${mergeProgress.done + mergeProgress.failed} / ${mergeProgress.total}`
-                                        }
-                                        {mergeProgress.failed > 0 && ` (${mergeProgress.failed} omitidos)`}
-                                    </span>
-                                </div>
-                            )}
+                                );
+                            })()}
 
                             <div className="progress-bar" style={{ marginTop: "0.5rem", height: "6px" }}>
                                 <div className="progress-fill" style={{ width: `${porc}%`, background: progressColor }} />
@@ -721,7 +732,7 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                                                                     <div style={{ display: "flex", gap: "0.25rem", alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
                                                                         {botonesUnificacion.map((btn) => {
                                                                             const btnKey = `${prog.id}_${periodo.id}_${btn.tipo}`;
-                                                                            const isThisMerging = mergingKey === btnKey;
+                                                                            const isThisMerging = Boolean(mergingKeys[btnKey]);
                                                                             const btnText = btn.tipo === "REGISTROS" ? "Unificar Registros"
                                                                                 : btn.tipo === "EVIDENCIAS" ? "Unificar Evidencias"
                                                                                 : btn.label;
@@ -730,7 +741,7 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                                                                                 <button
                                                                                     key={btn.tipo}
                                                                                     onClick={() => handleMergePdfs(prog, btn, periodo.id)}
-                                                                                    disabled={mergingKey !== null}
+                                                                                    disabled={isThisMerging}
                                                                                     title={`Unificar PDFs de ${btn.label} para ${getPeriodoLabel(periodo, prog.nombre)} ordenados por CCT`}
                                                                                     style={{
                                                                                         padding: "0.15rem 0.45rem",
@@ -739,12 +750,12 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                                                                                         background: isThisMerging ? "var(--primary-bg)" : "#ffffff",
                                                                                         border: "1px solid var(--primary)",
                                                                                         color: "var(--primary)",
-                                                                                        cursor: mergingKey ? "not-allowed" : "pointer",
+                                                                                        cursor: isThisMerging ? "not-allowed" : "pointer",
                                                                                         display: "inline-flex",
                                                                                         alignItems: "center",
                                                                                         gap: "0.25rem",
                                                                                         fontWeight: 700,
-                                                                                        opacity: mergingKey && !isThisMerging ? 0.45 : 1,
+                                                                                        opacity: isThisMerging ? 0.7 : 1,
                                                                                         whiteSpace: "nowrap"
                                                                                     }}
                                                                                 >
