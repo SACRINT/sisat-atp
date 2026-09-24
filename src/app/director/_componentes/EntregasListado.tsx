@@ -94,7 +94,7 @@ export default function EntregasListado({
             });
 
             if (!signRes.ok) {
-                const err = await signRes.json();
+                const err = await signRes.json().catch(() => ({}));
                 throw new Error(err.error || "No se pudo iniciar la subida");
             }
 
@@ -115,7 +115,7 @@ export default function EntregasListado({
             });
 
             if (!uploadRes.ok) {
-                const errData = await uploadRes.json();
+                const errData = await uploadRes.json().catch(() => ({}));
                 throw new Error(errData.error?.message || "Error al subir a la nube");
             }
 
@@ -141,7 +141,7 @@ export default function EntregasListado({
                 onSetMessage({ type: "success", text: `✅ "${file.name}" subido correctamente` });
                 router.refresh();
             } else {
-                const data = await confirmRes.json();
+                const data = await confirmRes.json().catch(() => ({}));
                 onSetMessage({ type: "error", text: data.error || "Error al guardar el archivo" });
             }
         } catch (error: any) {

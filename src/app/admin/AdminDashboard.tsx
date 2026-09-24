@@ -335,27 +335,93 @@ export default function AdminDashboard({
         setUploadingAdminFile(true);
         setMessage(null);
         try {
-            const formData = new FormData();
-            formData.append("entregaId", correccionModal.entregaId);
-            formData.append("file", files[0]);
+            const file = files[0];
 
-            const res = await fetch("/api/upload", {
-                method: "POST",
-                body: formData
-            });
-
-            if (!res.ok) {
-                const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.error || "Error al subir archivo");
+            // 0. Validar tamaño (máximo 25 MB) y tipo de archivo
+            if (file.size > 25 * 1024 * 1024) {
+                throw new Error(`"${file.name}" es muy grande. Máximo 25 MB.`);
+            }
+            const allowedTypes = [
+                "application/pdf",
+                "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "application/vnd.ms-excel",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "application/vnd.ms-powerpoint",
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                "image/jpeg",
+                "image/png",
+            ];
+            if (!allowedTypes.includes(file.type)) {
+                throw new Error(`"${file.name}" no es un tipo permitido. Use PDF, Word, Excel, PowerPoint o imagen.`);
             }
 
-            const data = await res.json();
-            // Update local state files list
-            setCorreccionModal(prev => prev ? { ...prev, archivos: [...(prev.archivos || []), ...(data.archivos || [])] } : null);
+            // 1. Obtener firma Cloudinary
+            const signRes = await fetch("/api/sign-cloudinary", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    entregaId: correccionModal.entregaId,
+                    originalFilename: file.name,
+                }),
+            });
+
+            if (!signRes.ok) {
+                const errData = await signRes.json().catch(() => ({}));
+                throw new Error(errData.error || "No se pudo iniciar la subida");
+            }
+
+            const { signature, timestamp, folder, publicId, apiKey, cloudName } = await signRes.json();
+
+            // 2. Subida directa a Cloudinary (bypassa el límite de 4.5MB de Vercel)
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("api_key", apiKey);
+            formData.append("timestamp", timestamp.toString());
+            formData.append("signature", signature);
+            formData.append("folder", folder);
+            if (publicId) formData.append("public_id", publicId);
+
+            const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+                method: "POST",
+                body: formData,
+            });
+
+            if (!uploadRes.ok) {
+                const errData = await uploadRes.json().catch(() => ({}));
+                throw new Error(errData.error?.message || "Error al subir a la nube");
+            }
+
+            const uploadData = await uploadRes.json();
+
+            // 3. Confirmar en base de datos
+            const confirmRes = await fetch("/api/upload/confirm", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    entregaId: correccionModal.entregaId,
+                    etiqueta: null,
+                    fileData: {
+                        name: file.name,
+                        type: file.type,
+                        url: uploadData.secure_url,
+                        publicId: uploadData.public_id,
+                    },
+                }),
+            });
+
+            if (!confirmRes.ok) {
+                const errData = await confirmRes.json().catch(() => ({}));
+                throw new Error(errData.error || "Error al guardar el archivo");
+            }
+
+            const conf = await confirmRes.json();
+
+            // Actualizar lista local de archivos (confirm devuelve `archivo` singular)
+            setCorreccionModal(prev => prev ? { ...prev, archivos: [...(prev.archivos || []), conf.archivo] } : null);
             setMessage({ type: "success", text: "Archivo subido exitosamente. Iniciando pre-revisión..." });
-            
-            // Trigger automatic AI recheck on new file
-            handleReEvaluate();
+
+            // /api/upload/confirm ya dispara la IA en segundo plano para ATP/Admin
             router.refresh();
         } catch (err: any) {
             console.error(err);

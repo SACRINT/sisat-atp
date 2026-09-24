@@ -76,8 +76,13 @@ export async function extractTextFromPdf(
 
 function cleanAndParseGeminiJson(raw: string) {
     let text = raw.trim();
-    if (text.startsWith("```")) {
-        text = text.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
+    // Extraer bloque JSON si viene envuelto en markdown ```json ... ``` o texto explicativo
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        text = text.slice(firstBrace, lastBrace + 1).trim();
+    } else if (text.includes("```")) {
+        text = text.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
     }
     try {
         return JSON.parse(text);
@@ -481,7 +486,7 @@ Responde únicamente en formato JSON con la siguiente estructura:
 }`;
 
                     const rawResponse = await callGemini(systemInstruction, prompt, buffer, undefined, undefined, false, entrega.escuelaId);
-                    const parsed = JSON.parse(rawResponse);
+                    const parsed = cleanAndParseGeminiJson(rawResponse);
 
                     reportes.push({
                         nombre: file.nombre,
@@ -590,7 +595,7 @@ Responde únicamente en formato JSON con la siguiente estructura:
 
                         try {
                             const rawResponse = await callGemini(systemInstruction, prompt, undefined, undefined, undefined, false, entrega.escuelaId);
-                            const parsed = JSON.parse(rawResponse);
+                            const parsed = cleanAndParseGeminiJson(rawResponse);
                             borradorCorreo = parsed.email_draft || "";
                         } catch (e) {
                             console.error("Error generating email draft with Gemini:", e);
@@ -633,7 +638,7 @@ Responde únicamente en formato JSON con la siguiente estructura:
 }`;
 
                     const rawResponse = await callGemini(systemInstruction, prompt, buffer, undefined, undefined, false, entrega.escuelaId);
-                    const parsed = JSON.parse(rawResponse);
+                    const parsed = cleanAndParseGeminiJson(rawResponse);
 
                     resultado = {
                         tipo: "ACOSO_ESCOLAR",

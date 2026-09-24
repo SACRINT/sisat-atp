@@ -5,6 +5,21 @@ import { prisma } from "@/lib/db";
 import { buildFolderPath } from "@/lib/cloudinary";
 import { buildExpedienteFileName } from "@/lib/download-url";
 
+/**
+ * Sanitiza y limita el nombre del public_id para que el path completo
+ * `${folder}/${publicId}` NUNCA supere el límite estricto de 255 caracteres de Cloudinary.
+ */
+function sanitizePublicId(name: string, maxLength: number): string {
+    return name
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // remover acentos
+        .replace(/\s+/g, "_")             // espacios a guiones bajos
+        .replace(/[^a-zA-Z0-9._\-]/g, "") // caracteres seguros para Cloudinary
+        .replace(/_+/g, "_")              // colapsar guiones repetidos
+        .slice(0, maxLength)              // truncar al espacio seguro
+        .replace(/^_+|_+$/g, "");         // recortar guiones en los extremos
+}
+
 export async function POST(req: NextRequest) {
     try {
         const session = await auth();
@@ -88,6 +103,10 @@ export async function POST(req: NextRequest) {
             const isAcosoEscolar = programaNombre.toUpperCase().includes("ACOSO ESCOLAR");
             const isExpedientes = programaNombre === "Expedientes";
 
+            // Cloudinary limita el public_id completo (folder + '/' + public_id) a 255 caracteres.
+            // Dejamos un margen seguro de 15 caracteres (max 240 caracteres totales).
+            const maxPublicIdLength = Math.max(30, 240 - folder.length);
+
             let finalName: string;
 
             if (isExpedientes && apellidoPaterno) {
@@ -114,22 +133,19 @@ export async function POST(req: NextRequest) {
                 const anio = cicloNombre.split("-").pop() || new Date().getFullYear().toString();
                 const mes = periodo?.mes ? MESES[periodo.mes] : (periodo?.semestre ? `Semestre${periodo.semestre}` : "CicloCompleto");
 
-                finalName = `${escuelaCct}_ACOSO ESCOLAR_${anio}_${mes}_${escuelaNombreResolved}`;
-                if (subfolder === "_correcciones") {
-                    finalName = `${escuelaCct}_ACOSO ESCOLAR_${anio}_${mes}_${escuelaNombreResolved}_Correccion`;
-                }
+                finalName = `${escuelaCct}_ACOSO_ESCOLAR_${anio}_${mes}${subfolder === "_correcciones" ? "_Correccion" : ""}`;
             } else {
-                // Formato default: CCT_Nombre_Programa_Documento
+                // Formato default: CCT_Etiqueta o CCT_NombreArchivo
+                // No repetimos escuelaNombre ni programaNombre porque ya están en el folder padre
                 const docName = etiqueta ? etiqueta : originalFilename.split('.').slice(0, -1).join('.');
-                const prefix = `${escuelaCct}_${escuelaNombreResolved}_${programaNombre}`;
+                const prefix = `${escuelaCct}${subfolder === "_correcciones" ? "_Correccion" : ""}`;
                 finalName = `${prefix}_${docName}`;
-                if (subfolder === "_correcciones") {
-                    finalName = `${prefix}_Correccion_${docName}`;
-                }
             }
 
-            // Cloudinary public_id cannot contain ? & # \ % < >
-            publicId = finalName.replace(/[?\&#\\%<>]/g, '').trim();
+            publicId = sanitizePublicId(finalName, maxPublicIdLength);
+            if (!publicId) {
+                publicId = `${Date.now()}`;
+            }
         }
 
         // Configure cloudinary using env vars

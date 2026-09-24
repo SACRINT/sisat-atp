@@ -165,24 +165,86 @@ export default function ListadoEscuelas({ escuelas, onSetMessage, onSetCorreccio
         onSetMessage(null);
 
         try {
-            const formData = new FormData();
-            formData.append("file", file);
-            formData.append("entregaId", selectedEntrega);
-            if (selectedEtiqueta) {
-                formData.append("etiqueta", selectedEtiqueta);
+            // 0. Validación de tamaño (máximo 25 MB) y tipo de archivo
+            if (file.size > 25 * 1024 * 1024) {
+                throw new Error(`"${file.name}" es muy grande. Máximo 25 MB.`);
+            }
+            const allowedTypes = [
+                "application/pdf",
+                "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "application/vnd.ms-excel",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "application/vnd.ms-powerpoint",
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                "image/jpeg",
+                "image/png",
+            ];
+            if (!allowedTypes.includes(file.type)) {
+                throw new Error(`"${file.name}" no es un tipo permitido. Use PDF, Word, Excel, PowerPoint o imagen.`);
             }
 
-            const res = await fetch("/api/upload", {
+            // 1. Obtener firma Cloudinary
+            const signRes = await fetch("/api/sign-cloudinary", {
                 method: "POST",
-                body: formData
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    entregaId: selectedEntrega,
+                    originalFilename: file.name,
+                    etiqueta: selectedEtiqueta,
+                }),
             });
 
-            if (res.ok) {
+            if (!signRes.ok) {
+                const errData = await signRes.json().catch(() => ({}));
+                throw new Error(errData.error || "No se pudo iniciar la subida");
+            }
+
+            const { signature, timestamp, folder, publicId, apiKey, cloudName } = await signRes.json();
+
+            // 2. Subida directa a Cloudinary (bypassa el límite de 4.5MB de Vercel)
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("api_key", apiKey);
+            formData.append("timestamp", timestamp.toString());
+            formData.append("signature", signature);
+            formData.append("folder", folder);
+            if (publicId) formData.append("public_id", publicId);
+
+            const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+                method: "POST",
+                body: formData,
+            });
+
+            if (!uploadRes.ok) {
+                const errData = await uploadRes.json().catch(() => ({}));
+                throw new Error(errData.error?.message || "Error al subir a la nube");
+            }
+
+            const uploadData = await uploadRes.json();
+
+            // 3. Confirmar en base de datos
+            const confirmRes = await fetch("/api/upload/confirm", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    entregaId: selectedEntrega,
+                    etiqueta: selectedEtiqueta,
+                    fileData: {
+                        name: file.name,
+                        type: file.type,
+                        url: uploadData.secure_url,
+                        publicId: uploadData.public_id,
+                    },
+                }),
+            });
+
+            if (confirmRes.ok) {
                 onSetMessage({ type: "success", text: `✅ "${file.name}" subido en representación de la escuela.` });
                 router.refresh();
             } else {
-                const errData = await res.json();
-                onSetMessage({ type: "error", text: errData.error || "Error al subir el archivo." });
+                const errData = await confirmRes.json().catch(() => ({}));
+                onSetMessage({ type: "error", text: errData.error || "Error al guardar el archivo." });
             }
         } catch (error: any) {
             onSetMessage({ type: "error", text: error.message || "Error al conectar con el servidor." });
