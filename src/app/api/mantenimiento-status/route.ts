@@ -35,14 +35,15 @@ export async function GET() {
       bloquear: mantenimientoActivo && !esExento
     });
   } catch (error: any) {
-    // Detectar error de cuota agotada de Neon (código PG 53000)
-    // para que el frontend pueda mostrar un mensaje diferenciado.
+    // Cualquier falla de BD (cuota agotada, timeout, connection-refused) devuelve
+    // 503 + db_error:true para que el pre-chequeo del login lo detecte correctamente.
+    // db_quota:true distingue específicamente el error de cuota Neon (código 53000).
     const code = error?.cause?.code ?? error?.code ?? "";
     const isDbQuota = code === "53000" || String(error?.message ?? "").includes("exceeded the quota");
-
+    console.error("[mantenimiento-status] BD no disponible:", error?.message);
     return NextResponse.json(
-      { mantenimiento: false, bloquear: false, db_error: isDbQuota },
-      { status: isDbQuota ? 503 : 200 }
+      { mantenimiento: false, bloquear: false, db_error: true, db_quota: isDbQuota },
+      { status: 503 }
     );
   }
 }

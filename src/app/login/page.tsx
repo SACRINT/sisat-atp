@@ -18,6 +18,22 @@ export default function LoginPage() {
         setError("");
         setLoading(true);
 
+        // Pre-chequeo: si la BD no responde, no intentar signIn para evitar
+        // el mensaje engañoso "credenciales incorrectas" cuando falla Neon.
+        // La ruta devuelve 503 para cualquier falla de BD (cuota, timeout, etc.)
+        try {
+            const chk = await fetch("/api/mantenimiento-status", { cache: "no-store" });
+            if (!chk.ok) {
+                setError("No se pudo conectar con la base de datos. Inténtalo en unos minutos.");
+                setLoading(false);
+                return;
+            }
+        } catch {
+            setError("No se pudo conectar con la base de datos. Inténtalo en unos minutos.");
+            setLoading(false);
+            return;
+        }
+
         try {
             const result = await signIn("credentials", {
                 email,
@@ -26,20 +42,19 @@ export default function LoginPage() {
             });
 
             if (result?.error) {
-                // next-auth codifica el error original en result.error.
-                // Cuando Neon supera su cuota, el mensaje contiene "53000" o
-                // "exceeded the quota" / "DriverAdapterError".
+                // next-auth@5 devuelve result.error = "Configuration" cuando
+                // authorize() lanza una excepción (cuota Neon u otro error de BD).
+                // Los strings "53000" / "DriverAdapterError" nunca llegan al cliente,
+                // pero se mantienen como salvaguarda para futuros cambios de versión.
                 const raw = result.error ?? "";
                 if (
+                    raw === "Configuration" ||
                     raw.includes("53000") ||
                     raw.includes("exceeded the quota") ||
                     raw.includes("DriverAdapterError") ||
                     raw.includes("quota")
                 ) {
-                    setError(
-                        "El servicio está temporalmente no disponible (límite de base de datos alcanzado). " +
-                        "Por favor intenta nuevamente en unos minutos."
-                    );
+                    setError("No se pudo conectar con la base de datos. Inténtalo en unos minutos.");
                 } else {
                     setError("Correo o contraseña incorrectos");
                 }
