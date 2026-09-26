@@ -90,8 +90,20 @@ export default function RankingEscuelas({ cicloNombre, cicloId, isDirector = fal
 
     useEffect(() => {
         fetchRanking();
-        const interval = setInterval(() => fetchRanking(), 15000);
-        return () => clearInterval(interval);
+        // Polling cada 60 s (antes: 15 s) — reduce consumo de CU-hours en Neon ~75 %
+        const interval = setInterval(() => {
+            if (document.visibilityState !== "hidden") fetchRanking();
+        }, 60_000);
+
+        const handleVisibility = () => {
+            if (document.visibilityState === "visible") fetchRanking();
+        };
+        document.addEventListener("visibilitychange", handleVisibility);
+
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener("visibilitychange", handleVisibility);
+        };
     }, [fetchRanking]);
 
     const getMedalIcon = (medalla: string) => {

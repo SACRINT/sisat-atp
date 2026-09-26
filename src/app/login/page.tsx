@@ -26,7 +26,23 @@ export default function LoginPage() {
             });
 
             if (result?.error) {
-                setError("Correo o contraseña incorrectos");
+                // next-auth codifica el error original en result.error.
+                // Cuando Neon supera su cuota, el mensaje contiene "53000" o
+                // "exceeded the quota" / "DriverAdapterError".
+                const raw = result.error ?? "";
+                if (
+                    raw.includes("53000") ||
+                    raw.includes("exceeded the quota") ||
+                    raw.includes("DriverAdapterError") ||
+                    raw.includes("quota")
+                ) {
+                    setError(
+                        "El servicio está temporalmente no disponible (límite de base de datos alcanzado). " +
+                        "Por favor intenta nuevamente en unos minutos."
+                    );
+                } else {
+                    setError("Correo o contraseña incorrectos");
+                }
             } else {
                 router.push("/");
                 router.refresh();

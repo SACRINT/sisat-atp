@@ -17,6 +17,8 @@ export default function MantenimientoListener() {
     let timerId: any;
 
     const verificarEstado = async () => {
+      // No consultar si la pestaña está oculta (ahorra CU-hours en Neon)
+      if (document.visibilityState === "hidden") return;
       try {
         const res = await fetch("/api/mantenimiento-status", { cache: "no-store" });
         if (res.ok) {
@@ -36,10 +38,19 @@ export default function MantenimientoListener() {
     // Verificar inmediatamente al cambiar de página
     verificarEstado();
 
-    // Polling cada 15 segundos
-    timerId = setInterval(verificarEstado, 15000);
+    // Polling cada 60 segundos (antes: 15 s) — reduce consumo de CU-hours en Neon ~75 %
+    timerId = setInterval(verificarEstado, 60_000);
 
-    return () => clearInterval(timerId);
+    // Cuando el usuario vuelve a la pestaña, verificar de inmediato
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") verificarEstado();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInterval(timerId);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [pathname]);
 
   if (!bloqueado) return null;

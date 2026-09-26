@@ -34,7 +34,15 @@ export async function GET() {
       mantenimiento: mantenimientoActivo,
       bloquear: mantenimientoActivo && !esExento
     });
-  } catch (error) {
-    return NextResponse.json({ mantenimiento: false, bloquear: false });
+  } catch (error: any) {
+    // Detectar error de cuota agotada de Neon (código PG 53000)
+    // para que el frontend pueda mostrar un mensaje diferenciado.
+    const code = error?.cause?.code ?? error?.code ?? "";
+    const isDbQuota = code === "53000" || String(error?.message ?? "").includes("exceeded the quota");
+
+    return NextResponse.json(
+      { mantenimiento: false, bloquear: false, db_error: isDbQuota },
+      { status: isDbQuota ? 503 : 200 }
+    );
   }
 }

@@ -187,7 +187,11 @@ export default function ExpedientesPanel({ escuela, highlightPersonId }: Props) 
 
         if (!hasPending) return;
 
+        // Polling de validación IA: 30 s (antes: 4 s) — el servicio de IA suele
+        // tardar varios segundos de todos modos; 30 s es suficiente granularidad.
         const interval = setInterval(async () => {
+            // No consultar si la pestaña está oculta
+            if (document.visibilityState === "hidden") return;
             try {
                 const res = await fetch("/api/expedientes/personal");
                 if (res.ok) {
@@ -196,9 +200,23 @@ export default function ExpedientesPanel({ escuela, highlightPersonId }: Props) 
             } catch (err) {
                 console.error("Error polling EXPEDIENTES validation:", err);
             }
-        }, 4000);
+        }, 30_000);
 
-        return () => clearInterval(interval);
+        const handleVisibility = () => {
+            if (document.visibilityState === "visible") {
+                // Cuando se vuelve a la pestaña, refrescar inmediatamente
+                fetch("/api/expedientes/personal")
+                    .then(r => r.ok ? r.json() : null)
+                    .then(data => { if (data) setPersonal(data); })
+                    .catch(() => {});
+            }
+        };
+        document.addEventListener("visibilitychange", handleVisibility);
+
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener("visibilitychange", handleVisibility);
+        };
     }, [personal]);
 
     useEffect(() => {

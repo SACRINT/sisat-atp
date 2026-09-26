@@ -14,6 +14,8 @@ export default function AlertaBadge({ className = "" }: AlertaBadgeProps) {
   const [totalCriticas, setTotalCriticas] = useState(0);
 
   const consultarConteoAlertas = useCallback(async () => {
+    // No consultar si la pestaña está oculta (ahorra CU-hours en Neon)
+    if (document.visibilityState === "hidden") return;
     try {
       const res = await fetch("/api/vigilancia/alertas?noLeidas=true");
       if (res.ok) {
@@ -28,9 +30,19 @@ export default function AlertaBadge({ className = "" }: AlertaBadgeProps) {
 
   useEffect(() => {
     consultarConteoAlertas();
-    // Polling ligero cada 60 segundos
-    const interval = setInterval(consultarConteoAlertas, 60000);
-    return () => clearInterval(interval);
+    // Polling cada 120 segundos (antes: 60 s) — reduce consumo de CU-hours en Neon ~50 %
+    const interval = setInterval(consultarConteoAlertas, 120_000);
+
+    // Al regresar a la pestaña, actualizar de inmediato
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") consultarConteoAlertas();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [consultarConteoAlertas]);
 
   const handleAlertasActualizadas = (noLeidas: number, criticas: number) => {
