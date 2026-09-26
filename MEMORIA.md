@@ -12,7 +12,7 @@ SISAT-ATP está construido sobre una arquitectura **Serverless** y **SSR (Server
 *   **Base de Datos**: PostgreSQL alojada en [Neon](https://neon.tech/), optimizada para entornos serverless.
 *   **ORM**: **Prisma** (`prisma/schema.prisma`). Gestiona los modelos, migraciones y el cliente fuertemente tipado.
 *   **Autenticación**: **NextAuth.js v5 (Beta)**. Implementa estrategias JWT usando el proveedor `Credentials`. Soporta roles mixtos (Director de Escuela, ATP Lector, ATP Editor, Super Admin).
-*   **Almacenamiento de Archivos**: **Cloudinary**. Se usa para almacenar PDFs, DOCX y JPGs de manera temporal o persistente. La subida se orquesta desde `/api/upload/route.ts`.
+*   **Almacenamiento de Archivos**: **Cloudinary**. Se usa para almacenar PDFs, DOCX y JPGs de manera temporal o persistente. La subida va directo a Cloudinary desde el cliente con firma de `/api/sign-cloudinary` y se confirma en `/api/upload/confirm` (evita el límite de 4.5 MB de Vercel).
 *   **Motor de Inteligencia Artificial**: **Google Gemini API** (`@google/genai`). Utilizado para revisión de documentos (texto) y OCR inteligente (visión). Cuenta con un sistema interno de rotación y fallback de API Keys.
 
 ---
@@ -58,7 +58,7 @@ El núcleo de parametrización del sistema.
 
 Ubicado en `src/app/director/DirectorPortal.tsx`. Los componentes viven en `src/app/director/_componentes/`.
 
-*   **Avance de Entregas (`EntregasListado.tsx`)**: Lista de tareas (PMC, PAEC, etc). Al subir un archivo, se dispara `/api/upload` y se invoca la Pre-Revisión IA automáticamente. El **Asistente de Correcciones** es una ventana de chat embebida que habla con el LLM usando como contexto las observaciones de esa entrega.
+*   **Avance de Entregas (`EntregasListado.tsx`)**: Lista de tareas (PMC, PAEC, etc). Al subir un archivo, se dispara `/api/upload/confirm` y se invoca la Pre-Revisión IA automáticamente. El **Asistente de Correcciones** es una ventana de chat embebida que habla con el LLM usando como contexto las observaciones de esa entrega.
 
 *   **Expedientes de Personal (`ExpedientesPanel.tsx`)**: CRUD de trabajadores de la escuela. El director llena datos básicos (RFC, nombre) y sube hasta 10 tipos de documentos. Al subir, se lanza validación OCR en segundo plano. **Regla de validación de Título según Cargo**:
     - **Personal de Apoyo Administrativo**: acepta Certificado de Bachillerato como Título válido (marcado como correcto).
