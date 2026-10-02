@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Bell } from "lucide-react";
 import CentroAlertasDrawer from "./CentroAlertasDrawer";
+import { useUserIdle } from "@/hooks/useUserIdle";
 
 interface AlertaBadgeProps {
   className?: string;
@@ -12,10 +13,21 @@ export default function AlertaBadge({ className = "" }: AlertaBadgeProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [totalNoLeidas, setTotalNoLeidas] = useState(0);
   const [totalCriticas, setTotalCriticas] = useState(0);
+  const lastCheckRef = useRef<number>(0);
 
-  const consultarConteoAlertas = useCallback(async () => {
-    // No consultar si la pestaña está oculta (ahorra CU-hours en Neon)
-    if (document.visibilityState === "hidden") return;
+  // Detectar inactividad humana (2 minutos sin mover mouse/teclado/scroll)
+  const isIdle = useUserIdle(120_000);
+
+  const consultarConteoAlertas = useCallback(async (forzar = false) => {
+    // Si la pestaña está oculta o el usuario está inactivo (sin forzar), no consultar a Neon
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+    if (!forzar && isIdle) return;
+
+    const ahora = Date.now();
+    // Throttle mínimo de 2 minutos para evitar ráfagas
+    if (!forzar && ahora - lastCheckRef.current < 120_000) return;
+    lastCheckRef.current = ahora;
+
     try {
       const res = await fetch("/api/vigilancia/alertas?noLeidas=true");
       if (res.ok) {
@@ -26,16 +38,25 @@ export default function AlertaBadge({ className = "" }: AlertaBadgeProps) {
     } catch {
       // Silencioso para no romper UI
     }
-  }, []);
+  }, [isIdle]);
 
   useEffect(() => {
-    consultarConteoAlertas();
-    // Polling cada 120 segundos (antes: 60 s) — reduce consumo de CU-hours en Neon ~50 %
-    const interval = setInterval(consultarConteoAlertas, 120_000);
+    // Consulta inicial al montar
+    consultarConteoAlertas(true);
 
-    // Al regresar a la pestaña, actualizar de inmediato
+    // Si el usuario está inactivo, pausar temporizador completamente para permitir Scale-to-Zero en Neon
+    if (isIdle) return;
+
+    // Polling espaciado a 5 minutos (300 s) únicamente con usuario activo
+    const interval = setInterval(() => {
+      consultarConteoAlertas(false);
+    }, 300_000);
+
+    // Al regresar a la pestaña, actualizar si el usuario no está inactivo
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") consultarConteoAlertas();
+      if (document.visibilityState === "visible") {
+        consultarConteoAlertas(false);
+      }
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
@@ -43,7 +64,7 @@ export default function AlertaBadge({ className = "" }: AlertaBadgeProps) {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [consultarConteoAlertas]);
+  }, [consultarConteoAlertas, isIdle]);
 
   const handleAlertasActualizadas = (noLeidas: number, criticas: number) => {
     setTotalNoLeidas(noLeidas);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { Wrench } from "lucide-react";
 
@@ -11,47 +11,49 @@ export default function MantenimientoListener() {
   // Determinar si debemos ejecutar la verificación (no en mantenimiento/login)
   const esRutaExcluida = pathname === "/mantenimiento" || pathname === "/login";
 
-  useEffect(() => {
-    // No ejecutar si estamos en rutas excluidas
-    if (esRutaExcluida) return;
-    let timerId: any;
+  const lastCheckRef = useRef<number>(0);
 
-    const verificarEstado = async () => {
-      // No consultar si la pestaña está oculta (ahorra CU-hours en Neon)
-      if (document.visibilityState === "hidden") return;
-      try {
-        const res = await fetch("/api/mantenimiento-status", { cache: "no-store" });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.bloquear) {
-            setBloqueado(true);
-            setTimeout(() => {
-              window.location.href = "/mantenimiento";
-            }, 2500);
-          }
+  const verificarEstado = useCallback(async (forzar = false) => {
+    if (esRutaExcluida) return;
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+
+    const ahora = Date.now();
+    // Throttle: no consultar más de 1 vez cada 3 minutos a menos que sea forzado por navegación
+    if (!forzar && ahora - lastCheckRef.current < 180_000) return;
+    lastCheckRef.current = ahora;
+
+    try {
+      const res = await fetch("/api/mantenimiento-status");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.bloquear) {
+          setBloqueado(true);
+          setTimeout(() => {
+            window.location.href = "/mantenimiento";
+          }, 2500);
         }
-      } catch {
-        /* silencioso */
+      }
+    } catch {
+      /* Silencioso para no degradar UX */
+    }
+  }, [esRutaExcluida]);
+
+  useEffect(() => {
+    // 1. Verificar puntualmente al cambiar de página o montar
+    verificarEstado(true);
+
+    // 2. Al regresar a la pestaña tras haber estado oculta, verificar con throttle (máx. 1 vez cada 3 min)
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        verificarEstado(false);
       }
     };
 
-    // Verificar inmediatamente al cambiar de página
-    verificarEstado();
-
-    // Polling cada 60 segundos (antes: 15 s) — reduce consumo de CU-hours en Neon ~75 %
-    timerId = setInterval(verificarEstado, 60_000);
-
-    // Cuando el usuario vuelve a la pestaña, verificar de inmediato
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") verificarEstado();
-    };
     document.addEventListener("visibilitychange", handleVisibility);
-
     return () => {
-      clearInterval(timerId);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [pathname]);
+  }, [pathname, verificarEstado]);
 
   if (!bloqueado) return null;
 

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
+import { setCacheMantenimiento } from "@/lib/mantenimiento-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,10 @@ export async function POST(req: Request) {
     const body = await req.json();
     const updateData: any = {};
     if (body.activoDirectores !== undefined) updateData.activoDirectores = body.activoDirectores;
-    if (body.mantenimiento !== undefined) updateData.mantenimiento = body.mantenimiento;
+    if (body.mantenimiento !== undefined) {
+        updateData.mantenimiento = body.mantenimiento;
+        setCacheMantenimiento(Boolean(body.mantenimiento));
+    }
     if (body.limiteIntentos !== undefined) updateData.limiteIntentos = Number(body.limiteIntentos);
     if (body.providerDefault !== undefined) updateData.providerDefault = body.providerDefault;
     if (body.modelDefault !== undefined) updateData.modelDefault = body.modelDefault;

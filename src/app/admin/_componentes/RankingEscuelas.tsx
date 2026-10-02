@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Trophy, Medal, AlertCircle, Download, Loader2, RotateCw, ToggleLeft, ToggleRight } from "lucide-react";
+import { useUserIdle } from "@/hooks/useUserIdle";
 import {
     Document, Packer, Paragraph, TextRun,
     Table, TableRow, TableCell,
@@ -88,15 +89,30 @@ export default function RankingEscuelas({ cicloNombre, cicloId, isDirector = fal
         }
     };
 
+    const lastFetchRef = useRef<number>(Date.now());
+    // Detectar inactividad humana (2 minutos sin interacción)
+    const isIdle = useUserIdle(120_000);
+
     useEffect(() => {
         fetchRanking();
-        // Polling cada 60 s (antes: 15 s) — reduce consumo de CU-hours en Neon ~75 %
+
+        // Si el usuario está inactivo, pausar el polling por completo para permitir que Neon escale a cero
+        if (isIdle) return;
+
+        // Polling espaciado a 5 minutos (300 s) únicamente cuando el usuario está activo
         const interval = setInterval(() => {
-            if (document.visibilityState !== "hidden") fetchRanking();
-        }, 60_000);
+            if (document.visibilityState !== "hidden" && !isIdle) {
+                lastFetchRef.current = Date.now();
+                fetchRanking();
+            }
+        }, 300_000);
 
         const handleVisibility = () => {
-            if (document.visibilityState === "visible") fetchRanking();
+            // Solo refrescar si han pasado más de 3 minutos desde la última petición
+            if (document.visibilityState === "visible" && !isIdle && Date.now() - lastFetchRef.current > 180_000) {
+                lastFetchRef.current = Date.now();
+                fetchRanking();
+            }
         };
         document.addEventListener("visibilitychange", handleVisibility);
 
@@ -104,7 +120,7 @@ export default function RankingEscuelas({ cicloNombre, cicloId, isDirector = fal
             clearInterval(interval);
             document.removeEventListener("visibilitychange", handleVisibility);
         };
-    }, [fetchRanking]);
+    }, [fetchRanking, isIdle]);
 
     const getMedalIcon = (medalla: string) => {
         switch (medalla) {

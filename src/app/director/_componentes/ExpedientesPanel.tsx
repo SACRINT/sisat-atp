@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useUserIdle } from "@/hooks/useUserIdle";
 import {
     Plus,
     Trash2,
@@ -177,6 +178,9 @@ export default function ExpedientesPanel({ escuela, highlightPersonId }: Props) 
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
+    const isIdle = useUserIdle(120_000);
+    const pollAttemptsRef = useRef<number>(0);
+
     useEffect(() => {
         let hasPending = false;
         personal.forEach(p => {
@@ -185,13 +189,24 @@ export default function ExpedientesPanel({ escuela, highlightPersonId }: Props) 
             }
         });
 
-        if (!hasPending) return;
+        if (!hasPending) {
+            pollAttemptsRef.current = 0;
+            return;
+        }
 
-        // Polling de validación IA: 30 s (antes: 4 s) — el servicio de IA suele
-        // tardar varios segundos de todos modos; 30 s es suficiente granularidad.
+        // Si el usuario está inactivo o superó el máximo de intentos (6 intentos = 3 min), detener
+        if (isIdle || pollAttemptsRef.current >= 6) return;
+
+        // Polling de validación IA espaciado a 30 s con límite de salvaguarda
         const interval = setInterval(async () => {
-            // No consultar si la pestaña está oculta
-            if (document.visibilityState === "hidden") return;
+            if (document.visibilityState === "hidden" || isIdle) return;
+            pollAttemptsRef.current += 1;
+
+            if (pollAttemptsRef.current > 6) {
+                clearInterval(interval);
+                return;
+            }
+
             try {
                 const res = await fetch("/api/expedientes/personal");
                 if (res.ok) {
@@ -203,8 +218,7 @@ export default function ExpedientesPanel({ escuela, highlightPersonId }: Props) 
         }, 30_000);
 
         const handleVisibility = () => {
-            if (document.visibilityState === "visible") {
-                // Cuando se vuelve a la pestaña, refrescar inmediatamente
+            if (document.visibilityState === "visible" && !isIdle && pollAttemptsRef.current < 6) {
                 fetch("/api/expedientes/personal")
                     .then(r => r.ok ? r.json() : null)
                     .then(data => { if (data) setPersonal(data); })
@@ -217,7 +231,7 @@ export default function ExpedientesPanel({ escuela, highlightPersonId }: Props) 
             clearInterval(interval);
             document.removeEventListener("visibilitychange", handleVisibility);
         };
-    }, [personal]);
+    }, [personal, isIdle]);
 
     useEffect(() => {
         if (highlightPersonId && personal.length > 0) {
