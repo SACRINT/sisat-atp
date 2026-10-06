@@ -54,8 +54,9 @@ export default function EntregasListado({
 }) {
     const [uploading, setUploading] = useState<string | null>(null);
     const [deleting, setDeleting] = useState<string | null>(null);
-    // Auto-expand all single-period (annual) programs; start with first multi-period expanded
-    const [expandedProg, setExpandedProg] = useState<string | null>(programas[0]?.programa.id ?? null);
+    // Por defecto todos los programas aparecen expandidos (desplegados) para que los directores
+    // vean todas sus entregas pendientes. Al hacer clic se contraen.
+    const [collapsedProgs, setCollapsedProgs] = useState<Record<string, boolean>>({});
     const [expandedCorrecciones, setExpandedCorrecciones] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [selectedEntrega, setSelectedEntrega] = useState<string | null>(null);
@@ -191,8 +192,8 @@ export default function EntregasListado({
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {programas.map((group) => {
                     const isSinglePeriod = group.entregas.length === 1;
-                    // Single-period programs (annual) are always expanded
-                    const isExpanded = isSinglePeriod || expandedProg === group.programa.id;
+                    // Por defecto todos los programas aparecen desplegados a menos que se hayan contraído manualmente
+                    const isExpanded = isSinglePeriod || !collapsedProgs[group.programa.id];
                     const aprobProg = group.entregas.filter((e) => e.estado === "APROBADO").length;
                     const totalProg = group.entregas.length;
                     const pct = totalProg > 0 ? Math.round((aprobProg / totalProg) * 100) : 0;
@@ -211,7 +212,15 @@ export default function EntregasListado({
                         <div key={group.programa.id} className="card" style={{ padding: 0, overflow: "hidden", borderLeft: `4px solid ${borderColor}` }}>
                             {/* Programa header */}
                             <div
-                                onClick={() => !isSinglePeriod && setExpandedProg(isExpanded ? null : group.programa.id)}
+                                onClick={() => {
+                                    if (!isSinglePeriod) {
+                                        setCollapsedProgs((prev) => ({
+                                            ...prev,
+                                            [group.programa.id]: !prev[group.programa.id],
+                                        }));
+                                    }
+                                }}
+                                title={!isSinglePeriod ? (isExpanded ? "Clic para contraer" : "Clic para expandir") : undefined}
                                 style={{
                                     padding: "0.875rem 1rem",
                                     cursor: isSinglePeriod ? "default" : "pointer",
