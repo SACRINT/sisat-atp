@@ -117,3 +117,16 @@ export function calcularPillDirector(
     };
 }
 
+export function calcularHasErrorAdmin(
+    res?: PreRevisionResultadoPersistida | null
+): boolean {
+    if (!res) return false;
+    return Boolean(
+        res.errorConexo ||
+        res.error ||
+        res.explicacion?.includes("Failed to download") ||
+        !res.borradorCorreo
+    );
+}
+
+
