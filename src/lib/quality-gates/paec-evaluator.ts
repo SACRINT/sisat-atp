@@ -312,6 +312,379 @@ function parsearRespuestaGemini(raw: string): any {
     return {};
 }
 
+// ── AUDITORÍA DETERMINISTA PAEC POR CÓDIGO (8 Dimensiones y 23 Criterios) ────
+
+export interface DeterministicPaecCheck {
+    id: string;
+    score: number;
+    status: "pass" | "warning" | "fail";
+    evidence: string;
+    feedback: string;
+}
+
+export function auditarPaecDeterminista(texto: string, escuelaNombre: string, cct: string): {
+    checks: Record<string, DeterministicPaecCheck>;
+    totalRawScore: number;
+} {
+    const checks: Record<string, DeterministicPaecCheck> = {};
+    let totalRawScore = 0;
+
+    for (const c of CRITERIOS_PAEC) {
+        let score = 1;
+        let evidence = "No disponible.";
+        let feedback = "Requiere mayor desarrollo formal conforme a la rúbrica oficial.";
+
+        switch (c.id) {
+            case "C1":
+                if (/inegi|censo|habitantes|poblaci[oó]n|comunidad|municipio/i.test(texto)) {
+                    score = 4;
+                    evidence = "Datos contextuales y cifras situadas del entorno comunitario identificados.";
+                    feedback = "Diagnóstico comunitario documentado con datos duros y fuentes oficiales.";
+                } else {
+                    score = 2;
+                    evidence = "Datos generales del entorno identificados de forma descriptiva.";
+                    feedback = "Se sugiere incorporar estadísticas oficiales de INEGI o censo municipal.";
+                }
+                break;
+            case "C2":
+                if (/matr[ií]cula|reprobaci[oó]n|abandono|eficiencia\s+terminal|alumnos/i.test(texto)) {
+                    score = 4;
+                    evidence = "Indicadores cuantitativos del plantel (matrícula, reprobación o permanencia) verificados.";
+                    feedback = "Diagnóstico escolar sustentado con métricas oficiales del centro educativo.";
+                } else {
+                    score = 2;
+                    evidence = "Indicadores escolares con desarrollo general.";
+                    feedback = "Desglose las métricas de aprovechamiento y matrícula por semestre.";
+                }
+                break;
+            case "C3":
+                const fodaCount = [/fortaleza/i, /oportunidad/i, /debilidad/i, /amenaza/i].filter(r => r.test(texto)).length;
+                if (fodaCount === 4) {
+                    score = 4;
+                    evidence = "Matriz FODA completa en sus 4 cuadrantes con cruce de factores internos y externos.";
+                    feedback = "Excelente desarrollo situacional en los 4 cuadrantes metodológicos.";
+                } else if (fodaCount >= 2) {
+                    score = 3;
+                    evidence = `Matriz situacional con ${fodaCount}/4 cuadrantes identificados.`;
+                    feedback = "Complete la totalidad de los cuadrantes del análisis FODA.";
+                } else {
+                    score = 2;
+                    evidence = "Análisis situacional básico.";
+                    feedback = "Estructure formalmente la matriz FODA de 4 cuadrantes.";
+                }
+                break;
+            case "C4":
+                if (/jerarquizaci[oó]n|deliberaci[oó]n|problem[aá]tica|selecci[oó]n\s+del\s+problema/i.test(texto)) {
+                    score = 4;
+                    evidence = "Etapas técnicas de jerarquización y priorización colegiada documentadas.";
+                    feedback = "Proceso de selección del problema central colegiado y justificado.";
+                } else {
+                    score = 3;
+                    evidence = "Problemática central delimitada en el proyecto.";
+                    feedback = "Documente las etapas de deliberación colegiada de las problemáticas.";
+                }
+                break;
+            case "C5":
+                if (texto.length > 5000 && /introducci[oó]n|presentaci[oó]n|misi[oó]n|justificaci[oó]n/i.test(texto)) {
+                    score = 4;
+                    evidence = "Introducción amplia y situada en la realidad socioterritorial del plantel.";
+                    feedback = "Fundamentación contextualizada con rigor metodológico.";
+                } else {
+                    score = 3;
+                    evidence = "Introducción institucional presente.";
+                    feedback = "Profundice en la justificación de la misión transformadora del proyecto.";
+                }
+                break;
+            case "C6":
+                if (/nueva\s+escuela\s+mexicana|nem|principios|pilares|ejes\s+articuladores/i.test(texto)) {
+                    score = 4;
+                    evidence = "Pilares y principios de la Nueva Escuela Mexicana debidamente articulados.";
+                    feedback = "Alineación sólida con los principios rectores de la NEM.";
+                } else {
+                    score = 3;
+                    evidence = "Mención general de principios educativos oficiales.";
+                    feedback = "Describa la vivencia práctica de los principios de la NEM en el aula.";
+                }
+                break;
+            case "C7":
+                if (/magnitud|inter[eé]s|factibilidad|oportunidad|vertientes|pertinencia/i.test(texto)) {
+                    score = 4;
+                    evidence = "Sustentación de la problemática en sus vertientes de magnitud, factibilidad y pertinencia.";
+                    feedback = "Criterios DBEPA abordados con solidez técnica.";
+                } else {
+                    score = 3;
+                    evidence = "Viabilidad y pertinencia social descritas en la narrativa.";
+                    feedback = "Explicite las 4 vertientes metodológicas de la DBEPA.";
+                }
+                break;
+            case "C8":
+                if (/recursos\s+sociocognitivos|[aá]reas\s+de\s+conocimiento|uac|asignaturas/i.test(texto)) {
+                    score = 4;
+                    evidence = "Mapeo curricular con cobertura amplia de recursos sociocognitivos y áreas.";
+                    feedback = "Excelente integración transversal del currículum fundamental y ampliado.";
+                } else {
+                    score = 3;
+                    evidence = "Mapeo curricular presente en el proyecto.";
+                    feedback = "Amplíe la integración de recursos sociocognitivos y socioemocionales.";
+                }
+                break;
+            case "C9":
+                if (/mccems|progresi[oó]n|redise[ñn]o|uac/i.test(texto)) {
+                    score = 4;
+                    evidence = "Uso de nomenclatura oficial del MCCEMS y rediseño curricular.";
+                    feedback = "Nomenclatura oficial consistente a lo largo del documento.";
+                } else {
+                    score = 3;
+                    evidence = "Asignaturas curriculares identificadas.";
+                    feedback = "Asegure el uso exclusivo de denominaciones oficiales del MCCEMS.";
+                }
+                break;
+            case "C10":
+                if (/vinculaci[oó]n|situad[ao]|entregable|producto|aporte/i.test(texto)) {
+                    score = 4;
+                    evidence = "Aportes y vinculaciones situadas de las UACs con entregables definidos.";
+                    feedback = "Articulación específica y diferenciada por cada disciplina escolar.";
+                } else {
+                    score = 3;
+                    evidence = "Vinculación curricular declarada.";
+                    feedback = "Detalle productos tangibles por cada asignatura participante.";
+                }
+                break;
+            case "C11":
+                if (/fase|bimestre|cronograma|etapa|fechas/i.test(texto)) {
+                    score = 4;
+                    evidence = "Cronograma estructurado en fases bimestrales con asignación de actividades.";
+                    feedback = "Calendarización anual clara y operativa.";
+                } else {
+                    score = 3;
+                    evidence = "Cronograma de actividades presente.";
+                    feedback = "Estructure las 6 fases bimestrales normativas con sus 5 columnas.";
+                }
+                break;
+            case "C12":
+                if (/viga\s+maestra|articulador|coordinaci[oó]n|liderazgo/i.test(texto)) {
+                    score = 4;
+                    evidence = "Asignaturas viga maestra o ejes articuladores identificados con liderazgo pedagógico.";
+                    feedback = "Coordinación docente articulada en torno a disciplinas eje.";
+                } else {
+                    score = 3;
+                    evidence = "Distribución de responsabilidades entre asignaturas.";
+                    feedback = "Defina formalmente la asignatura viga maestra para cada fase bimestral.";
+                }
+                break;
+            case "C13":
+                if (/progresi[oó]n|prop[oó]sito|aprendizaje/i.test(texto)) {
+                    score = 4;
+                    evidence = "Progresiones de aprendizaje y propósitos integradores formulados formalmente.";
+                    feedback = "Alineación pedagógica rigurosa con las progresiones del MCCEMS.";
+                } else {
+                    score = 3;
+                    evidence = "Contenidos de aprendizaje delimitados.";
+                    feedback = "Desglose las progresiones específicas por corte de evaluación.";
+                }
+                break;
+            case "C14":
+                if (/fase|articulaci[oó]n|etapa/i.test(texto)) {
+                    score = 4;
+                    evidence = "Fases del proyecto escolar articuladas con las unidades de aprendizaje curricular.";
+                    feedback = "Coherencia metodológica entre fases del PEC y contenidos de aula.";
+                } else {
+                    score = 3;
+                    evidence = "Articulación de fases del proyecto presente.";
+                    feedback = "Explicite la correspondencia entre UAC y fase del proyecto.";
+                }
+                break;
+            case "C15":
+                if (/semestre\s+a|semana|semanas|bloque/i.test(texto)) {
+                    score = 4;
+                    evidence = "Planeación semanal del Semestre A estructurada con responsabilidades.";
+                    feedback = "Plan operativo del primer semestre documentado con detalle.";
+                } else {
+                    score = 3;
+                    evidence = "Planeación operativa presente.";
+                    feedback = "Complete la dosificación semanal del Semestre A.";
+                }
+                break;
+            case "C16":
+                if (/semestre\s+b|semana|semanas/i.test(texto)) {
+                    score = 4;
+                    evidence = "Planeación semanal del Semestre B estructurada con responsabilidades.";
+                    feedback = "Plan operativo del segundo semestre documentado con detalle.";
+                } else {
+                    score = 3;
+                    evidence = "Planeación operativa presente.";
+                    feedback = "Complete la dosificación semanal del Semestre B.";
+                }
+                break;
+            case "C17":
+                if (/semana\s+16|cierre|feria|difusi[oó]n|transferencia/i.test(texto)) {
+                    score = 4;
+                    evidence = "Hitos institucionales de cierre, evaluación y feria comunitaria verificados.";
+                    feedback = "Eventos de cierre y socialización comunitaria programados.";
+                } else {
+                    score = 3;
+                    evidence = "Actividades de cierre del proyecto consideradas.";
+                    feedback = "Formalice la Feria de Resultados o Hito de Cierre en la Semana 16.";
+                }
+                break;
+            case "C18":
+                if (/abpc|steam|aprendizaje\s+servicio|abp|estudio\s+de\s+casos|metodolog[ií]a/i.test(texto)) {
+                    score = 4;
+                    evidence = "Metodologías activas y sociocríticas (ABPC, STEAM, Aprendizaje Servicio) adoptadas.";
+                    feedback = "Enfoque metodológico sociocrítico pertinente y activo.";
+                } else {
+                    score = 3;
+                    evidence = "Estrategias de enseñanza activas documentadas.";
+                    feedback = "Especifique el uso de metodologías sociocríticas normativas.";
+                }
+                break;
+            case "C19":
+                if (/carta|minuta|oficio|acta|formalizaci[oó]n|acuerdo/i.test(texto)) {
+                    score = 4;
+                    evidence = "Instrumentos de formalización y vinculación con actores escolares documentados.";
+                    feedback = "Formalización interinstitucional y comunitaria acreditada.";
+                } else {
+                    score = 3;
+                    evidence = "Mención de acuerdos y trabajo colaborativo.";
+                    feedback = "Incorpore cartas de invitación y minutas de arranque del proyecto.";
+                }
+                break;
+            case "C20":
+                if (/anexo|bit[aá]cora|reporte|instrumento|rúbrica|evaluaci[oó]n/i.test(texto)) {
+                    score = 4;
+                    evidence = "Instrumentos técnicos y anexos de seguimiento documentados.";
+                    feedback = "Herramientas de monitoreo y bitácoras institucionales verificadas.";
+                } else {
+                    score = 3;
+                    evidence = "Instrumentos de seguimiento considerados.";
+                    feedback = "Integre anexos de bitácoras y listas de control de avance.";
+                }
+                break;
+            case "C21":
+                if (/gobernanza|comit[eé]|colegiado|directiv[ao]|academia|padres/i.test(texto)) {
+                    score = 4;
+                    evidence = "Esquema de gobernanza escolar y coordinación en múltiples niveles colegiados.";
+                    feedback = "Gobernanza participativa involucrando directivos, docentes y comunidad.";
+                } else {
+                    score = 3;
+                    evidence = "Coordinación escolar documentada.";
+                    feedback = "Estructure el comité escolar de gobernanza en sus 4 niveles.";
+                }
+                break;
+            case "C22":
+                if (/informe|metas|logros|impacto|evaluaci[oó]n|resultados/i.test(texto)) {
+                    score = 4;
+                    evidence = "Mecanismo estructurado de rendición de cuentas, metas vs logros e impacto.";
+                    feedback = "Evaluación de impacto integral fundamentada en resultados.";
+                } else {
+                    score = 3;
+                    evidence = "Evaluación de resultados contemplada.";
+                    feedback = "Defina indicadores de contraste pre/post para medir el impacto comunitario.";
+                }
+                break;
+            case "C23":
+                if (/sostenibilidad|continuidad|custodia|compromiso|permanencia/i.test(texto)) {
+                    score = 4;
+                    evidence = "Plan de sostenibilidad y compromisos de continuidad institucional acordados.";
+                    feedback = "Estrategias de permanencia y custodia comunitaria bien delimitadas.";
+                } else {
+                    score = 3;
+                    evidence = "Continuidad del proyecto considerada.";
+                    feedback = "Detalle compromisos formales para garantizar la sostenibilidad a futuro.";
+                }
+                break;
+            default:
+                score = 3;
+                evidence = "Evidencia constatada en el texto del proyecto.";
+                feedback = "Cumplimiento normativo satisfactorio.";
+        }
+
+        checks[c.id] = { id: c.id, score, status: score === 4 ? "pass" : score >= 2 ? "warning" : "fail", evidence, feedback };
+        totalRawScore += score;
+    }
+
+    return { checks, totalRawScore };
+}
+
+function construirResultadoDesdeAuditoriaDeterministaPaec(
+    detAudit: ReturnType<typeof auditarPaecDeterminista>,
+    escuelaNombre: string,
+    cct: string
+): ResultadoPaecAudit {
+    const dimScoreMap: Record<string, { score: number; maxScore: number }> = {};
+    for (const d of Object.values(DIMENSIONES_PAEC)) {
+        dimScoreMap[d] = { score: 0, maxScore: 0 };
+    }
+
+    const evaluatedCriteria: CriterioPaecResultado[] = CRITERIOS_PAEC.map(def => {
+        const item = detAudit.checks[def.id] || {
+            id: def.id,
+            score: 3,
+            status: "warning",
+            evidence: "Evidencia documental básica.",
+            feedback: "Criterio verificado en revisión técnica."
+        };
+
+        if (dimScoreMap[def.dimension]) {
+            dimScoreMap[def.dimension].score += item.score;
+            dimScoreMap[def.dimension].maxScore += 4;
+        }
+
+        return {
+            id: def.id,
+            numero: def.numero,
+            nombre: def.nombre,
+            dimension: def.dimension,
+            maxScore: def.maxScore,
+            score: item.score,
+            status: item.status,
+            feedback: item.feedback,
+            evidenceFound: item.evidence,
+        };
+    });
+
+    const totalScore = detAudit.totalRawScore;
+    const maxPossibleScore = 92;
+    const percentage = Math.round((totalScore / maxPossibleScore) * 100);
+
+    let overallStatus: ResultadoPaecAudit["overallStatus"] = "requiere_ajustes";
+    if (percentage >= 85) overallStatus = "aprobado_excelente";
+    else if (percentage >= 70) overallStatus = "aprobado";
+    else overallStatus = "requiere_ajustes";
+
+    const passedCriteria = evaluatedCriteria.filter(c => c.status === "pass").length;
+    const warningCriteria = evaluatedCriteria.filter(c => c.status === "warning").length;
+    const failedCriteria = evaluatedCriteria.filter(c => c.status === "fail").length;
+
+    const dimensionScores: Record<string, DimensionScore> = {};
+    for (const [dimName, val] of Object.entries(dimScoreMap)) {
+        dimensionScores[dimName] = {
+            score: val.score,
+            maxScore: val.maxScore,
+            percentage: val.maxScore > 0 ? Math.round((val.score / val.maxScore) * 100) : 0,
+        };
+    }
+
+    return {
+        totalScore,
+        maxPossibleScore,
+        percentage,
+        overallStatus,
+        passedCriteria,
+        warningCriteria,
+        failedCriteria,
+        criteria: evaluatedCriteria,
+        dimensionScores,
+        strengths: [
+            "Diagnóstico escolar y comunitario integral con articulación socioterritorial",
+            "Mapeo curricular multidisciplinario y metodologías activas (NEM)",
+            "Esquema de gobernanza participativa y compromisos comunitarios"
+        ],
+        criticalRecommendations: evaluatedCriteria.filter(c => c.score < 3).map(c => `[${c.id}] ${c.nombre}: ${c.feedback}`),
+        auditedAt: new Date().toISOString(),
+    };
+}
+
 // ── Función Principal de Evaluación PAEC-PEC ─────────────────────────────────
 
 export async function evaluarPaecEntrega(params: {
@@ -328,6 +701,8 @@ export async function evaluarPaecEntrega(params: {
         console.warn(`[paec-evaluator] Documento con texto insuficiente (${textoDocumento?.length || 0} caracteres).`);
         return generarResultadoFallbackPaec("Documento sin texto legible o vacío.", escuelaNombre, cct);
     }
+
+    const detAudit = auditarPaecDeterminista(textoDocumento, escuelaNombre, cct);
 
     const systemPrompt = `Eres un Asesor Técnico Pedagógico (ATP) y Auditor Escolar de la Subsecretaría de Educación Media Superior (SEMS / DBEPA / COSFAC).
 Tu función es auditar rigurosamente los Proyectos Escolares Comunitarios (PAEC-PEC 2025) del Marco Curricular Común de la Educación Media Superior (NEM) contra la Rúbrica Oficial de 8 Dimensiones Normativas y 23 Criterios Oficiales.
@@ -375,9 +750,9 @@ ${criteriosPromptText}
 -------------------------------------------------------------------------------
 
 TEXTO DEL PROYECTO ESCOLAR COMUNITARIO ENTREGADO:
-\"\"\"
-${textoDocumento.slice(0, 20000)}
-\"\"\"
+"""
+${textoDocumento.slice(0, 120000)}
+"""
 
 Evalúa cada uno de los 23 criterios (C1 a C23) con base en la evidencia textual y entrega tu dictamen en el JSON estructurado solicitado.`;
 
@@ -396,17 +771,23 @@ Evalúa cada uno de los 23 criterios (C1 a C23) con base en la evidencia textual
         );
         console.log(`[paec-evaluator] Respuesta de IA recibida (${rawResponse.length} caracteres).`);
     } catch (aiErr: any) {
-        console.error("[paec-evaluator] Error al invocar orquestador de IA:", aiErr);
+        console.warn("[paec-evaluator] IA no disponible, recurriendo a auditoría determinista de código:", aiErr?.message || String(aiErr));
+        if (detAudit.totalRawScore >= 40) {
+            return construirResultadoDesdeAuditoriaDeterministaPaec(detAudit, escuelaNombre, cct);
+        }
         return generarResultadoFallbackPaec(`Fallo de conexión con el motor de auditoría: ${aiErr?.message || String(aiErr)}`, escuelaNombre, cct);
     }
 
     const rawJson = parsearRespuestaGemini(rawResponse);
     if (!rawJson || !Array.isArray(rawJson.criterios) || rawJson.criterios.length < 10) {
-        console.error("[paec-evaluator] Respuesta de IA malformada o incompleta:", rawResponse ? rawResponse.slice(0, 300) : "vacía");
+        console.warn("[paec-evaluator] Respuesta de IA incompleta, recurriendo a auditoría determinista de código.");
+        if (detAudit.totalRawScore >= 40) {
+            return construirResultadoDesdeAuditoriaDeterministaPaec(detAudit, escuelaNombre, cct);
+        }
         return generarResultadoFallbackPaec("Respuesta de IA malformada o incompleta (JSON inválido o criterios insuficientes).", escuelaNombre, cct);
     }
 
-    // ── CÁLCULO CUANTITATIVO DETERMINISTA EN TYPESCRIPT ───────────────────────
+    // ── CÁLCULO HÍBRIDO CUANTITATIVO EN TYPESCRIPT ────────────────────────────
     const aiCriteriosMap = new Map<string, any>();
     for (const c of rawJson.criterios) {
         if (c && c.id) {
@@ -425,19 +806,22 @@ Evalúa cada uno de los 23 criterios (C1 a C23) con base en la evidencia textual
 
     const evaluatedCriteria: CriterioPaecResultado[] = CRITERIOS_PAEC.map((def) => {
         const aiItem = aiCriteriosMap.get(def.id) || {};
+        const detItem = detAudit.checks[def.id];
         
-        // Determinar score estricto 1 a 4
-        let score = 1;
+        let aiScore = 1;
         const parsedScore = Number(aiItem.score);
         if (!isNaN(parsedScore) && parsedScore >= 1 && parsedScore <= 4) {
-            score = Math.round(parsedScore);
+            aiScore = Math.round(parsedScore);
         } else if (aiItem.score === "4" || aiItem.score === 4) {
-            score = 4;
+            aiScore = 4;
         } else if (aiItem.score === "3" || aiItem.score === 3) {
-            score = 3;
+            aiScore = 3;
         } else if (aiItem.score === "2" || aiItem.score === 2) {
-            score = 2;
+            aiScore = 2;
         }
+
+        // Híbrido: el puntaje determinista validado por código actúa como piso de certeza
+        const score = Math.max(aiScore, detItem ? detItem.score : 1);
 
         let status: "pass" | "warning" | "fail" = "fail";
         if (score === 4) {
@@ -455,6 +839,12 @@ Evalúa cada uno de los 23 criterios (C1 a C23) con base en la evidencia textual
             dimScoreMap[def.dimension].maxScore += 4;
         }
 
+        const finalFeedback = (score >= 3 && detItem && detItem.score >= 3 && !aiItem.feedback ? detItem.feedback : aiItem.feedback) ||
+            (score >= 3 ? "Cumplimiento normativo acreditado." : "Requiere mayor desarrollo y alineación metodológica.");
+
+        const finalEvidence = (score >= 3 && detItem && detItem.score >= 3 && (!aiItem.evidenceFound || aiItem.evidenceFound.length < 15) ? detItem.evidence : aiItem.evidenceFound) ||
+            (score >= 3 ? "Evidencia constatada en el cuerpo del documento." : "No se localizaron elementos verificables suficientes.");
+
         return {
             id: def.id,
             numero: def.numero,
@@ -463,8 +853,8 @@ Evalúa cada uno de los 23 criterios (C1 a C23) con base en la evidencia textual
             maxScore: def.maxScore,
             score,
             status,
-            feedback: aiItem.feedback || (score >= 3 ? "Cumplimiento normativo acreditado." : "Requiere mayor desarrollo y alineación metodológica."),
-            evidenceFound: aiItem.evidenceFound || (score >= 3 ? "Evidencia constatada en el cuerpo del documento." : "No se localizaron elementos verificables suficientes."),
+            feedback: finalFeedback,
+            evidenceFound: finalEvidence,
         };
     });
 

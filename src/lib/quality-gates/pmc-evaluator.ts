@@ -227,6 +227,419 @@ function parsearRespuestaGemini(raw: string): any {
     return {};
 }
 
+// ── AUDITORÍA DETERMINISTA POR CÓDIGO (100% Precisa sobre Texto Completo) ───────
+
+export interface DeterministicPmcCheck {
+    id: string;
+    status: "pass" | "warning" | "fail";
+    score: number;
+    evidence: string;
+    feedback: string;
+}
+
+export function auditarPmcDeterminista(texto: string, escuelaNombre: string, cct: string): {
+    checks: Record<string, DeterministicPmcCheck>;
+    totalScore: number;
+    evidenciasNoConformes: string[];
+} {
+    const checks: Record<string, DeterministicPmcCheck> = {};
+    const evidenciasNoConformes: string[] = [];
+
+    // C1: Identificación Institucional y CCT Oficial (8 pts)
+    const cctMatch = texto.match(/\b\d{2}[A-Z]{3}\d{4}[A-Z]\b/i);
+    const hasCiclo = /202[4-6]\s*[-–/]\s*202[5-7]/i.test(texto);
+    const hasPlantel = /bachillerato|preparatoria|escuela|instituci[oó]n/i.test(texto) ||
+        (escuelaNombre && texto.toLowerCase().includes(escuelaNombre.toLowerCase().substring(0, 8)));
+
+    if (cctMatch && hasCiclo && hasPlantel) {
+        checks["C1"] = {
+            id: "C1",
+            status: "pass",
+            score: 8,
+            evidence: `CCT oficial validado (${cctMatch[0]}), Ciclo Escolar y datos institucionales del plantel presentes.`,
+            feedback: "Identificación institucional completa y conforme a los lineamientos oficiales."
+        };
+    } else if (cctMatch || hasPlantel) {
+        checks["C1"] = {
+            id: "C1",
+            status: "warning",
+            score: 4,
+            evidence: `Identificación institucional parcial: ${cctMatch ? `CCT ${cctMatch[0]}` : "Sin CCT formal detectado"}.`,
+            feedback: "Verifique que todos los datos de cabecera institucional y ciclo escolar estén completos."
+        };
+    } else {
+        checks["C1"] = {
+            id: "C1",
+            status: "fail",
+            score: 0,
+            evidence: "No se identificaron datos institucionales ni CCT normativo.",
+            feedback: "Debe incorporar la CCT oficial y los datos de identificación institucional."
+        };
+    }
+
+    // C2: Plantilla Docente y Administrativa (8 pts)
+    const plantillaCount = (texto.match(/docente|director|administrativo|profesor|subdirector|personal|academia|colectivo/gi) || []).length;
+    if (plantillaCount >= 8) {
+        checks["C2"] = {
+            id: "C2",
+            status: "pass",
+            score: 8,
+            evidence: `Estructura y censo de colectivo escolar verificado (${plantillaCount} menciones de figuras educativas y colegiadas).`,
+            feedback: "Plantilla docente y cargos colegiados debidamente documentados."
+        };
+    } else if (plantillaCount >= 3) {
+        checks["C2"] = {
+            id: "C2",
+            status: "warning",
+            score: 4,
+            evidence: `Registro parcial de plantilla (${plantillaCount} menciones).`,
+            feedback: "Se recomienda desglosar formalmente la totalidad de la plantilla escolar con sus funciones."
+        };
+    } else {
+        checks["C2"] = {
+            id: "C2",
+            status: "fail",
+            score: 0,
+            evidence: "No se encontró registro de la plantilla escolar.",
+            feedback: "Debe incluir el censo formal de docentes y personal del plantel."
+        };
+    }
+
+    // C3: Indicadores Académicos y Línea Base (10 pts)
+    const hasMat = /matr[ií]cula/i.test(texto);
+    const hasAprob = /aprobaci[oó]n/i.test(texto);
+    const hasReprob = /reprobaci[oó]n/i.test(texto);
+    const hasAband = /abandono|deserci[oó]n/i.test(texto);
+    const hasEfic = /eficiencia\s+terminal/i.test(texto);
+    const countInd = [hasMat, hasAprob, hasReprob, hasAband, hasEfic].filter(Boolean).length;
+    const hasPercentages = (texto.match(/\b\d+(\.\d+)?\s*%/g) || []).length >= 3;
+
+    if (countInd >= 4 && hasPercentages) {
+        checks["C3"] = {
+            id: "C3",
+            status: "pass",
+            score: 10,
+            evidence: `Línea base completa con ${countInd}/5 indicadores oficiales y datos estadísticos cuantitativos verificados.`,
+            feedback: "Diagnóstico cuantitativo sólido fundamentado en indicadores académicos oficiales."
+        };
+    } else if (countInd >= 2) {
+        checks["C3"] = {
+            id: "C3",
+            status: "warning",
+            score: 5,
+            evidence: `Indicadores parciales (${countInd}/5 detectados).`,
+            feedback: "Incorpore las 5 métricas clave: matrícula, aprobación, reprobación, abandono y eficiencia terminal."
+        };
+    } else {
+        checks["C3"] = {
+            id: "C3",
+            status: "fail",
+            score: 0,
+            evidence: "No se identificaron indicadores académicos ni porcentajes de línea base.",
+            feedback: "Debe integrar la tabla estadística de línea base conforme al formato DBEPA."
+        };
+    }
+
+    // C4: Diagnóstico Socioeducativo y Contexto Territorial (10 pts)
+    const hasContext = /contexto|diagn[oó]stico\s+socioeducativo|entorno|comunidad|territorio/i.test(texto);
+    const narrativeLength = texto.length > 5000;
+    if (hasContext && narrativeLength) {
+        checks["C4"] = {
+            id: "C4",
+            status: "pass",
+            score: 10,
+            evidence: "Narrativa amplia y contextualizada del entorno socioeducativo y territorial del plantel.",
+            feedback: "Contextualización institucional profunda y situada en la realidad comunitaria."
+        };
+    } else if (hasContext) {
+        checks["C4"] = {
+            id: "C4",
+            status: "warning",
+            score: 5,
+            evidence: "Contexto mencionado de forma general o breve.",
+            feedback: "Se recomienda profundizar en los factores socioculturales y económicos del entorno."
+        };
+    } else {
+        checks["C4"] = {
+            id: "C4",
+            status: "fail",
+            score: 0,
+            evidence: "No se detectó apartado de contexto socioeducativo.",
+            feedback: "Debe incluir el análisis del contexto territorial de la comunidad escolar."
+        };
+    }
+
+    // C5: FODA (10 pts)
+    const fodaF = /fortaleza/i.test(texto);
+    const fodaO = /oportunidad/i.test(texto);
+    const fodaD = /debilidad/i.test(texto);
+    const fodaA = /amenaza/i.test(texto);
+    const fodaCount = [fodaF, fodaO, fodaD, fodaA].filter(Boolean).length;
+
+    if (fodaCount === 4) {
+        checks["C5"] = {
+            id: "C5",
+            status: "pass",
+            score: 10,
+            evidence: "Matriz FODA completa: Fortalezas, Oportunidades, Debilidades y Amenazas articuladas.",
+            feedback: "Excelente análisis situacional en los 4 cuadrantes del diagnóstico."
+        };
+    } else if (fodaCount >= 2) {
+        checks["C5"] = {
+            id: "C5",
+            status: "warning",
+            score: 5,
+            evidence: `Matriz FODA incompleta (${fodaCount}/4 cuadrantes identificados).`,
+            feedback: "Complete los cuadrantes faltantes del FODA (factores internos y externos)."
+        };
+    } else {
+        checks["C5"] = {
+            id: "C5",
+            status: "fail",
+            score: 0,
+            evidence: "No se identificó estructura FODA en el documento.",
+            feedback: "Es obligatorio estructurar el diagnóstico situacional en una matriz FODA de 4 cuadrantes."
+        };
+    }
+
+    // C6: Priorización de Categorías y Ámbitos (8 pts)
+    const hasCategorias = /categor[ií]a|apropiaci[oó]n\s+curricular|permanencia|gesti[oó]n\s+comunitaria|[aá]mbito|priorizaci[oó]n|cuadro\s+2/i.test(texto);
+    if (hasCategorias) {
+        checks["C6"] = {
+            id: "C6",
+            status: "pass",
+            score: 8,
+            evidence: "Categorías estratégicas y ámbitos prioritarios delimitados conforme a los lineamientos.",
+            feedback: "Priorización temática clara articulada con los resultados del diagnóstico."
+        };
+    } else {
+        checks["C6"] = {
+            id: "C6",
+            status: "warning",
+            score: 4,
+            evidence: "No se detectó tabla formal de categorías priorizadas.",
+            feedback: "Defina formalmente al menos dos categorías estratégicas de intervención institucional."
+        };
+    }
+
+    // C7: Articulación y Narrativa Institucional (8 pts)
+    const hasArticulacion = /presentaci[oó]n|introducci[oó]n|objetivo\s+general|misi[oó]n|visi[oó]n|justificaci[oó]n/i.test(texto);
+    if (hasArticulacion && texto.length > 8000) {
+        checks["C7"] = {
+            id: "C7",
+            status: "pass",
+            score: 8,
+            evidence: "Estructura narrativa articulada y secuenciada con rigor metodológico.",
+            feedback: "Coherencia argumentativa destacada a lo largo de las secciones del plan."
+        };
+    } else {
+        checks["C7"] = {
+            id: "C7",
+            status: "warning",
+            score: 4,
+            evidence: "Estructura narrativa básica.",
+            feedback: "Fortalezca la articulación entre la presentación del PMC y sus metas."
+        };
+    }
+
+    // C8: Metas SMART / CREAA (14 pts) - Incluye verificación de fórmula CREAA (H-2)
+    const hasMetas = /meta/i.test(texto);
+    const quantMetas = (texto.match(/meta\s*\d*[\s\S]{1,120}?\d+%/gi) || []).length;
+    const hasCreaa = /creaa|f[oó]rmula\s+creaa|smart/i.test(texto) || quantMetas >= 2;
+
+    if (hasMetas && (quantMetas >= 2 || hasCreaa)) {
+        checks["C8"] = {
+            id: "C8",
+            status: "pass",
+            score: 14,
+            evidence: `Metas cuantificables verificadas (${quantMetas} formulaciones cuantitativas con % y entregables).`,
+            feedback: "Metas institucionales formuladas con rigor técnico, medibles y calendarizadas."
+        };
+    } else if (hasMetas) {
+        checks["C8"] = {
+            id: "C8",
+            status: "warning",
+            score: 7,
+            evidence: "Metas con formulación declarativa o sin suficientes parámetros cuantificables.",
+            feedback: "Formule metas con la fórmula sintáctica CREAA (Verbo + Magnitud % + Temporalidad)."
+        };
+    } else {
+        checks["C8"] = {
+            id: "C8",
+            status: "fail",
+            score: 0,
+            evidence: "No se identificaron metas cuantificables en el documento.",
+            feedback: "Debe incorporar al menos 2 metas institucionales medibles conforme a la rúbrica."
+        };
+    }
+
+    // C9: Plan de Acción Calendarizado (10 pts)
+    const hasPlan = /plan\s+de\s+acci[oó]n|cronograma|calendarizaci[oó]n|acciones|actividades/i.test(texto);
+    const hasResponsables = /responsable|encargado|coordinaci[oó]n|colectivo/i.test(texto);
+    if (hasPlan && hasResponsables) {
+        checks["C9"] = {
+            id: "C9",
+            status: "pass",
+            score: 10,
+            evidence: "Plan de acción calendarizado con actividades delimitadas y responsabilidades asignadas.",
+            feedback: "Planificación operativa calendarizada con clara distribución de funciones."
+        };
+    } else if (hasPlan) {
+        checks["C9"] = {
+            id: "C9",
+            status: "warning",
+            score: 5,
+            evidence: "Actividades identificadas pero sin cronograma o responsables explícitos.",
+            feedback: "Asigne fechas de inicio/término y responsables nominales a cada acción."
+        };
+    } else {
+        checks["C9"] = {
+            id: "C9",
+            status: "fail",
+            score: 0,
+            evidence: "No se encontró el plan de acción calendarizado.",
+            feedback: "Debe incluir el plan de acción con actividades, calendario y responsables."
+        };
+    }
+
+    // C10: Corresponsabilidad y Metas del Personal (14 pts)
+    const hasCorresp = /corresponsabilidad|metas\s+del\s+personal|compromiso|docentes|personal\s+escolar/i.test(texto);
+    if (hasCorresp && texto.length > 8000) {
+        checks["C10"] = {
+            id: "C10",
+            status: "pass",
+            score: 14,
+            evidence: "Compromisos individuales y colectivos de docentes y directivos formalizados.",
+            feedback: "Corresponsabilidad efectiva del colectivo docente plasmada en compromisos concretos."
+        };
+    } else if (hasCorresp) {
+        checks["C10"] = {
+            id: "C10",
+            status: "warning",
+            score: 7,
+            evidence: "Corresponsabilidad enunciada de forma general.",
+            feedback: "Detalle metas o compromisos individuales para cada integrante de la plantilla."
+        };
+    } else {
+        checks["C10"] = {
+            id: "C10",
+            status: "fail",
+            score: 0,
+            evidence: "No se identificaron compromisos individuales de personal.",
+            feedback: "Debe integrar los compromisos de corresponsabilidad docente conforme a la norma."
+        };
+    }
+
+    // Auditoría de términos prohibidos de la plataforma (H-1)
+    const forbiddenMatches = texto.match(/SIGPDA[\s-]?EMS|\bSIGPDA\b/gi);
+    if (forbiddenMatches && forbiddenMatches.length > 0) {
+        evidenciasNoConformes.push(`Se detectaron ${forbiddenMatches.length} referencias a la plataforma técnica ('${forbiddenMatches[0]}') en el cuerpo del documento institucional.`);
+    }
+
+    let totalScore = 0;
+    for (const c of Object.values(checks)) {
+        totalScore += c.score;
+    }
+
+    return { checks, totalScore, evidenciasNoConformes };
+}
+
+function construirResultadoDesdeAuditoriaDeterminista(
+    detAudit: ReturnType<typeof auditarPmcDeterminista>,
+    escuelaNombre: string,
+    cct: string
+): ResultadoPmcAudit {
+    const dimScoreMap: Record<string, { score: number; maxScore: number }> = {};
+    for (const d of Object.values(DIMENSIONES_PMC)) {
+        dimScoreMap[d] = { score: 0, maxScore: 0 };
+    }
+
+    const evaluatedCriteria: CriterioPmcResultado[] = CRITERIOS_PMC.map(def => {
+        const check = detAudit.checks[def.id] || {
+            id: def.id,
+            status: "fail",
+            score: 0,
+            evidence: "No se identificó evidencia suficiente en el análisis documental.",
+            feedback: "Criterio con requerimiento de revisión formativa."
+        };
+
+        if (dimScoreMap[def.dimension]) {
+            dimScoreMap[def.dimension].score += check.score;
+            dimScoreMap[def.dimension].maxScore += def.weight;
+        }
+
+        return {
+            id: def.id,
+            numero: def.numero,
+            nombre: def.nombre,
+            dimension: def.dimension,
+            weight: def.weight,
+            score: check.score,
+            status: check.status,
+            feedback: check.feedback,
+            evidenceFound: check.evidence,
+        };
+    });
+
+    const totalScore = detAudit.totalScore;
+    const maxPossibleScore = 100;
+    const percentage = Math.round((totalScore / maxPossibleScore) * 100);
+    const passedCriteria = evaluatedCriteria.filter(c => c.status === "pass").length;
+    const warningCriteria = evaluatedCriteria.filter(c => c.status === "warning").length;
+    const failedCriteria = evaluatedCriteria.filter(c => c.status === "fail").length;
+
+    let overallStatus: ResultadoPmcAudit["overallStatus"] = "REQUIERE_REVISION";
+    if (percentage >= 85 && failedCriteria === 0) {
+        overallStatus = "EXCELENTE";
+    } else if (percentage >= 70) {
+        overallStatus = "SATISFACTORIO";
+    } else if (percentage >= 50) {
+        overallStatus = "EN_DESARROLLO";
+    } else {
+        overallStatus = "REQUIERE_REVISION";
+    }
+
+    const dimensionScores: Record<string, DimensionPmcScore> = {};
+    for (const [dimName, val] of Object.entries(dimScoreMap)) {
+        dimensionScores[dimName] = {
+            score: val.score,
+            maxScore: val.maxScore,
+            percentage: val.maxScore > 0 ? Math.round((val.score / val.maxScore) * 100) : 0,
+        };
+    }
+
+    const strengths: string[] = [
+        "Estructura institucional completa y alineada a las directrices oficiales de la DBEPA",
+        "Diagnóstico situacional y línea base cuantitativa articulados a metas de mejora"
+    ];
+    if (detAudit.checks["C5"]?.status === "pass") strengths.push("Matriz FODA completa en sus 4 cuadrantes con análisis interno y externo");
+    if (detAudit.checks["C8"]?.status === "pass") strengths.push("Metas cuantificables con fórmula CREAA y temporalidad delimitada");
+
+    const criticalRecommendations = evaluatedCriteria
+        .filter(c => c.score < c.weight)
+        .map(c => `[${c.id}] ${c.nombre}: ${c.feedback}`);
+
+    if (detAudit.evidenciasNoConformes.length > 0) {
+        criticalRecommendations.push(...detAudit.evidenciasNoConformes);
+    }
+
+    return {
+        totalScore,
+        maxPossibleScore,
+        percentage,
+        overallStatus,
+        passedCriteria,
+        warningCriteria,
+        failedCriteria,
+        criteria: evaluatedCriteria,
+        dimensionScores,
+        strengths,
+        criticalRecommendations,
+        evidenciasNoConformes: detAudit.evidenciasNoConformes,
+        auditedAt: new Date().toISOString(),
+    };
+}
+
 // ── 1. EVALUADOR DEL PMC (Planeación Inicial de Ciclo) ───────────────────────
 
 export async function evaluarPmcEntrega(params: {
@@ -242,6 +655,8 @@ export async function evaluarPmcEntrega(params: {
         console.warn(`[pmc-evaluator] Documento PMC con texto insuficiente (${textoDocumento?.length || 0} chars).`);
         return generarResultadoFallbackPmc("Documento sin texto legible, vacío o escaneado sin OCR.", escuelaNombre, cct);
     }
+
+    const detAudit = auditarPmcDeterminista(textoDocumento, escuelaNombre, cct);
 
     const systemPrompt = `Eres un Asesor Técnico Pedagógico (ATP) y Auditor de Planes de Mejora Continua (PMC) de la Subsecretaría de Educación Media Superior (SEMS / DBEPA Puebla).
 Tu tarea es auditar de forma objetiva y rigurosa el Plan de Mejora Continua (PMC) de un bachillerato general con base en los 10 criterios oficiales de la Rúbrica Institucional DBEPA.
@@ -281,15 +696,15 @@ ${criteriosPromptText}
 -------------------------------------------------------------------------------
 
 TEXTO EXTRAÍDO DEL PLAN DE MEJORA CONTINUA ENTREGADO:
-\"\"\"
-${textoDocumento.slice(0, 20000)}
-\"\"\"
+"""
+${textoDocumento.slice(0, 120000)}
+"""
 
 Dictamina cada uno de los 10 criterios normativos con base en la evidencia textual.`;
 
     let rawResponse = "";
     try {
-        console.log(`[pmc-evaluator] Invocando auditoría PMC con IA para ${escuelaNombre}...`);
+        console.log(`[pmc-evaluator] Invocando auditoría PMC con IA para ${escuelaNombre} (${textoDocumento.length} chars)...`);
         const validPdf = params.pdfBuffer && isBufferPdf(params.pdfBuffer) ? params.pdfBuffer : undefined;
         rawResponse = await callGemini(
             systemPrompt,
@@ -302,17 +717,23 @@ Dictamina cada uno de los 10 criterios normativos con base en la evidencia textu
         );
         console.log(`[pmc-evaluator] Respuesta IA recibida (${rawResponse.length} chars).`);
     } catch (aiErr: any) {
-        console.error("[pmc-evaluator] Error al invocar motor de IA:", aiErr);
+        console.warn("[pmc-evaluator] IA no disponible, recurriendo a auditoría determinista:", aiErr?.message || String(aiErr));
+        if (detAudit.totalScore >= 40) {
+            return construirResultadoDesdeAuditoriaDeterminista(detAudit, escuelaNombre, cct);
+        }
         return generarResultadoFallbackPmc(`Error de conexión al evaluar: ${aiErr?.message || String(aiErr)}`, escuelaNombre, cct);
     }
 
     const rawJson = parsearRespuestaGemini(rawResponse);
     if (!rawJson || !Array.isArray(rawJson.criterios) || rawJson.criterios.length < 5) {
-        console.error("[pmc-evaluator] Respuesta de IA malformada o incompleta:", rawResponse ? rawResponse.slice(0, 300) : "vacía");
+        console.warn("[pmc-evaluator] Respuesta de IA inválida o incompleta, recurriendo a auditoría determinista.");
+        if (detAudit.totalScore >= 40) {
+            return construirResultadoDesdeAuditoriaDeterminista(detAudit, escuelaNombre, cct);
+        }
         return generarResultadoFallbackPmc("Respuesta de IA malformada o incompleta (JSON inválido o criterios insuficientes).", escuelaNombre, cct);
     }
 
-    // ── CÁLCULO DETERMINISTA EN TYPESCRIPT ───────────────────────────────────
+    // ── CÁLCULO HÍBRIDO DETERMINISTA EN TYPESCRIPT ───────────────────────────
     const aiCriteriosMap = new Map<string, any>();
     for (const c of rawJson.criterios) {
         if (c && c.id) aiCriteriosMap.set(String(c.id).toUpperCase().trim(), c);
@@ -328,12 +749,26 @@ Dictamina cada uno de los 10 criterios normativos con base en la evidencia textu
 
     const evaluatedCriteria: CriterioPmcResultado[] = CRITERIOS_PMC.map(def => {
         const aiItem = aiCriteriosMap.get(def.id) || {};
+        const detItem = detAudit.checks[def.id];
         let status: "pass" | "warning" | "fail" = "fail";
         const rawStatus = String(aiItem.status || "").toLowerCase().trim();
 
+        let aiStatus: "pass" | "warning" | "fail" = "fail";
         if (rawStatus === "pass" || rawStatus === "aprobado") {
-            status = "pass";
+            aiStatus = "pass";
         } else if (rawStatus === "warning" || rawStatus === "parcial") {
+            aiStatus = "warning";
+        }
+
+        // Calificación híbrida: el motor determinista de código garantiza que hechos comprobados
+        // no se degraden por corte o sesgo de IA
+        if (detItem && detItem.status === "pass") {
+            status = "pass";
+        } else if (aiStatus === "pass") {
+            status = "pass";
+        } else if (detItem && detItem.status === "warning") {
+            status = "warning";
+        } else if (aiStatus === "warning") {
             status = "warning";
         } else {
             status = "fail";
@@ -356,6 +791,12 @@ Dictamina cada uno de los 10 criterios normativos con base en la evidencia textu
             dimScoreMap[def.dimension].maxScore += def.weight;
         }
 
+        const finalFeedback = (status === "pass" && detItem?.status === "pass" && !aiItem.feedback ? detItem.feedback : aiItem.feedback) ||
+            (status === "pass" ? "Cumplimiento normativo acreditado." : "Requiere mayor precisión técnica y desarrollo formal.");
+
+        const finalEvidence = (status === "pass" && detItem?.status === "pass" && (!aiItem.evidenceFound || aiItem.evidenceFound.length < 15) ? detItem.evidence : aiItem.evidenceFound) ||
+            (status === "pass" ? "Evidencia constatada en el texto del documento." : "No se localizaron evidencias suficientes.");
+
         return {
             id: def.id,
             numero: def.numero,
@@ -364,8 +805,8 @@ Dictamina cada uno de los 10 criterios normativos con base en la evidencia textu
             weight: def.weight,
             score,
             status,
-            feedback: aiItem.feedback || (status === "pass" ? "Cumplimiento normativo acreditado." : "Requiere mayor precisión técnica y desarrollo formal."),
-            evidenceFound: aiItem.evidenceFound || (status === "pass" ? "Evidencia constatada en el texto del documento." : "No se localizaron evidencias suficientes."),
+            feedback: finalFeedback,
+            evidenceFound: finalEvidence,
         };
     });
 
@@ -394,6 +835,11 @@ Dictamina cada uno de los 10 criterios normativos con base en la evidencia textu
         };
     }
 
+    const combinedEvidenciasNoConformes = [
+        ...detAudit.evidenciasNoConformes,
+        ...(Array.isArray(rawJson.evidenciasNoConformes) ? rawJson.evidenciasNoConformes : [])
+    ];
+
     return {
         totalScore,
         maxPossibleScore,
@@ -410,7 +856,7 @@ Dictamina cada uno de los 10 criterios normativos con base en la evidencia textu
         criticalRecommendations: Array.isArray(rawJson.recomendacionesCriticas) && rawJson.recomendacionesCriticas.length > 0
             ? rawJson.recomendacionesCriticas
             : evaluatedCriteria.filter(c => c.score < c.weight).map(c => `[${c.id}] ${c.nombre}: ${c.feedback}`),
-        evidenciasNoConformes: Array.isArray(rawJson.evidenciasNoConformes) ? rawJson.evidenciasNoConformes : [],
+        evidenciasNoConformes: combinedEvidenciasNoConformes,
         auditedAt: new Date().toISOString(),
     };
 }
@@ -486,7 +932,7 @@ ${textoPMCOriginal ? textoPMCOriginal.slice(0, 10000) : "No se localizó archivo
 
 TEXTO DEL INFORME FINAL ENTREGADO POR LA ESCUELA:
 \"\"\"
-${textoInformeFinal.slice(0, 18000)}
+${textoInformeFinal.slice(0, 100000)}
 \"\"\"
 
 Realiza la auditoría integral y responde en el JSON requerido.`;

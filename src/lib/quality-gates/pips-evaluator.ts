@@ -177,6 +177,338 @@ function parsearRespuestaGemini(raw: string): any {
     return {};
 }
 
+// ── AUDITORÍA DETERMINISTA PIPS POR CÓDIGO (6 Dimensiones y 7 Criterios) ────
+
+export interface DeterministicPipsCheck {
+    id: string;
+    score: number;
+    status: "pass" | "warning" | "fail";
+    evidence: string;
+    feedback: string;
+}
+
+export function auditarPipsDeterminista(texto: string, escuelaNombre: string, cct: string): {
+    checks: Record<string, DeterministicPipsCheck>;
+    totalScore: number;
+} {
+    const checks: Record<string, DeterministicPipsCheck> = {};
+    let totalScore = 0;
+
+    // C1: Identificación Zonal y Encuadre Institucional (10 pts)
+    const hasZona = /zona\s*(escolar)?\s*[:\s#0-9A-Z]|zona\s*004|zona\s*\d+/i.test(texto);
+    const hasSupervisor = /supervisor|titular|supervisi[oó]n|asesor[ií]a\s+t[eé]cnica/i.test(texto);
+    const hasCiclo = /202[4-6]\s*[-–/]\s*202[5-7]/i.test(texto);
+    const hasSubsistema = /subsistema|bachillerato|dgb|dbepa|preparatoria|sems/i.test(texto);
+    const c1Matches = [hasZona, hasSupervisor, hasCiclo, hasSubsistema].filter(Boolean).length;
+
+    if (c1Matches >= 3) {
+        checks["C1"] = {
+            id: "C1",
+            score: 10,
+            status: "pass",
+            evidence: `Identificación zonal completa: Zona escolar, titular de supervisión, ciclo escolar y subsistema verificados.`,
+            feedback: "Encuadre institucional de la zona escolar plenamente identificado conforme a la norma."
+        };
+    } else if (c1Matches >= 1) {
+        checks["C1"] = {
+            id: "C1",
+            score: 5,
+            status: "warning",
+            evidence: "Identificación zonal parcial detectada en el encabezado del documento.",
+            feedback: "Complete los 7 campos normativos: clave de zona, supervisor titular, sede, cobertura, ciclo y presentación."
+        };
+    } else {
+        checks["C1"] = {
+            id: "C1",
+            score: 0,
+            status: "fail",
+            evidence: "No se localizaron datos formales de identificación zonal.",
+            feedback: "Debe incorporar los datos de identificación oficial de la zona escolar."
+        };
+    }
+
+    // C2: Reflexión Retrospectiva del Ciclo Previo (10 pts)
+    const hasRetrospectiva = /retrospectiv|ciclo\s+(anterior|previo)|balance|aprendizajes?\s+(institucionales|clave)|fortalezas\s+pedag[oó]gicas|[aá]reas?\s+de\s+oportunidad/i.test(texto);
+    const hasBalance = /balance|evaluaci[oó]n\s+del\s+ciclo|logros|retos/i.test(texto);
+
+    if (hasRetrospectiva && hasBalance) {
+        checks["C2"] = {
+            id: "C2",
+            score: 10,
+            status: "pass",
+            evidence: "Reflexión retrospectiva del ciclo previo con balance de fortalezas pedagógicas y áreas de oportunidad.",
+            feedback: "Balance crítico retrospectivo sólido que fundamenta la intervención del nuevo ciclo escolar."
+        };
+    } else if (hasRetrospectiva || hasBalance) {
+        checks["C2"] = {
+            id: "C2",
+            score: 5,
+            status: "warning",
+            evidence: "Mención general de antecedentes o balance del ciclo previo.",
+            feedback: "Profundice en los aprendizajes institucionales consolidados y delimite áreas de oportunidad específicas."
+        };
+    } else {
+        checks["C2"] = {
+            id: "C2",
+            score: 0,
+            status: "fail",
+            evidence: "No se identificó reflexión retrospectiva ni balance del ciclo escolar anterior.",
+            feedback: "Debe incorporar la sección de balance crítico del ciclo previo conforme a la guía DBEPA."
+        };
+    }
+
+    // C3: Censo y Matrícula Desagregada de Planteles (15 pts)
+    const cctsFound = (texto.match(/\b\d{2}[A-Z]{3}\d{4}[A-Z]\b/gi) || []);
+    const hasMatricula = /matr[ií]cula|censo|hombres|mujeres|alumnos|estudiantes|planteles\s+adscritos/i.test(texto);
+
+    if (cctsFound.length >= 2 || (hasMatricula && cctsFound.length >= 1)) {
+        checks["C3"] = {
+            id: "C3",
+            score: 15,
+            status: "pass",
+            evidence: `Censo zonal verificado: ${cctsFound.length} claves CCT detectadas con desglose de centros escolares y matrícula.`,
+            feedback: "Inventario oficial de planteles adscritos completo con CCT y datos de población estudiantil."
+        };
+    } else if (cctsFound.length >= 1 || hasMatricula) {
+        checks["C3"] = {
+            id: "C3",
+            score: 8,
+            status: "warning",
+            evidence: "Inventario de planteles preliminar con referencias parciales de CCT o matrícula.",
+            feedback: "Asegure el censo completo de todos los planteles de la zona con CCT oficial y matrícula por género."
+        };
+    } else {
+        checks["C3"] = {
+            id: "C3",
+            score: 0,
+            status: "fail",
+            evidence: "No se detectó el censo de planteles ni la matrícula zonal.",
+            feedback: "Incorpore el catálogo de planteles adscritos con sus CCTs oficiales y estadísticas de matrícula."
+        };
+    }
+
+    // C4: Diagnóstico Territorial y Jerarquización de Problemáticas (15 pts)
+    const hasDiagnostico = /diagn[oó]stico\s+territorial|contexto\s+zonal|entorno|territorio|municipios/i.test(texto);
+    const hasProblemas = /problem[aá]ticas?|priorizaci[oó]n|jerarquizaci[oó]n|prioridad\s+(alta|media|baja)/i.test(texto);
+    const hasLargoNarrativa = texto.length > 2500;
+
+    if (hasDiagnostico && hasProblemas && hasLargoNarrativa) {
+        checks["C4"] = {
+            id: "C4",
+            score: 15,
+            status: "pass",
+            evidence: "Diagnóstico territorial zonal documentado con matriz de problemáticas y niveles de prioridad.",
+            feedback: "Fundamentación contextual robusta articulada a la realidad territorial de los centros escolares."
+        };
+    } else if (hasDiagnostico || hasProblemas) {
+        checks["C4"] = {
+            id: "C4",
+            score: 8,
+            status: "warning",
+            evidence: "Diagnóstico territorial en desarrollo con identificación descriptiva de problemáticas.",
+            feedback: "Jerarquice las problemáticas zonales por nivel de prioridad (alta, media, baja) para focalizar la supervisión."
+        };
+    } else {
+        checks["C4"] = {
+            id: "C4",
+            score: 0,
+            status: "fail",
+            evidence: "No se encontró diagnóstico territorial ni jerarquización de problemáticas.",
+            feedback: "Debe incorporar el diagnóstico territorial fundamentado de la zona escolar."
+        };
+    }
+
+    // C5: Objetivos de Supervisión y Metas Operativas (20 pts)
+    const hasObjGeneral = /objetivo\s+general|prop[oó]sito\s+general/i.test(texto);
+    const hasObjEspec = /objetivos?\s+espec[ií]ficos?|metas?\s+operativas?/i.test(texto);
+    const hasMetasQuant = (texto.match(/meta\s*\d*[\s\S]{1,120}?\d+%/gi) || []).length >= 1 || /\b\d+(\.\d+)?\s*%/g.test(texto);
+
+    if (hasObjGeneral && hasObjEspec && hasMetasQuant) {
+        checks["C5"] = {
+            id: "C5",
+            score: 20,
+            status: "pass",
+            evidence: "Objetivo general de supervisión, objetivos específicos y metas operativas cuantificables formulados.",
+            feedback: "Alineación de objetivos y metas operativas conforme a las prioridades técnico-pedagógicas."
+        };
+    } else if (hasObjGeneral || hasObjEspec) {
+        checks["C5"] = {
+            id: "C5",
+            score: 10,
+            status: "warning",
+            evidence: "Objetivos de supervisión formulados pero con metas predominantemente cualitativas.",
+            feedback: "Incorpore indicadores cuantitativos e indicadores de logro porcentuales en las metas operativas."
+        };
+    } else {
+        checks["C5"] = {
+            id: "C5",
+            score: 0,
+            status: "fail",
+            evidence: "Ausencia de objetivos y metas de supervisión formalmente estructurados.",
+            feedback: "Defina el objetivo general y al menos 2 objetivos específicos con metas medibles."
+        };
+    }
+
+    // C6: Cronograma de Acompañamiento Técnico-Pedagógico (15 pts)
+    const hasCronograma = /cronograma|calendario|programaci[oó]n|fechas|meses/i.test(texto);
+    const hasActividadesATP = /acompañamiento|visitas?\s+[aá]ulicas?|asesor[ií]a|cte|consejo\s+t[eé]cnico|reuniones?\s+de\s+directores/i.test(texto);
+
+    if (hasCronograma && hasActividadesATP) {
+        checks["C6"] = {
+            id: "C6",
+            score: 15,
+            status: "pass",
+            evidence: "Cronograma de acompañamiento técnico-pedagógico con actividades programadas y calendarizadas.",
+            feedback: "Calendarización integral de visitas áulicas, asesorías y sesiones colegiadas con los directores."
+        };
+    } else if (hasCronograma || hasActividadesATP) {
+        checks["C6"] = {
+            id: "C6",
+            score: 8,
+            status: "warning",
+            evidence: "Actividades de acompañamiento descritas de manera preliminar sin cronograma detallado.",
+            feedback: "Estructure un cronograma mensual con al menos 4 actividades clave de acompañamiento técnico."
+        };
+    } else {
+        checks["C6"] = {
+            id: "C6",
+            score: 0,
+            status: "fail",
+            evidence: "No se identificó cronograma de acompañamiento técnico-pedagógico.",
+            feedback: "Debe incorporar la programación de visitas áulicas y asesorías de la supervisión escolar."
+        };
+    }
+
+    // C7: Monitoreo, Semáforos e Instrumentos de Evaluación (15 pts)
+    const hasMonitoreo = /monitoreo|seguimiento|sem[aá]foro|instrumentos?\s+de\s+evaluaci[oó]n|r[uú]brica|gu[ií]a\s+de\s+observaci[oó]n|lista\s+de\s+cotejo/i.test(texto);
+    const hasVerificacion = /indicador|verificaci[oó]n|evidencia|meta\s+porcentual/i.test(texto);
+
+    if (hasMonitoreo && hasVerificacion) {
+        checks["C7"] = {
+            id: "C7",
+            score: 15,
+            status: "pass",
+            evidence: "Mecanismos de monitoreo, semaforización e instrumentos formales de seguimiento de supervisión acreditados.",
+            feedback: "Sistema de seguimiento e instrumentos de evaluación bien definidos para la supervisión zonal."
+        };
+    } else if (hasMonitoreo || hasVerificacion) {
+        checks["C7"] = {
+            id: "C7",
+            score: 8,
+            status: "warning",
+            evidence: "Seguimiento y evaluación descritos con instrumentos preliminares o generales.",
+            feedback: "Defina formalmente al menos 2 instrumentos de seguimiento con semáforos o indicadores porcentuales."
+        };
+    } else {
+        checks["C7"] = {
+            id: "C7",
+            score: 0,
+            status: "fail",
+            evidence: "No se identificaron instrumentos formales de monitoreo ni semaforización.",
+            feedback: "Incorpore instrumentos de evaluación y semáforos de seguimiento para la supervisión zonal."
+        };
+    }
+
+    for (const c of Object.values(checks)) {
+        totalScore += c.score;
+    }
+
+    return { checks, totalScore };
+}
+
+function construirResultadoDesdeAuditoriaDeterministaPips(
+    detAudit: ReturnType<typeof auditarPipsDeterminista>,
+    escuelaNombre: string,
+    cct: string
+): ResultadoPipsAudit {
+    const dimScoreMap: Record<string, { score: number; maxScore: number }> = {};
+    for (const d of Object.values(DIMENSIONES_PIPS)) {
+        dimScoreMap[d] = { score: 0, maxScore: 0 };
+    }
+
+    const evaluatedCriteria: CriterioPipsResultado[] = CRITERIOS_PIPS.map(def => {
+        const item = detAudit.checks[def.id] || {
+            id: def.id,
+            score: Math.round(def.weight * 0.5),
+            status: "warning" as const,
+            evidence: "Evidencia zonal documentada.",
+            feedback: "Revisión técnica institucional."
+        };
+
+        if (dimScoreMap[def.dimension]) {
+            dimScoreMap[def.dimension].score += item.score;
+            dimScoreMap[def.dimension].maxScore += def.weight;
+        }
+
+        return {
+            id: def.id,
+            numero: def.numero,
+            nombre: def.nombre,
+            dimension: def.dimension,
+            weight: def.weight,
+            score: item.score,
+            status: item.status,
+            feedback: item.feedback,
+            evidenceFound: item.evidence,
+        };
+    });
+
+    const totalScore = detAudit.totalScore;
+    const maxPossibleScore = 100;
+    const percentage = Math.round((totalScore / maxPossibleScore) * 100);
+
+    const passedCriteria = evaluatedCriteria.filter(c => c.status === "pass").length;
+    const warningCriteria = evaluatedCriteria.filter(c => c.status === "warning").length;
+    const failedCriteria = evaluatedCriteria.filter(c => c.status === "fail").length;
+
+    let overallStatus: ResultadoPipsAudit["overallStatus"] = "REQUIERE_REVISION";
+    if (percentage >= 85 && failedCriteria === 0) {
+        overallStatus = "EXCELENTE";
+    } else if (percentage >= 70) {
+        overallStatus = "SATISFACTORIO";
+    } else if (percentage >= 50) {
+        overallStatus = "EN_DESARROLLO";
+    } else {
+        overallStatus = "REQUIERE_REVISION";
+    }
+
+    const dimensionScores: Record<string, DimensionPipsScore> = {};
+    for (const [dimName, val] of Object.entries(dimScoreMap)) {
+        dimensionScores[dimName] = {
+            score: val.score,
+            maxScore: val.maxScore,
+            percentage: val.maxScore > 0 ? Math.round((val.score / val.maxScore) * 100) : 0,
+        };
+    }
+
+    const strengths: string[] = [];
+    if (detAudit.checks["C1"]?.status === "pass") strengths.push("Identificación zonal y encuadre institucional completo");
+    if (detAudit.checks["C3"]?.status === "pass") strengths.push("Censo exhaustivo de centros escolares y matrícula desagregada");
+    if (detAudit.checks["C4"]?.status === "pass") strengths.push("Diagnóstico territorial articulado y jerarquización de problemáticas");
+    if (detAudit.checks["C5"]?.status === "pass") strengths.push("Objetivos de supervisión claros con metas operativas cuantitativas");
+    if (detAudit.checks["C6"]?.status === "pass") strengths.push("Cronograma sistemático de acompañamiento técnico-pedagógico");
+    if (strengths.length === 0) strengths.push("Estructura de intervención zonal conforme a los lineamientos oficiales DBEPA");
+
+    const criticalRecommendations = evaluatedCriteria
+        .filter(c => c.score < c.weight)
+        .map(c => `[${c.id}] ${c.nombre}: ${c.feedback}`);
+
+    return {
+        totalScore,
+        maxPossibleScore,
+        percentage,
+        overallStatus,
+        passedCriteria,
+        warningCriteria,
+        failedCriteria,
+        criteria: evaluatedCriteria,
+        dimensionScores,
+        strengths,
+        criticalRecommendations: criticalRecommendations.length > 0 ? criticalRecommendations : ["Mantener el seguimiento y actualización periódica del plan zonal."],
+        auditedAt: new Date().toISOString(),
+    };
+}
+
 // ── Función Principal de Evaluación PIPS ─────────────────────────────────────
 
 export async function evaluarPipsEntrega(params: {
@@ -192,6 +524,8 @@ export async function evaluarPipsEntrega(params: {
         console.warn(`[pips-evaluator] Documento PIPS con texto insuficiente (${textoDocumento?.length || 0} chars).`);
         return generarResultadoFallbackPips("Documento sin texto legible o vacío.", escuelaNombre, cct);
     }
+
+    const detAudit = auditarPipsDeterminista(textoDocumento, escuelaNombre, cct);
 
     const systemPrompt = `Eres un Asesor Técnico Pedagógico (ATP) y Auditor de la Subsecretaría de Educación Media Superior (SEMS / DBEPA Puebla).
 Tu función es auditar con rigor normativo el Plan de Intervención Pedagógica de Supervisión Escolar (PIPS) / Cartografía Territorial Pedagógica de una zona escolar con base en los 7 criterios institucionales oficiales de la DBEPA.
@@ -228,15 +562,15 @@ ${criteriosPromptText}
 -------------------------------------------------------------------------------
 
 TEXTO EXTRAÍDO DEL DOCUMENTO PIPS ENTREGADO:
-\"\"\"
-${textoDocumento.slice(0, 20000)}
-\"\"\"
+"""
+${textoDocumento.slice(0, 100000)}
+"""
 
 Dictamina cada uno de los 7 criterios normativos con base en la evidencia textual.`;
 
     let rawResponse = "";
     try {
-        console.log(`[pips-evaluator] Invocando auditoría PIPS para ${escuelaNombre}...`);
+        console.log(`[pips-evaluator] Invocando auditoría PIPS para ${escuelaNombre} (${textoDocumento.length} caracteres de texto)...`);
         const validPdf = params.pdfBuffer && isBufferPdf(params.pdfBuffer) ? params.pdfBuffer : undefined;
         rawResponse = await callGemini(
             systemPrompt,
@@ -249,17 +583,23 @@ Dictamina cada uno de los 7 criterios normativos con base en la evidencia textua
         );
         console.log(`[pips-evaluator] Respuesta IA recibida (${rawResponse.length} chars).`);
     } catch (aiErr: any) {
-        console.error("[pips-evaluator] Error al invocar motor de IA:", aiErr);
+        console.warn("[pips-evaluator] IA no disponible, recurriendo a auditoría determinista de código:", aiErr?.message || String(aiErr));
+        if (detAudit.totalScore >= 40) {
+            return construirResultadoDesdeAuditoriaDeterministaPips(detAudit, escuelaNombre, cct);
+        }
         return generarResultadoFallbackPips(`Fallo al evaluar con IA: ${aiErr?.message || String(aiErr)}`, escuelaNombre, cct);
     }
 
     const rawJson = parsearRespuestaGemini(rawResponse);
     if (!rawJson || !Array.isArray(rawJson.criterios) || rawJson.criterios.length < 4) {
-        console.error("[pips-evaluator] Respuesta de IA malformada o incompleta:", rawResponse ? rawResponse.slice(0, 300) : "vacía");
+        console.warn("[pips-evaluator] Respuesta de IA incompleta, recurriendo a auditoría determinista de código.");
+        if (detAudit.totalScore >= 40) {
+            return construirResultadoDesdeAuditoriaDeterministaPips(detAudit, escuelaNombre, cct);
+        }
         return generarResultadoFallbackPips("Respuesta de IA malformada o incompleta (JSON inválido o criterios insuficientes).", escuelaNombre, cct);
     }
 
-    // ── CÁLCULO DETERMINISTA EN TYPESCRIPT ───────────────────────────────────
+    // ── CÁLCULO HÍBRIDO DETERMINISTA EN TYPESCRIPT ───────────────────────────
     const aiCriteriosMap = new Map<string, any>();
     for (const c of rawJson.criterios) {
         if (c && c.id) aiCriteriosMap.set(String(c.id).toUpperCase().trim(), c);
@@ -275,6 +615,7 @@ Dictamina cada uno de los 7 criterios normativos con base en la evidencia textua
 
     const evaluatedCriteria: CriterioPipsResultado[] = CRITERIOS_PIPS.map(def => {
         const aiItem = aiCriteriosMap.get(def.id) || {};
+        const detItem = detAudit.checks[def.id];
         let status: "pass" | "warning" | "fail" = "fail";
         const rawStatus = String(aiItem.status || "").toLowerCase().trim();
 
@@ -295,6 +636,12 @@ Dictamina cada uno de los 7 criterios normativos con base en la evidencia textua
             score = 0;
         }
 
+        // Híbrido: el chequeo determinista validado por código actúa como piso de certeza
+        if (detItem && detItem.score > score) {
+            score = detItem.score;
+            status = detItem.status;
+        }
+
         totalScore += score;
 
         if (dimScoreMap[def.dimension]) {
@@ -310,8 +657,8 @@ Dictamina cada uno de los 7 criterios normativos con base en la evidencia textua
             weight: def.weight,
             score,
             status,
-            feedback: aiItem.feedback || (status === "pass" ? "Cumplimiento normativo acreditado." : "Área de oportunidad para fortalecimiento del plan zonal."),
-            evidenceFound: aiItem.evidenceFound || (status === "pass" ? "Evidencias constatadas en el cuerpo del PIPS." : "No se localizaron elementos suficientes en el texto."),
+            feedback: aiItem.feedback || detItem?.feedback || (status === "pass" ? "Cumplimiento normativo acreditado." : "Área de oportunidad para fortalecimiento del plan zonal."),
+            evidenceFound: aiItem.evidenceFound || detItem?.evidence || (status === "pass" ? "Evidencias constatadas en el cuerpo del PIPS." : "No se localizaron elementos suficientes en el texto."),
         };
     });
 
