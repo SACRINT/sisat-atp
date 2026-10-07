@@ -552,7 +552,15 @@ Responde únicamente en formato JSON con la siguiente estructura:
                     const buffer = await downloadFile(file.driveUrl!);
                     const workbook = XLSX.read(buffer, { type: "buffer" });
                     const sheetNames = workbook.SheetNames;
-                    const incidencias: Array<Record<string, unknown>> = [];
+                    const incidencias: Array<{
+                        mes: string;
+                        categoria: string;
+                        edad: string;
+                        violencia: string[];
+                        escuela: string;
+                        cct: string;
+                        localidad: string;
+                    }> = [];
 
                     for (const sheetName of sheetNames) {
                         const sheet = workbook.Sheets[sheetName];
@@ -576,21 +584,20 @@ Responde únicamente en formato JSON con la siguiente estructura:
                                 const discriminatorio = row[4];
                                 const otro = row[5];
                                 
-                                const tieneCaso = [agFisica, hostigamiento, discriminatorio, otro].some(val => 
-                                    val && typeof val === 'string' && val.toUpperCase().trim() === 'X'
-                                );
+                                const isX = (val: unknown): boolean => typeof val === 'string' && val.toUpperCase().trim() === 'X';
+                                const tieneCaso = [agFisica, hostigamiento, discriminatorio, otro].some(isX);
                                 
                                 if (tieneCaso) {
                                     const tiposViolencia: string[] = [];
-                                    if (agFisica && agFisica.toUpperCase().trim() === 'X') tiposViolencia.push("Agresión Física");
-                                    if (hostigamiento && hostigamiento.toUpperCase().trim() === 'X') tiposViolencia.push("Hostigamiento");
-                                    if (discriminatorio && discriminatorio.toUpperCase().trim() === 'X') tiposViolencia.push("Discriminatorio");
-                                    if (otro && otro.toUpperCase().trim() === 'X') tiposViolencia.push("Otro");
+                                    if (isX(agFisica)) tiposViolencia.push("Agresión Física");
+                                    if (isX(hostigamiento)) tiposViolencia.push("Hostigamiento");
+                                    if (isX(discriminatorio)) tiposViolencia.push("Discriminatorio");
+                                    if (isX(otro)) tiposViolencia.push("Otro");
 
                                     incidencias.push({
                                         mes: sheetName,
                                         categoria: currentCategoria || "General",
-                                        edad: row[1] || "S/D",
+                                        edad: row[1] ? String(row[1]) : "S/D",
                                         violencia: tiposViolencia,
                                         escuela: schoolName ? schoolName.toString().trim() : "N/D",
                                         cct: cct ? cct.toString().trim() : "N/D",
@@ -676,12 +683,13 @@ Responde únicamente en formato JSON con la siguiente estructura:
                     };
                 } catch (e: unknown) {
                     console.error("Error analyzing acoso PDF:", e);
+                    const msg = e instanceof Error ? e.message : String(e);
                     resultado = {
                         tipo: "ACOSO_ESCOLAR",
                         tieneIncidencias: false,
                         firmado: false,
                         sellado: false,
-                        explicacion: `Error de análisis visual: ${e.message}`
+                        explicacion: `Error de análisis visual: ${msg}`
                     };
                 }
             }
