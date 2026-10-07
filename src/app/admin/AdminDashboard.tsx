@@ -1857,7 +1857,7 @@ export default function AdminDashboard({
                                 }
 
                                 if (res.tipo === "PMC" || res.tipo === "PAEC" || res.tipo === "INFORME_FINAL" || res.tipo === "PIPS") {
-                                    const hasError = res.explicacion?.includes("Failed to download") || !res.borradorCorreo;
+                                    const hasError = Boolean(res.errorConexo || res.error || res.explicacion?.includes("Failed to download") || !res.borradorCorreo);
                                     return (
                                         <div style={{
                                             marginBottom: "1rem", padding: "0.75rem", borderRadius: "8px",
