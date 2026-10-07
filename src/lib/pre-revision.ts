@@ -1267,13 +1267,20 @@ Responde únicamente en formato JSON:
     } catch (error) {
         console.error(`Critical error in analizarEntregaConIA for delivery ${entregaId}:`, error);
         try {
+            const existingPreRev = await prisma.preRevision.findUnique({ where: { entregaId } });
+            const existingResultado = existingPreRev?.resultado as Record<string, any> | null;
+
             await prisma.preRevision.upsert({
                 where: { entregaId },
                 update: {
                     resultado: { 
-                        tipo: "OTROS",
-                        error: "Error crítico al analizar el documento con IA",
-                        detalle: error instanceof Error ? error.message : String(error)
+                        ...(existingResultado && typeof existingResultado === 'object' ? existingResultado : {}),
+                        tipo: existingResultado?.tipo || "OTROS",
+                        error: "Error crítico al procesar la entrega con IA",
+                        detalle: error instanceof Error ? error.message : String(error),
+                        errorConexo: true,
+                        resultadoPrevia: existingResultado || undefined,
+                        actualizadoEn: new Date().toISOString()
                     } as any
                 },
                 create: {
@@ -1281,7 +1288,9 @@ Responde únicamente en formato JSON:
                     resultado: { 
                         tipo: "OTROS",
                         error: "Error crítico al analizar el documento con IA",
-                        detalle: error instanceof Error ? error.message : String(error)
+                        detalle: error instanceof Error ? error.message : String(error),
+                        errorConexo: true,
+                        actualizadoEn: new Date().toISOString()
                     } as any
                 }
             });
