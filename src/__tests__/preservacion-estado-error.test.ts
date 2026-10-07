@@ -122,4 +122,67 @@ describe("Preservación de Estado de Pre-Revisión ante Fallos Críticos (P2-03)
         // 4. Debe incluir timestamp de actualización
         expect(savedResultado.actualizadoEn).toBeDefined();
     });
+
+    it("debe evitar el anidamiento recursivo de resultadoPrevia en fallos consecutivos (H-5)", async () => {
+        const entregaId = "entrega-anidamiento-test";
+
+        mockFindUniqueEntrega.mockResolvedValue({
+            id: entregaId,
+            escuelaId: "escuela-cmufnzvnt",
+            archivos: [
+                {
+                    id: "archivo-pmc-2",
+                    tipo: "ENTREGA",
+                    nombre: "PMC_Test.docx",
+                    driveUrl: "https://res.cloudinary.com/demo/raw/upload/v1234/PMC_Test.docx"
+                }
+            ],
+            periodoEntrega: {
+                cicloEscolarId: "ciclo-2026",
+                programa: { nombre: "PMC - Programa de Mejora Continua" }
+            },
+            escuela: { nombre: "Escuela Prueba", cct: "21EBH0002Y" }
+        });
+
+        // Simular que el estado existente en BD ya proviene de un fallo previo y tiene resultadoPrevia
+        const resultadoPrevioConFallo = {
+            tipo: "PMC",
+            error: "Fallo anterior",
+            errorConexo: true,
+            resultadoPrevia: {
+                tipo: "PMC",
+                aprobado: true,
+                puntuacion: "80%"
+            }
+        };
+
+        mockFindUniquePreRev.mockResolvedValue({
+            entregaId,
+            resultado: resultadoPrevioConFallo
+        });
+
+        mockFindFirstPlantilla.mockResolvedValue(null);
+
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = vi.fn().mockResolvedValue({
+            ok: false,
+            status: 500,
+            statusText: "Internal Server Error"
+        });
+
+        try {
+            await analizarEntregaConIA(entregaId);
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+
+        expect(mockUpsertPreRev).toHaveBeenCalledTimes(1);
+        const upsertCall = mockUpsertPreRev.mock.calls[0][0];
+        const savedResultado = upsertCall.update.resultado;
+
+        expect(savedResultado.resultadoPrevia).toBeDefined();
+        // Verificar que el nuevo resultadoPrevia NO contenga a su vez un resultadoPrevia recursivo
+        expect(savedResultado.resultadoPrevia.resultadoPrevia).toBeUndefined();
+    });
 });
+

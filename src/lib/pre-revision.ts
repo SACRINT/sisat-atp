@@ -1323,6 +1323,10 @@ Responde únicamente en formato JSON:
             const existingPreRev = await prisma.preRevision.findUnique({ where: { entregaId } });
             const existingResultado = (existingPreRev?.resultado as unknown as PreRevisionResultadoPersistida) || null;
 
+            const sanitizedPrevia = existingResultado && typeof existingResultado === 'object'
+                ? { ...existingResultado, resultadoPrevia: undefined }
+                : undefined;
+
             await prisma.preRevision.upsert({
                 where: { entregaId },
                 update: {
@@ -1332,7 +1336,7 @@ Responde únicamente en formato JSON:
                         error: "Error crítico al procesar la entrega con IA",
                         detalle: error instanceof Error ? error.message : String(error),
                         errorConexo: true,
-                        resultadoPrevia: existingResultado || undefined,
+                        resultadoPrevia: sanitizedPrevia,
                         actualizadoEn: new Date().toISOString()
                     } as unknown as import("@prisma/client").Prisma.InputJsonValue
                 },
