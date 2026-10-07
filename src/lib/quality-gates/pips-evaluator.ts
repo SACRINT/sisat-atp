@@ -71,6 +71,8 @@ export interface ResultadoPipsAudit {
     strengths: string[];
     criticalRecommendations: string[];
     auditedAt: string;
+    errorConexo?: boolean;
+    errorMessage?: string;
 }
 
 // ── Catálogo Oficial de 6 Dimensiones y 7 Criterios ──────────────────────────
@@ -252,13 +254,15 @@ Dictamina cada uno de los 7 criterios normativos con base en la evidencia textua
     }
 
     const rawJson = parsearRespuestaGemini(rawResponse);
+    if (!rawJson || !Array.isArray(rawJson.criterios) || rawJson.criterios.length < 4) {
+        console.error("[pips-evaluator] Respuesta de IA malformada o incompleta:", rawResponse ? rawResponse.slice(0, 300) : "vacía");
+        return generarResultadoFallbackPips("Respuesta de IA malformada o incompleta (JSON inválido o criterios insuficientes).", escuelaNombre, cct);
+    }
 
     // ── CÁLCULO DETERMINISTA EN TYPESCRIPT ───────────────────────────────────
     const aiCriteriosMap = new Map<string, any>();
-    if (Array.isArray(rawJson.criterios)) {
-        for (const c of rawJson.criterios) {
-            if (c && c.id) aiCriteriosMap.set(String(c.id).toUpperCase().trim(), c);
-        }
+    for (const c of rawJson.criterios) {
+        if (c && c.id) aiCriteriosMap.set(String(c.id).toUpperCase().trim(), c);
     }
 
     let totalScore = 0;
@@ -489,8 +493,10 @@ function generarResultadoFallbackPips(motivo: string, escuelaNombre: string, cct
         strengths: [],
         criticalRecommendations: [
             motivo,
-            "Verifique que el archivo subido sea un documento digital legible (PDF con texto extraíble o Word .docx)."
+            "Reintente la evaluación para procesar el documento con el motor de IA."
         ],
         auditedAt: new Date().toISOString(),
+        errorConexo: true,
+        errorMessage: motivo,
     };
 }

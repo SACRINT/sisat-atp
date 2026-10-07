@@ -132,6 +132,7 @@ export interface PreRevisionResult {
     tipo: "DIA_NARANJA" | "ACOSO_ESCOLAR" | "PMC" | "PAEC" | "INFORME_FINAL" | "PIPS" | "CONCENTRADO_INSCRITOS" | "CARTAS_COMPROMISO" | "INFORMES_BIMESTRALES" | "SIMULACRO" | "CULTURA_PAZ" | "PIPC" | "SEGUROS" | "OTROS";
     aprobado?: boolean;
     error?: string;
+    estadoError?: string;
     // Día Naranja fields
     archivos?: {
         nombre: string;
@@ -792,22 +793,33 @@ Responde únicamente en formato JSON con la siguiente estructura:
                             pdfBuffer: (isPdf ? buffer : undefined) || undefined,
                         });
 
-                        resultado = {
-                            tipo: "PAEC",
-                            aprobado: resultadoPaec.overallStatus !== "requiere_ajustes",
-                            puntuacion: `${resultadoPaec.percentage}%`,
-                            explicacion: `Evaluación normativa DBEPA: ${resultadoPaec.passedCriteria}/23 criterios acreditados con excelencia (${resultadoPaec.percentage}% global)`,
-                            borradorCorreo: generarReportePaecMarkdown(resultadoPaec, { nombre: escuelaNombre, cct: escuelaCct }),
-                            tieneIncidencias: resultadoPaec.overallStatus === "requiere_ajustes",
-                            // Nuevos campos cuantitativos estructurados
-                            scoreNumerico: resultadoPaec.percentage,
-                            totalPuntosBrutos: `${resultadoPaec.totalScore}/92`,
-                            estatusOficial: resultadoPaec.overallStatus,
-                            dimensionesDesglose: resultadoPaec.dimensionScores,
-                            criteriosEvaluados: resultadoPaec.criteria,
-                            fortalezas: resultadoPaec.strengths,
-                            recomendaciones: resultadoPaec.criticalRecommendations,
-                        };
+                        if (resultadoPaec.errorConexo) {
+                            resultado = {
+                                tipo: "PAEC",
+                                aprobado: false,
+                                error: resultadoPaec.errorMessage || "Error de comunicación con motor de IA",
+                                estadoError: "ERROR_CONEXION",
+                                explicacion: `Error de procesamiento o conexión: ${resultadoPaec.errorMessage || "No se pudo obtener dictamen de IA"}. Reintente la evaluación.`,
+                                tieneIncidencias: false,
+                            };
+                        } else {
+                            resultado = {
+                                tipo: "PAEC",
+                                aprobado: resultadoPaec.overallStatus !== "requiere_ajustes",
+                                puntuacion: `${resultadoPaec.percentage}%`,
+                                explicacion: `Evaluación normativa DBEPA: ${resultadoPaec.passedCriteria}/23 criterios acreditados con excelencia (${resultadoPaec.percentage}% global)`,
+                                borradorCorreo: generarReportePaecMarkdown(resultadoPaec, { nombre: escuelaNombre, cct: escuelaCct }),
+                                tieneIncidencias: resultadoPaec.overallStatus === "requiere_ajustes",
+                                // Nuevos campos cuantitativos estructurados
+                                scoreNumerico: resultadoPaec.percentage,
+                                totalPuntosBrutos: `${resultadoPaec.totalScore}/92`,
+                                estatusOficial: resultadoPaec.overallStatus,
+                                dimensionesDesglose: resultadoPaec.dimensionScores,
+                                criteriosEvaluados: resultadoPaec.criteria,
+                                fortalezas: resultadoPaec.strengths,
+                                recomendaciones: resultadoPaec.criticalRecommendations,
+                            };
+                        }
                     } else if (modulo === "PMC") {
                         console.log(`[pre-revision] Iniciando evaluación homologada PMC para entrega ${entregaId} (${escuelaNombre})...`);
                         const resultadoPmc = await evaluarPmcEntrega({
@@ -818,21 +830,32 @@ Responde únicamente en formato JSON con la siguiente estructura:
                             pdfBuffer: (isPdf ? buffer : undefined) || undefined,
                         });
 
-                        resultado = {
-                            tipo: "PMC",
-                            aprobado: resultadoPmc.overallStatus === "EXCELENTE" || resultadoPmc.overallStatus === "SATISFACTORIO",
-                            puntuacion: `${resultadoPmc.percentage}%`,
-                            explicacion: `Evaluación normativa DBEPA: ${resultadoPmc.passedCriteria}/10 criterios acreditados (${resultadoPmc.percentage}% de cumplimiento global - ${resultadoPmc.overallStatus})`,
-                            borradorCorreo: generarReportePmcMarkdown(resultadoPmc, { nombre: escuelaNombre, cct: escuelaCct }),
-                            tieneIncidencias: resultadoPmc.overallStatus === "REQUIERE_REVISION" || resultadoPmc.overallStatus === "EN_DESARROLLO",
-                            scoreNumerico: resultadoPmc.percentage,
-                            totalPuntosBrutos: `${resultadoPmc.totalScore}/100`,
-                            estatusOficial: resultadoPmc.overallStatus,
-                            dimensionesDesglose: resultadoPmc.dimensionScores,
-                            criteriosEvaluados: resultadoPmc.criteria,
-                            fortalezas: resultadoPmc.strengths,
-                            recomendaciones: resultadoPmc.criticalRecommendations,
-                        };
+                        if (resultadoPmc.errorConexo) {
+                            resultado = {
+                                tipo: "PMC",
+                                aprobado: false,
+                                error: resultadoPmc.errorMessage || "Error de comunicación con motor de IA",
+                                estadoError: "ERROR_CONEXION",
+                                explicacion: `Error de procesamiento o conexión: ${resultadoPmc.errorMessage || "No se pudo obtener dictamen de IA"}. Reintente la evaluación.`,
+                                tieneIncidencias: false,
+                            };
+                        } else {
+                            resultado = {
+                                tipo: "PMC",
+                                aprobado: resultadoPmc.overallStatus === "EXCELENTE" || resultadoPmc.overallStatus === "SATISFACTORIO",
+                                puntuacion: `${resultadoPmc.percentage}%`,
+                                explicacion: `Evaluación normativa DBEPA: ${resultadoPmc.passedCriteria}/10 criterios acreditados (${resultadoPmc.percentage}% de cumplimiento global - ${resultadoPmc.overallStatus})`,
+                                borradorCorreo: generarReportePmcMarkdown(resultadoPmc, { nombre: escuelaNombre, cct: escuelaCct }),
+                                tieneIncidencias: resultadoPmc.overallStatus === "REQUIERE_REVISION" || resultadoPmc.overallStatus === "EN_DESARROLLO",
+                                scoreNumerico: resultadoPmc.percentage,
+                                totalPuntosBrutos: `${resultadoPmc.totalScore}/100`,
+                                estatusOficial: resultadoPmc.overallStatus,
+                                dimensionesDesglose: resultadoPmc.dimensionScores,
+                                criteriosEvaluados: resultadoPmc.criteria,
+                                fortalezas: resultadoPmc.strengths,
+                                recomendaciones: resultadoPmc.criticalRecommendations,
+                            };
+                        }
                     } else if (modulo === "INFORME_FINAL") {
                         console.log(`[pre-revision] Iniciando evaluación homologada INFORME FINAL PMC para entrega ${entregaId} (${escuelaNombre})...`);
                         const resultadoInforme = await evaluarInformeFinalPMC({
@@ -844,21 +867,32 @@ Responde únicamente en formato JSON con la siguiente estructura:
                             pdfBuffer: (isPdf ? buffer : undefined) || undefined,
                         });
 
-                        resultado = {
-                            tipo: "INFORME_FINAL",
-                            aprobado: resultadoInforme.overallStatus === "EXCELENTE" || resultadoInforme.overallStatus === "SATISFACTORIO",
-                            puntuacion: `${resultadoInforme.percentage}%`,
-                            explicacion: `Evaluación de Cierre de Ciclo: ${resultadoInforme.metasCumplidas}/${resultadoInforme.totalMetasEvaluadas} metas acreditadas (${resultadoInforme.percentage}% de efectividad - ${resultadoInforme.overallStatus})`,
-                            borradorCorreo: generarReporteInformeFinalMarkdown(resultadoInforme, { nombre: escuelaNombre, cct: escuelaCct }),
-                            tieneIncidencias: resultadoInforme.overallStatus === "REQUIERE_REVISION" || resultadoInforme.overallStatus === "EN_DESARROLLO",
-                            scoreNumerico: resultadoInforme.percentage,
-                            totalPuntosBrutos: `${resultadoInforme.totalScore}/100`,
-                            estatusOficial: resultadoInforme.overallStatus,
-                            dimensionesDesglose: resultadoInforme.dimensionScores,
-                            criteriosEvaluados: resultadoInforme.criteria,
-                            fortalezas: resultadoInforme.strengths,
-                            recomendaciones: resultadoInforme.criticalRecommendations,
-                        };
+                        if (resultadoInforme.errorConexo) {
+                            resultado = {
+                                tipo: "INFORME_FINAL",
+                                aprobado: false,
+                                error: resultadoInforme.errorMessage || "Error de comunicación con motor de IA",
+                                estadoError: "ERROR_CONEXION",
+                                explicacion: `Error de procesamiento o conexión: ${resultadoInforme.errorMessage || "No se pudo obtener dictamen de IA"}. Reintente la evaluación.`,
+                                tieneIncidencias: false,
+                            };
+                        } else {
+                            resultado = {
+                                tipo: "INFORME_FINAL",
+                                aprobado: resultadoInforme.overallStatus === "EXCELENTE" || resultadoInforme.overallStatus === "SATISFACTORIO",
+                                puntuacion: `${resultadoInforme.percentage}%`,
+                                explicacion: `Evaluación de Cierre de Ciclo: ${resultadoInforme.metasCumplidas}/${resultadoInforme.totalMetasEvaluadas} metas acreditadas (${resultadoInforme.percentage}% de efectividad - ${resultadoInforme.overallStatus})`,
+                                borradorCorreo: generarReporteInformeFinalMarkdown(resultadoInforme, { nombre: escuelaNombre, cct: escuelaCct }),
+                                tieneIncidencias: resultadoInforme.overallStatus === "REQUIERE_REVISION" || resultadoInforme.overallStatus === "EN_DESARROLLO",
+                                scoreNumerico: resultadoInforme.percentage,
+                                totalPuntosBrutos: `${resultadoInforme.totalScore}/100`,
+                                estatusOficial: resultadoInforme.overallStatus,
+                                dimensionesDesglose: resultadoInforme.dimensionScores,
+                                criteriosEvaluados: resultadoInforme.criteria,
+                                fortalezas: resultadoInforme.strengths,
+                                recomendaciones: resultadoInforme.criticalRecommendations,
+                            };
+                        }
                     } else if (modulo === "PIPS") {
                         console.log(`[pre-revision] Iniciando evaluación homologada PIPS para entrega ${entregaId} (${escuelaNombre})...`);
                         const resultadoPips = await evaluarPipsEntrega({
@@ -869,21 +903,32 @@ Responde únicamente en formato JSON con la siguiente estructura:
                             pdfBuffer: (isPdf ? buffer : undefined) || undefined,
                         });
 
-                        resultado = {
-                            tipo: "PIPS",
-                            aprobado: resultadoPips.overallStatus === "EXCELENTE" || resultadoPips.overallStatus === "SATISFACTORIO",
-                            puntuacion: `${resultadoPips.percentage}%`,
-                            explicacion: `Evaluación de Cartografía Territorial: ${resultadoPips.passedCriteria}/7 criterios acreditados (${resultadoPips.percentage}% global - ${resultadoPips.overallStatus})`,
-                            borradorCorreo: generarReportePipsMarkdown(resultadoPips, { nombre: escuelaNombre, cct: escuelaCct }),
-                            tieneIncidencias: resultadoPips.overallStatus === "REQUIERE_REVISION" || resultadoPips.overallStatus === "EN_DESARROLLO",
-                            scoreNumerico: resultadoPips.percentage,
-                            totalPuntosBrutos: `${resultadoPips.totalScore}/100`,
-                            estatusOficial: resultadoPips.overallStatus,
-                            dimensionesDesglose: resultadoPips.dimensionScores,
-                            criteriosEvaluados: resultadoPips.criteria,
-                            fortalezas: resultadoPips.strengths,
-                            recomendaciones: resultadoPips.criticalRecommendations,
-                        };
+                        if (resultadoPips.errorConexo) {
+                            resultado = {
+                                tipo: "PIPS",
+                                aprobado: false,
+                                error: resultadoPips.errorMessage || "Error de comunicación con motor de IA",
+                                estadoError: "ERROR_CONEXION",
+                                explicacion: `Error de procesamiento o conexión: ${resultadoPips.errorMessage || "No se pudo obtener dictamen de IA"}. Reintente la evaluación.`,
+                                tieneIncidencias: false,
+                            };
+                        } else {
+                            resultado = {
+                                tipo: "PIPS",
+                                aprobado: resultadoPips.overallStatus === "EXCELENTE" || resultadoPips.overallStatus === "SATISFACTORIO",
+                                puntuacion: `${resultadoPips.percentage}%`,
+                                explicacion: `Evaluación de Cartografía Territorial: ${resultadoPips.passedCriteria}/7 criterios acreditados (${resultadoPips.percentage}% global - ${resultadoPips.overallStatus})`,
+                                borradorCorreo: generarReportePipsMarkdown(resultadoPips, { nombre: escuelaNombre, cct: escuelaCct }),
+                                tieneIncidencias: resultadoPips.overallStatus === "REQUIERE_REVISION" || resultadoPips.overallStatus === "EN_DESARROLLO",
+                                scoreNumerico: resultadoPips.percentage,
+                                totalPuntosBrutos: `${resultadoPips.totalScore}/100`,
+                                estatusOficial: resultadoPips.overallStatus,
+                                dimensionesDesglose: resultadoPips.dimensionScores,
+                                criteriosEvaluados: resultadoPips.criteria,
+                                fortalezas: resultadoPips.strengths,
+                                recomendaciones: resultadoPips.criticalRecommendations,
+                            };
+                        }
                     } else {
                         console.warn(`[pre-revision] Módulo general o no contemplado en evaluadores especializados: ${modulo}. Usando dictamen genérico.`);
                         resultado = {

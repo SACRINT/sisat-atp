@@ -69,6 +69,8 @@ export interface ResultadoPaecAudit {
     strengths: string[];
     criticalRecommendations: string[];
     auditedAt: string;
+    errorConexo?: boolean;
+    errorMessage?: string;
 }
 
 // ── Catálogo Oficial de 8 Dimensiones y 23 Criterios ────────────────────────
@@ -399,14 +401,16 @@ Evalúa cada uno de los 23 criterios (C1 a C23) con base en la evidencia textual
     }
 
     const rawJson = parsearRespuestaGemini(rawResponse);
+    if (!rawJson || !Array.isArray(rawJson.criterios) || rawJson.criterios.length < 10) {
+        console.error("[paec-evaluator] Respuesta de IA malformada o incompleta:", rawResponse ? rawResponse.slice(0, 300) : "vacía");
+        return generarResultadoFallbackPaec("Respuesta de IA malformada o incompleta (JSON inválido o criterios insuficientes).", escuelaNombre, cct);
+    }
 
     // ── CÁLCULO CUANTITATIVO DETERMINISTA EN TYPESCRIPT ───────────────────────
     const aiCriteriosMap = new Map<string, any>();
-    if (Array.isArray(rawJson.criterios)) {
-        for (const c of rawJson.criterios) {
-            if (c && c.id) {
-                aiCriteriosMap.set(String(c.id).toUpperCase().trim(), c);
-            }
+    for (const c of rawJson.criterios) {
+        if (c && c.id) {
+            aiCriteriosMap.set(String(c.id).toUpperCase().trim(), c);
         }
     }
 
@@ -641,7 +645,7 @@ function generarResultadoFallbackPaec(
         nombre: def.nombre,
         dimension: def.dimension,
         maxScore: def.maxScore,
-        score: 1,
+        score: 0,
         status: "fail",
         feedback: "No evaluado automáticamente debido a error en el procesamiento del archivo.",
         evidenceFound: "No disponible.",
@@ -665,8 +669,10 @@ function generarResultadoFallbackPaec(
         strengths: [],
         criticalRecommendations: [
             motivo,
-            "Se requiere revisión manual por parte del ATP de la zona escolar o verificar que el archivo subido sea un documento digital legible (Word o PDF con texto)."
+            "Reintente la evaluación para procesar el documento con el motor de IA."
         ],
         auditedAt: new Date().toISOString(),
+        errorConexo: true,
+        errorMessage: motivo,
     };
 }

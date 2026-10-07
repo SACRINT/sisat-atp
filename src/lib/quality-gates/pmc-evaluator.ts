@@ -67,6 +67,8 @@ export interface ResultadoPmcAudit {
     criticalRecommendations: string[];
     evidenciasNoConformes: string[];
     auditedAt: string;
+    errorConexo?: boolean;
+    errorMessage?: string;
 }
 
 // ── Tipos y Rúbricas para INFORME FINAL ───────────────────────────────────────
@@ -98,6 +100,8 @@ export interface ResultadoInformeFinalAudit {
     criticalRecommendations: string[];
     justificacionInconclusasCalidad: string;
     auditedAt: string;
+    errorConexo?: boolean;
+    errorMessage?: string;
 }
 
 // ── Catálogo Oficial de 5 Dimensiones y 10 Criterios PMC ─────────────────────
@@ -303,13 +307,15 @@ Dictamina cada uno de los 10 criterios normativos con base en la evidencia textu
     }
 
     const rawJson = parsearRespuestaGemini(rawResponse);
+    if (!rawJson || !Array.isArray(rawJson.criterios) || rawJson.criterios.length < 5) {
+        console.error("[pmc-evaluator] Respuesta de IA malformada o incompleta:", rawResponse ? rawResponse.slice(0, 300) : "vacía");
+        return generarResultadoFallbackPmc("Respuesta de IA malformada o incompleta (JSON inválido o criterios insuficientes).", escuelaNombre, cct);
+    }
 
     // ── CÁLCULO DETERMINISTA EN TYPESCRIPT ───────────────────────────────────
     const aiCriteriosMap = new Map<string, any>();
-    if (Array.isArray(rawJson.criterios)) {
-        for (const c of rawJson.criterios) {
-            if (c && c.id) aiCriteriosMap.set(String(c.id).toUpperCase().trim(), c);
-        }
+    for (const c of rawJson.criterios) {
+        if (c && c.id) aiCriteriosMap.set(String(c.id).toUpperCase().trim(), c);
     }
 
     let totalScore = 0;
@@ -504,6 +510,10 @@ Realiza la auditoría integral y responde en el JSON requerido.`;
     }
 
     const rawJson = parsearRespuestaGemini(rawResponse);
+    if (!rawJson || !Array.isArray(rawJson.dimensiones) || rawJson.dimensiones.length < 3) {
+        console.error("[pmc-evaluator] Respuesta de IA malformada o incompleta en Informe Final:", rawResponse ? rawResponse.slice(0, 300) : "vacía");
+        return generarResultadoFallbackInformeFinal("Respuesta de IA malformada o incompleta en Informe Final.", escuelaNombre, cct);
+    }
 
     // Dimensiones predefinidas
     const dimsDef = [
@@ -820,10 +830,12 @@ function generarResultadoFallbackPmc(motivo: string, escuelaNombre: string, cct:
         strengths: [],
         criticalRecommendations: [
             motivo,
-            "Verifique que el archivo subido sea un documento digital legible de Word (.docx) o PDF con texto extraíble."
+            "Reintente la evaluación para procesar el documento con el motor de IA."
         ],
         evidenciasNoConformes: [],
         auditedAt: new Date().toISOString(),
+        errorConexo: true,
+        errorMessage: motivo,
     };
 }
 
@@ -866,5 +878,7 @@ function generarResultadoFallbackInformeFinal(motivo: string, escuelaNombre: str
         criticalRecommendations: [motivo, "Contactar al ATP de la zona escolar para revisión presencial o manual."],
         justificacionInconclusasCalidad: "No evaluada",
         auditedAt: new Date().toISOString(),
+        errorConexo: true,
+        errorMessage: motivo,
     };
 }
