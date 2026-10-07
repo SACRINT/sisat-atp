@@ -156,16 +156,49 @@ export async function GET(request: NextRequest) {
 
     configureCloudinary();
 
-    // ── Build public_id variants ───────────────────────────
-    // raw resources include the extension; image/video don't.
-    function adjustId(id: string, resType: string): string {
-        if (resType === "raw" && format && !id.endsWith(`.${format}`)) {
-            return `${id}.${format}`;
+    // ── Build public_id variants & candidate strategies ─────────────────────
+    // Handles:
+    // 1. Standard assets: public_id without extension, format="pdf" -> ".../name.pdf"
+    // 2. Legacy/Double extension: public_id with extension, format="pdf" -> ".../name.pdf.pdf"
+    // 3. Raw assets: public_id with extension, format=""
+    function getCandidates(
+        baseId: string,
+        baseFormat: string,
+        resType: string
+    ): Array<{ id: string; format: string }> {
+        const candidates: Array<{ id: string; format: string }> = [];
+        const hasExt = /\.\w{2,5}$/.test(baseId);
+        const idWithoutExt = hasExt ? baseId.replace(/\.[^/.]+$/, "") : baseId;
+        const idWithExt = hasExt ? baseId : (baseFormat ? `${baseId}.${baseFormat}` : baseId);
+
+        if (resType === "raw") {
+            candidates.push({ id: idWithExt, format: "" });
+            candidates.push({ id: baseId, format: "" });
+            candidates.push({ id: idWithoutExt, format: baseFormat });
+        } else {
+            // "image" | "video"
+            // 1. Estándar: id sin extensión + format
+            candidates.push({ id: idWithoutExt, format: baseFormat });
+
+            // 2. Legacy / doble extensión: cuando Cloudinary guardó el asset con extensión en su public_id
+            if (hasExt) {
+                candidates.push({ id: baseId, format: baseFormat });
+                candidates.push({ id: baseId, format: "" });
+            }
+
+            // 3. Fallback: id directo sin formato
+            candidates.push({ id: baseId, format: "" });
+            candidates.push({ id: idWithExt, format: "" });
         }
-        if (resType !== "raw" && /\.\w{2,5}$/.test(id)) {
-            return id.replace(/\.[^/.]+$/, "");
-        }
-        return id;
+
+        // Deduplicar manteniendo orden
+        const seen = new Set<string>();
+        return candidates.filter(c => {
+            const key = `${c.id}::${c.format}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
     }
 
     // Try URL-detected type first, then common fallbacks
@@ -175,41 +208,43 @@ export async function GET(request: NextRequest) {
     console.log(`[download] publicId=${publicId}, format=${format}, isInline=${isInline}`);
 
     for (const resType of tryTypes) {
-        const tryId = adjustId(publicId, resType);
+        const candidates = getCandidates(publicId, format, resType);
 
-        try {
-            // Build signed URL locally (fast: just HMAC, no network call)
-            const signedUrl = buildSignedUrl(tryId, format, resType);
-            console.log(`[download] Trying signed URL: ${resType}/${tryId}`);
+        for (const cand of candidates) {
+            try {
+                // Build signed URL locally (fast: just HMAC, no network call)
+                const signedUrl = buildSignedUrl(cand.id, cand.format, resType);
+                console.log(`[download] Trying signed URL: ${resType}/${cand.id} (fmt: "${cand.format}")`);
 
-            const res = await fetch(signedUrl, {
-                signal: AbortSignal.timeout(8000), // 8 s safety net
-            });
-
-            if (res.ok) {
-                const contentType =
-                    res.headers.get("content-type") || "application/octet-stream";
-                console.log(`[download] SUCCESS ${resType}/${tryId} — ${contentType}`);
-
-                // Stream the response body to the client
-                // (avoids buffering the full file in memory)
-                return new Response(res.body, {
-                    status: 200,
-                    headers: {
-                        "Content-Type":           contentType,
-                        "Content-Disposition":    disposition,
-                        "Cache-Control":          "private, max-age=300",
-                        // Allow this endpoint to be loaded in iframes from the same origin
-                        "X-Frame-Options":        "SAMEORIGIN",
-                        "X-Content-Type-Options": "nosniff",
-                    },
+                const res = await fetch(signedUrl, {
+                    signal: AbortSignal.timeout(8000), // 8 s safety net
                 });
-            }
 
-            console.log(`[download] ${resType} returned ${res.status}`);
-        } catch (e: unknown) {
-            const msg = e instanceof Error ? e.message : String(e);
-            console.error(`[download] Error for ${resType}/${tryId}:`, msg);
+                if (res.ok) {
+                    const contentType =
+                        res.headers.get("content-type") || "application/octet-stream";
+                    console.log(`[download] SUCCESS ${resType}/${cand.id} — ${contentType}`);
+
+                    // Stream the response body to the client
+                    // (avoids buffering the full file in memory)
+                    return new Response(res.body, {
+                        status: 200,
+                        headers: {
+                            "Content-Type":           contentType,
+                            "Content-Disposition":    disposition,
+                            "Cache-Control":          "private, max-age=300",
+                            // Allow this endpoint to be loaded in iframes from the same origin
+                            "X-Frame-Options":        "SAMEORIGIN",
+                            "X-Content-Type-Options": "nosniff",
+                        },
+                    });
+                }
+
+                console.log(`[download] ${resType}/${cand.id} returned ${res.status}`);
+            } catch (e: unknown) {
+                const msg = e instanceof Error ? e.message : String(e);
+                console.error(`[download] Error for ${resType}/${cand.id}:`, msg);
+            }
         }
     }
 
@@ -244,6 +279,11 @@ export async function GET(request: NextRequest) {
             error: "No se pudo descargar el archivo.",
             info: { publicId, format, configuredCloud },
         },
-        { status: 502 }
+        {
+            status: 502,
+            headers: {
+                "X-Frame-Options": "SAMEORIGIN",
+            },
+        }
     );
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { v2 as cloudinary } from "cloudinary";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { buildFolderPath } from "@/lib/cloudinary";
+import { buildFolderPath, getProgramaSlug } from "@/lib/cloudinary";
 import { buildExpedienteFileName } from "@/lib/download-url";
 
 /**
@@ -135,11 +135,31 @@ export async function POST(req: NextRequest) {
 
                 finalName = `${escuelaCct}_ACOSO_ESCOLAR_${anio}_${mes}${subfolder === "_correcciones" ? "_Correccion" : ""}`;
             } else {
-                // Formato default: CCT_Etiqueta o CCT_NombreArchivo
-                // No repetimos escuelaNombre ni programaNombre porque ya están en el folder padre
-                const docName = etiqueta ? etiqueta : originalFilename.split('.').slice(0, -1).join('.');
-                const prefix = `${escuelaCct}${subfolder === "_correcciones" ? "_Correccion" : ""}`;
-                finalName = `${prefix}_${docName}`;
+                // Formato compacto y limpio: [CCT]_[PROG_SLUG]_[DOC_NAME]
+                // 1. Limpiar extensiones (incluyendo dobles como .pdf.pdf) del nombre o etiqueta
+                const rawDoc = etiqueta ? etiqueta : originalFilename;
+                let cleanDoc = rawDoc;
+                while (/\.(pdf|docx?|xlsx?|pptx?|jpe?g|png|webp|csv|txt)$/i.test(cleanDoc)) {
+                    cleanDoc = cleanDoc.replace(/\.(pdf|docx?|xlsx?|pptx?|jpe?g|png|webp|csv|txt)$/i, "");
+                }
+
+                // 2. Remover CCT repetido si el usuario ya lo incluyó en el nombre de su archivo
+                const cctClean = escuelaCct.trim();
+                const cctRegex = new RegExp(`^${cctClean}[_-]?`, "i");
+                cleanDoc = cleanDoc.replace(cctRegex, "");
+
+                // 3. Remover nombre de la escuela si viene embebido en el nombre
+                if (escuelaNombreResolved) {
+                    const escSimple = escuelaNombreResolved.replace(/[^a-zA-Z0-9]/g, "_");
+                    cleanDoc = cleanDoc.replace(new RegExp(escSimple, "gi"), "");
+                }
+                cleanDoc = cleanDoc.replace(/^_+|_+$/g, "").trim();
+
+                const progSlug = getProgramaSlug(programaNombre);
+                const corrSuffix = subfolder === "_correcciones" ? "_Corr" : "";
+                const docSnippet = sanitizePublicId(cleanDoc, 30) || `doc_${Date.now()}`;
+
+                finalName = `${cctClean}_${progSlug}${corrSuffix}_${docSnippet}`;
             }
 
             publicId = sanitizePublicId(finalName, maxPublicIdLength);

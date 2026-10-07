@@ -55,6 +55,10 @@ export async function POST(req: NextRequest) {
         const periodo = entrega.periodoEntrega;
 
         let nombreFinal = fileData.name;
+        // Evitar dobles extensiones repetidas (ej. archivo.pdf.pdf -> archivo.pdf)
+        if (typeof nombreFinal === "string") {
+            nombreFinal = nombreFinal.replace(/\.(pdf|docx?|xlsx?|pptx?|jpe?g|png)\.(pdf|docx?|xlsx?|pptx?|jpe?g|png)$/i, ".$2");
+        }
         const pNom = programa.nombre.toUpperCase();
         if (pNom.includes("CULTURA DE PAZ") || pNom.includes("SEGURIDAD")) {
             const ext = fileData.name.includes(".") ? fileData.name.slice(fileData.name.lastIndexOf(".")) : "";

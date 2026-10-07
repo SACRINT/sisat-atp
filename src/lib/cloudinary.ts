@@ -181,12 +181,62 @@ function sanitizeFileName(name: string): string {
 }
 
 /**
- * Función para generar la estructura de carpetas: "CCT - Escuela/Programa"
+ * Genera un slug corto y estandarizado para carpetas y nombres de programas.
+ * Evita rutas excesivamente largas que superen el límite de 255 caracteres de Cloudinary.
  */
-export function buildFolderPath(cct: string, escuelaNombre: string, programaNombre: string): string {
-    const escuelaFolder = sanitizeFileName(`${cct} - ${escuelaNombre}`);
-    const programaFolder = sanitizeFileName(programaNombre);
+export function getProgramaSlug(programaNombre: string): string {
+    const norm = programaNombre
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase()
+        .trim();
+
+    if (norm.includes("PMC")) return "PMC";
+    if (norm.includes("PAEC")) return "PAEC";
+    if (norm.includes("ACOSO")) return "ACOSO";
+    if (norm.includes("NARANJA")) return "DNARANJA";
+    if (norm.includes("CULTURA DE PAZ") || norm.includes("SEGURIDAD Y CULTURA")) return "SEG_PAZ";
+    if (norm.includes("PROTECCION CIVIL") || norm.includes("PIPC")) return "PIPC";
+    if (norm.includes("SINIESTROS") || norm.includes("SEGUROS")) return "SEGUROS";
+    if (norm.includes("INSCRITOS") || norm.includes("REINSCRITOS")) return "INSCRITOS";
+    if (norm.includes("CARTAS COMPROMISO")) return "CARTAS_COMP";
+    if (norm.includes("PADRES DE FAMILIA")) return "INF_PADRES";
+    if (norm.includes("SIMULACRO")) return "SIMULACRO";
+    if (norm.includes("INDICADORES Y METAS") || norm.includes("METAS")) return "METAS";
+    if (norm.includes("PIPS")) return "PIPS";
+    if (norm.includes("JUEGOS TRADICIONALES")) return "JUEGOS_TRAD";
+    if (norm.includes("ABC")) {
+        const actMatch = norm.match(/ACTIVIDAD\s*(\d+)/);
+        return actMatch ? `ACT${actMatch[1]}_ABC` : "ABC_EMOCIONES";
+    }
+    if (norm.includes("SANAMENTE")) return "SANAMENTE";
+    if (norm.includes("LECTURA")) return "LECTURA";
+    if (norm.includes("EXPEDIENTES")) return "EXPEDIENTES";
+    if (norm.includes("CAPEMS")) return "CAPEMS";
+
+    const parenMatch = norm.match(/\(([^)]+)\)/);
+    if (parenMatch && parenMatch[1].length <= 8) {
+        return parenMatch[1].replace(/[^A-Z0-9]/g, "");
+    }
+
+    const stopWords = new Set(["DE", "DEL", "LA", "LAS", "EL", "LOS", "Y", "A", "EN", "POR", "PARA"]);
+    const words = norm
+        .replace(/[^A-Z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter(w => w.length > 1 && !stopWords.has(w));
+
+    return words.slice(0, 3).join("_").slice(0, 20) || "PROG";
+}
+
+/**
+ * Función para generar la estructura de carpetas compacta: "CCT/ProgramaSlug"
+ * Garantiza que la ruta total de carpeta no exceda los 35 caracteres.
+ */
+export function buildFolderPath(cct: string, _escuelaNombre: string, programaNombre: string): string {
+    const escuelaFolder = sanitizeFileName(cct);
+    const programaFolder = getProgramaSlug(programaNombre);
     return `${escuelaFolder}/${programaFolder}`;
 }
+
 
 

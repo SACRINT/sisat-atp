@@ -369,35 +369,55 @@ export async function downloadFile(url: string): Promise<Buffer> {
                 const tryTypes = [parsed.resourceType, "image", "raw", "video"]
                     .filter((v, i, a) => a.indexOf(v) === i);
 
+                const hasExt = /\.\w{2,5}$/.test(parsed.publicId);
+                const idWithoutExt = hasExt ? parsed.publicId.replace(/\.[^/.]+$/, "") : parsed.publicId;
+                const idWithExt = hasExt ? parsed.publicId : (parsed.format ? `${parsed.publicId}.${parsed.format}` : parsed.publicId);
+
                 for (const resType of tryTypes) {
-                    let id = parsed.publicId;
-                    if (resType === "raw" && parsed.format && !id.endsWith(`.${parsed.format}`)) {
-                        id = `${id}.${parsed.format}`;
-                    } else if (resType !== "raw" && /\.\w{2,5}$/.test(id)) {
-                        id = id.replace(/\.[^/.]+$/, "");
+                    const candidates: Array<{ id: string; format: string }> = [];
+                    if (resType === "raw") {
+                        candidates.push({ id: idWithExt, format: "" });
+                        candidates.push({ id: parsed.publicId, format: "" });
+                        candidates.push({ id: idWithoutExt, format: parsed.format });
+                    } else {
+                        candidates.push({ id: idWithoutExt, format: parsed.format });
+                        if (hasExt) {
+                            candidates.push({ id: parsed.publicId, format: parsed.format });
+                            candidates.push({ id: parsed.publicId, format: "" });
+                        }
+                        candidates.push({ id: parsed.publicId, format: "" });
                     }
 
-                    try {
-                        const formatToUse = resType === "raw" ? "" : parsed.format;
-                        const signedUrl = cloudinary.utils.private_download_url(id, formatToUse, {
-                            resource_type: resType as "image" | "raw" | "video",
-                            type: "upload",
-                            attachment: true, // Paridad total con /api/download
-                        });
+                    const seen = new Set<string>();
+                    const uniqueCandidates = candidates.filter(c => {
+                        const k = `${c.id}::${c.format}`;
+                        if (seen.has(k)) return false;
+                        seen.add(k);
+                        return true;
+                    });
 
-                        console.log(`[pre-revision] Trying to download signed url with resType: ${resType}, id: ${id}`);
-                        const res = await fetch(signedUrl, {
-                            signal: AbortSignal.timeout(10000)
-                        });
-                        if (res.ok) {
-                            console.log(`[pre-revision] Download success for resType: ${resType}`);
-                            const arrayBuffer = await res.arrayBuffer();
-                            return Buffer.from(arrayBuffer);
-                        } else {
-                            console.warn(`[pre-revision] Download failed for resType ${resType} with status: ${res.status}`);
+                    for (const cand of uniqueCandidates) {
+                        try {
+                            const signedUrl = cloudinary.utils.private_download_url(cand.id, cand.format, {
+                                resource_type: resType as "image" | "raw" | "video",
+                                type: "upload",
+                                attachment: true, // Paridad total con /api/download
+                            });
+
+                            console.log(`[pre-revision] Trying to download signed url with resType: ${resType}, id: ${cand.id}`);
+                            const res = await fetch(signedUrl, {
+                                signal: AbortSignal.timeout(10000)
+                            });
+                            if (res.ok) {
+                                console.log(`[pre-revision] Download success for resType: ${resType}`);
+                                const arrayBuffer = await res.arrayBuffer();
+                                return Buffer.from(arrayBuffer);
+                            } else {
+                                console.warn(`[pre-revision] Download failed for resType ${resType} with status: ${res.status}`);
+                            }
+                        } catch (err) {
+                            console.error(`[pre-revision] Error fetching signed URL for ${resType}:`, err);
                         }
-                    } catch (err) {
-                        console.error(`[pre-revision] Error fetching signed URL for ${resType}:`, err);
                     }
                 }
             }
