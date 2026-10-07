@@ -1,8 +1,8 @@
 # Plan de Implementación y Remediación Técnica
 
 ## Bases Auditadas
-- **SISAT-ATP**: `df8032d..de312b0` y extensiones de estabilización hasta `HEAD`
-- **SIGPDA-EMS**: `af101e2..c8bb9e4`
+- **SISAT-ATP**: `df8032d..aea0609`
+- **SIGPDA-EMS**: `af101e2..a41c6c4`
 
 ---
 
@@ -35,9 +35,9 @@
 
 ### [1a149e3 / cbd67a3] fix(admin): (T2/H-2 / P2-F2) Conectar cálculo de error en observaciones del panel
 - **Commits**: `1a149e3` y `cbd67a3`
-- **Archivos**: `src/app/admin/AdminDashboard.tsx:94,1860`, `src/lib/pre-revision-badge.ts:120-130`
+- **Archivos**: `src/app/admin/AdminDashboard.tsx:95,1861`, `src/lib/pre-revision-badge.ts:120-130`
 - **Criterio de Aceptación**:
-  - `AdminDashboard.tsx` consume directamente la función pura exportada `calcularHasErrorAdmin(res)` de `@/lib/pre-revision-badge`.
+  - `AdminDashboard.tsx` consume directamente la función pura exportada `calcularHasErrorAdmin(res)` importada en la línea 95 e invocada en la línea 1861.
   - Activa el contenedor de advertencia ante contingencias (`errorConexo`, `error`, fallos de descarga o ausencia de borrador), eliminando la duplicación inline y asegurando cobertura directa de los tests unitarios en producción.
 
 ### [9238dee] test(ui): (T3/P1) Pruebas de regresión para UI Director y Administrador
@@ -97,21 +97,51 @@
 ### [1f9c645] test(e2e): (T5/H-3) Ampliar timeout a 45s en descarga masiva zip
 - **Commit**: `1f9c645`
 - **Archivo**: `src/__tests__/bulk-download-zip.test.ts:150`
-- **Criterio de Aceptación**: Se incrementa el timeout del test de estrés E2E de 18 PDFs a 45000 ms, estabilizando la suite contra fluctuaciones de CPU en Node.js. 3 corridas consecutivas arrojaron 1274 pruebas exitosas (1267 passed, 7 skipped).
+- **Criterio de Aceptación**: Se incrementa el timeout del test de estrés E2E de 18 PDFs a 45000 ms, estabilizando la suite contra fluctuaciones de CPU en Node.js. 3 corridas arrojaron 1274 pruebas exitosas (1267 passed, 7 skipped) en el commit 1f9c645.
 
 ### [0dd04d3 & c8bb9e4] Componente CartografiaDownloadButton y timeout de fixtures PMC
 - **Commits**: `0dd04d3`, `c8bb9e4`
-- **Alcance**: Gestión en frontend del status 422 y homogeneización de timeouts a 45000ms en suites de fixtures reales de PMC.
+- **Archivos**: `src/components/cartografia/CartografiaDownloadButton.tsx`, `src/__tests__/pmc-parse-previous-coverage.test.ts`
+- **Alcance**: Gestión en frontend del status 422 con modal y homogeneización de timeouts a 45000ms en suites de fixtures reales de PMC (alcanzando 1276 pruebas: 1269 passed, 7 skipped en c8bb9e4).
+
+### [a41c6c4] test(cartografia): Cubrir branch 422 y extraer parseDownloadResponse en CartografiaDownloadButton (F-R22-02)
+- **Commit**: `a41c6c41c83ec0f603bf5cd8fd216d657c6879f0`
+- **Archivos**:
+  ```text
+  src/components/cartografia/CartografiaDownloadButton.tsx |  55 ++++---
+  src/__tests__/cartografia-download-button.test.tsx      | 130 ++++++++++++++++
+  2 files changed, 185 insertions(+), 32 deletions(-)
+  ```
+- **Alcance**: Extracción modular del parser de respuesta HTTP (`parseDownloadResponse`) y suite de pruebas unitarias exhaustiva con testing-library para simular códigos 200, 422 y errores de red, elevando la suite completa de SIGPDA-EMS a 1281 pruebas (1274 passed, 7 skipped en 149 archivos).
 
 ---
 
 ## 3. Estado de Verificación de Puertas de Calidad
-- **SISAT-ATP**:
+
+- **SISAT-ATP** (`df8032d..aea0609`):
   - `npx tsc --noEmit`: 0 errores (Exit code 0).
-  - `npm test`: 6 archivos, 28 pruebas pasadas (Exit code 0).
-  - `npx eslint`: 0 problemas introducidos; 51 advertencias/errores preexistentes de deuda técnica retenidos idénticos a `df8032d`.
-  - `npm run build`: 81/81 rutas compiladas exitosamente (Next.js 16.1.6 Turbopack).
-- **SIGPDA-EMS**:
+  - `npm test` / `vitest run --reporter=verbose`: 6 archivos, 28 pruebas pasadas (Exit code 0).
+  - `npx eslint`: 0 problemas nuevos introducidos; 51 advertencias/errores preexistentes retenidos idénticos al estado base `df8032d`.
+  - `npm run build`: 81/81 rutas compiladas exitosamente (Next.js 16.1.6 Turbopack, Exit code 0).
+- **SIGPDA-EMS** (`af101e2..a41c6c4`):
   - `npx tsc --noEmit`: 0 errores (Exit code 0).
-  - `npm test`: 149 suites, 1269 pruebas pasadas, 7 skipped (Exit code 0 en múltiples corridas).
-  - `npm run build`: 123/123 rutas + Middleware Proxy compiladas exitosamente (Next.js 16.2.9 Turbopack).
+  - `npm test`: 149 suites, 1274 pruebas pasadas, 7 skipped (1281 totales, Exit code 0).
+  - `npm run build`: 123/123 rutas + Middleware Proxy compiladas exitosamente (Next.js 16.2.9 Turbopack, Exit code 0).
+
+---
+
+## 4. Deuda Técnica Preexistente (Declarada sin Incremento Neto)
+
+### A. Emisiones de `console.*` en SISAT-ATP
+Deuda técnica histórica retenida en producción (no existe módulo centralizado `logger.ts` en SISAT-ATP):
+- `src/app/api/download/route.ts`: 9 ocurrencias
+- `src/lib/pre-revision.ts`: 49 ocurrencias
+- `src/app/api/sign-cloudinary/route.ts`: 1 ocurrencia
+- `src/app/api/upload/confirm/route.ts`: 8 ocurrencias
+- **Verificación de variación neta**: `git diff df8032d..HEAD | Select-String '^\+.*console\.'` (+8 agregados en nuevos bloques catch / -8 removidos en refactorización = 0 incremento neto).
+
+### B. Linters de Código Preexistente en SISAT-ATP
+Los 51 problemas reportados en ESLint corresponden al código base original:
+- 31 errores de `@typescript-eslint/no-explicit-any` en `AdminDashboard.tsx`, `download/route.ts`, `sign-cloudinary/route.ts` y `cloudinary.ts`.
+- 20 advertencias de `react-hooks/exhaustive-deps` y `@typescript-eslint/no-unused-vars` en manejadores heredados de administración y director.
+- Cero problemas nuevos introducidos tras la remoción quirúrgica de `score`.
