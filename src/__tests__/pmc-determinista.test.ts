@@ -17,7 +17,7 @@ describe("Motor Determinista PMC (auditarPmcDeterminista)", () => {
         const lorem = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore.";
         const audit = auditarPmcDeterminista(lorem, "Plantel Muestra", "21EBH0001X");
         expect(audit.totalScore).toBe(0);
-        expect(audit.totalScore / 100).toBeLessThan(0.5);
+        expect(audit.totalScore / 110).toBeLessThan(0.5);
     });
 
     it("debe identificar CCT, ciclo escolar y figuras educativas en texto institucional", () => {

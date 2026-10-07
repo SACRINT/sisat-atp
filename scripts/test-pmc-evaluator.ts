@@ -15,7 +15,7 @@ import {
 
 async function main() {
     console.log("=================================================================");
-    console.log("TEST: EVALUADOR DETERMINISTA PMC E INFORME FINAL (100 PUNTOS)");
+    console.log("TEST: EVALUADOR DETERMINISTA PMC E INFORME FINAL (110 PUNTOS)");
     console.log("=================================================================\n");
 
     // 1. Verificación del catálogo oficial PMC

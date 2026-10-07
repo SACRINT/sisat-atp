@@ -52,7 +52,7 @@ export function calcularBadgePreDictamen(
         r.error ||
         r.errorConexo ||
         r.tipo === "OTROS" ||
-        (isAiType && !r.borradorCorreo && !r.reporteMarkdown)
+        (isAiType && !r.borradorCorreo)
     );
 
     let texto = "✓ Correcto";
