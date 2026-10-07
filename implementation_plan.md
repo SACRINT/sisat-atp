@@ -1,8 +1,8 @@
 # Plan de Implementación y Remediación Técnica
 
 ## Bases Auditadas
-- **SISAT-ATP**: `df8032d..aea0609`
-- **SIGPDA-EMS**: `af101e2..a41c6c4`
+- **SISAT-ATP**: `df8032d..e2e6aec`
+- **SIGPDA-EMS**: `af101e2..8052348`
 
 ---
 
@@ -114,18 +114,27 @@
   ```
 - **Alcance**: Extracción modular del parser de respuesta HTTP (`parseDownloadResponse`) y suite de pruebas unitarias exhaustiva con testing-library para simular códigos 200, 422 y errores de red, elevando la suite completa de SIGPDA-EMS a 1281 pruebas (1274 passed, 7 skipped en 149 archivos).
 
+### [8052348] test(cartografia): Cubrir RFC 5987 y fallback sin header en parseDownloadResponse (F-R23-03)
+- **Commit**: `8052348be5ccaf2b84bc08e9bbf165ba0936db5f`
+- **Archivos**:
+  ```text
+  src/__tests__/cartografia-download-button.test.tsx | 65 +++++++++++++++++-----
+  1 file changed, 52 insertions(+), 13 deletions(-)
+  ```
+- **Alcance**: Cobertura unitaria rigurosa del parser de descargas ante cabeceras `Content-Disposition` codificadas con RFC 5987 (`filename*=UTF-8''...`) y resiliencia ante su ausencia completa (fallback a nombre sintético seguro), consolidando la suite de SIGPDA-EMS en 1283 pruebas (1276 passed, 7 skipped en 149 archivos).
+
 ---
 
 ## 3. Estado de Verificación de Puertas de Calidad
 
-- **SISAT-ATP** (`df8032d..aea0609`):
+- **SISAT-ATP** (`df8032d..e2e6aec`):
   - `npx tsc --noEmit`: 0 errores (Exit code 0).
   - `npm test` / `vitest run --reporter=verbose`: 6 archivos, 28 pruebas pasadas (Exit code 0).
   - `npx eslint`: 0 problemas nuevos introducidos; 51 advertencias/errores preexistentes retenidos idénticos al estado base `df8032d`.
   - `npm run build`: 81/81 rutas compiladas exitosamente (Next.js 16.1.6 Turbopack, Exit code 0).
-- **SIGPDA-EMS** (`af101e2..a41c6c4`):
+- **SIGPDA-EMS** (`af101e2..8052348`):
   - `npx tsc --noEmit`: 0 errores (Exit code 0).
-  - `npm test`: 149 suites, 1274 pruebas pasadas, 7 skipped (1281 totales, Exit code 0).
+  - `npm test`: 149 suites, 1276 pruebas pasadas, 7 skipped (1283 totales, Exit code 0).
   - `npm run build`: 123/123 rutas + Middleware Proxy compiladas exitosamente (Next.js 16.2.9 Turbopack, Exit code 0).
 
 ---
@@ -140,8 +149,20 @@ Deuda técnica histórica retenida en producción (no existe módulo centralizad
 - `src/app/api/upload/confirm/route.ts`: 8 ocurrencias
 - **Verificación de variación neta**: `git diff df8032d..HEAD | Select-String '^\+.*console\.'` (+8 agregados en nuevos bloques catch / -8 removidos en refactorización = 0 incremento neto).
 
-### B. Linters de Código Preexistente en SISAT-ATP
-Los 51 problemas reportados en ESLint corresponden al código base original:
-- 31 errores de `@typescript-eslint/no-explicit-any` en `AdminDashboard.tsx`, `download/route.ts`, `sign-cloudinary/route.ts` y `cloudinary.ts`.
-- 20 advertencias de `react-hooks/exhaustive-deps` y `@typescript-eslint/no-unused-vars` en manejadores heredados de administración y director.
-- Cero problemas nuevos introducidos tras la remoción quirúrgica de `score`.
+### B. Linters de Código Preexistente en SISAT-ATP (Desglose Real Medido)
+Los 51 problemas reportados en ESLint sobre los 13 archivos tocados corresponden al código base original (base `df8032d` tenía 99 en total):
+- **27 errores** de `@typescript-eslint/no-explicit-any`:
+  - `AdminDashboard.tsx`: 19
+  - `EntregasListado.tsx`: 3
+  - `cloudinary.ts`: 3
+  - `download/route.ts`: 1
+  - `sign-cloudinary/route.ts`: 1
+- **4 errores** de `react/no-unescaped-entities`:
+  - `EntregasListado.tsx`: 4
+- **17 advertencias** de `@typescript-eslint/no-unused-vars`:
+  - `AdminDashboard.tsx`: 16
+  - `EntregasListado.tsx`: 1
+- **3 advertencias** de `react-hooks/exhaustive-deps`:
+  - `AdminDashboard.tsx`: 2
+  - `EntregasListado.tsx`: 1
+- **Totales exactos**: 31 errores + 20 advertencias = 51 problemas retenidos. Cero problemas nuevos introducidos.
