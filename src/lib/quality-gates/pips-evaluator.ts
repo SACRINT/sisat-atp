@@ -24,6 +24,11 @@
 
 import { callGemini } from "../gemini";
 
+function isBufferPdf(buf?: Buffer): boolean {
+    if (!buf || !Buffer.isBuffer(buf) || buf.length < 4) return false;
+    return buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46; // %PDF
+}
+
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
 export interface CriterioPips {
@@ -230,11 +235,12 @@ Dictamina cada uno de los 7 criterios normativos con base en la evidencia textua
     let rawResponse = "";
     try {
         console.log(`[pips-evaluator] Invocando auditoría PIPS para ${escuelaNombre}...`);
+        const validPdf = params.pdfBuffer && isBufferPdf(params.pdfBuffer) ? params.pdfBuffer : undefined;
         rawResponse = await callGemini(
             systemPrompt,
             userPrompt,
-            params.pdfBuffer,
-            "application/pdf",
+            validPdf,
+            validPdf ? "application/pdf" : undefined,
             undefined,
             false,
             escuelaId

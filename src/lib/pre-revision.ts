@@ -789,7 +789,7 @@ Responde únicamente en formato JSON con la siguiente estructura:
                             escuelaId: entrega.escuelaId,
                             cct: escuelaCct,
                             escuelaNombre,
-                            pdfBuffer: buffer || undefined,
+                            pdfBuffer: (isPdf ? buffer : undefined) || undefined,
                         });
 
                         resultado = {
@@ -815,7 +815,7 @@ Responde únicamente en formato JSON con la siguiente estructura:
                             escuelaId: entrega.escuelaId,
                             cct: escuelaCct,
                             escuelaNombre,
-                            pdfBuffer: buffer || undefined,
+                            pdfBuffer: (isPdf ? buffer : undefined) || undefined,
                         });
 
                         resultado = {
@@ -841,7 +841,7 @@ Responde únicamente en formato JSON con la siguiente estructura:
                             escuelaId: entrega.escuelaId,
                             cct: escuelaCct,
                             escuelaNombre,
-                            pdfBuffer: buffer || undefined,
+                            pdfBuffer: (isPdf ? buffer : undefined) || undefined,
                         });
 
                         resultado = {
@@ -866,7 +866,7 @@ Responde únicamente en formato JSON con la siguiente estructura:
                             escuelaId: entrega.escuelaId,
                             cct: escuelaCct,
                             escuelaNombre,
-                            pdfBuffer: buffer || undefined,
+                            pdfBuffer: (isPdf ? buffer : undefined) || undefined,
                         });
 
                         resultado = {

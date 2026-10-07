@@ -19,6 +19,11 @@
 
 import { callGemini } from "../gemini";
 
+function isBufferPdf(buf?: Buffer): boolean {
+    if (!buf || !Buffer.isBuffer(buf) || buf.length < 4) return false;
+    return buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46; // %PDF
+}
+
 // ── Tipos y Rúbricas para PMC ────────────────────────────────────────────────
 
 export interface CriterioPmc {
@@ -281,11 +286,12 @@ Dictamina cada uno de los 10 criterios normativos con base en la evidencia textu
     let rawResponse = "";
     try {
         console.log(`[pmc-evaluator] Invocando auditoría PMC con IA para ${escuelaNombre}...`);
+        const validPdf = params.pdfBuffer && isBufferPdf(params.pdfBuffer) ? params.pdfBuffer : undefined;
         rawResponse = await callGemini(
             systemPrompt,
             userPrompt,
-            params.pdfBuffer,
-            "application/pdf",
+            validPdf,
+            validPdf ? "application/pdf" : undefined,
             undefined,
             false,
             escuelaId
@@ -482,11 +488,12 @@ Realiza la auditoría integral y responde en el JSON requerido.`;
     let rawResponse = "";
     try {
         console.log(`[pmc-evaluator] Evaluando Informe Final para ${escuelaNombre}...`);
+        const validPdf = params.pdfBuffer && isBufferPdf(params.pdfBuffer) ? params.pdfBuffer : undefined;
         rawResponse = await callGemini(
             systemPrompt,
             userPrompt,
-            params.pdfBuffer,
-            "application/pdf",
+            validPdf,
+            validPdf ? "application/pdf" : undefined,
             undefined,
             false,
             escuelaId

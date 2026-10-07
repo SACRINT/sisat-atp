@@ -22,6 +22,11 @@
 
 import { callGemini } from "../gemini";
 
+function isBufferPdf(buf?: Buffer): boolean {
+    if (!buf || !Buffer.isBuffer(buf) || buf.length < 4) return false;
+    return buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46; // %PDF
+}
+
 // ── Definición de Tipos ──────────────────────────────────────────────────────
 
 export interface CriterioPaec {
@@ -377,11 +382,12 @@ Evalúa cada uno de los 23 criterios (C1 a C23) con base en la evidencia textual
     let rawResponse = "";
     try {
         console.log(`[paec-evaluator] Invocando auditoría con IA para ${escuelaNombre} (${textoDocumento.length} caracteres de texto)...`);
+        const validPdf = params.pdfBuffer && isBufferPdf(params.pdfBuffer) ? params.pdfBuffer : undefined;
         rawResponse = await callGemini(
             systemPrompt,
             userPrompt,
-            params.pdfBuffer,
-            "application/pdf",
+            validPdf,
+            validPdf ? "application/pdf" : undefined,
             undefined,
             false,
             escuelaId
