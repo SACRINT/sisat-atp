@@ -14,6 +14,7 @@ import {
     CRITERIOS_PMC
 } from "./quality-gates/pmc-evaluator";
 import { evaluarPipsEntrega, generarReportePipsMarkdown } from "./quality-gates/pips-evaluator";
+import { PreRevisionResultadoPersistida } from "./pre-revision-badge";
 
 function parseCloudinaryUrl(url: string) {
     const decoded = decodeURIComponent(url);
@@ -1300,7 +1301,7 @@ Responde únicamente en formato JSON:
         console.error(`Critical error in analizarEntregaConIA for delivery ${entregaId}:`, error);
         try {
             const existingPreRev = await prisma.preRevision.findUnique({ where: { entregaId } });
-            const existingResultado = existingPreRev?.resultado as Record<string, any> | null;
+            const existingResultado = (existingPreRev?.resultado as unknown as PreRevisionResultadoPersistida) || null;
 
             await prisma.preRevision.upsert({
                 where: { entregaId },
@@ -1313,7 +1314,7 @@ Responde únicamente en formato JSON:
                         errorConexo: true,
                         resultadoPrevia: existingResultado || undefined,
                         actualizadoEn: new Date().toISOString()
-                    } as any
+                    } as unknown as import("@prisma/client").Prisma.InputJsonValue
                 },
                 create: {
                     entregaId,
@@ -1323,7 +1324,7 @@ Responde únicamente en formato JSON:
                         detalle: error instanceof Error ? error.message : String(error),
                         errorConexo: true,
                         actualizadoEn: new Date().toISOString()
-                    } as any
+                    } as unknown as import("@prisma/client").Prisma.InputJsonValue
                 }
             });
         } catch (dbErr) {

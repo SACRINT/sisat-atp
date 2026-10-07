@@ -707,6 +707,60 @@ function construirResultadoDesdeAuditoriaDeterminista(
 
 // ── 1. EVALUADOR DEL PMC (Planeación Inicial de Ciclo) ───────────────────────
 
+export interface RawAiCriterio {
+    id?: string;
+    status?: string;
+    score?: number;
+    feedback?: string;
+    evidenceFound?: string;
+}
+
+export function fusionarCriterioPMC(
+    def: CriterioPmc,
+    aiItem: RawAiCriterio | undefined,
+    detItem: DeterministicPmcCheck | undefined
+): { status: "pass" | "warning" | "fail"; score: number; feedback: string; evidenceFound: string } {
+    let status: "pass" | "warning" | "fail" = "fail";
+    let finalFeedback = "";
+    let finalEvidence = "";
+
+    if (aiItem && (aiItem.status !== undefined || aiItem.score !== undefined)) {
+        // El dictamen de IA tiene primacía cuando evalúa este criterio
+        const rawStatus = String(aiItem.status || "").toLowerCase().trim();
+        if (rawStatus === "pass" || rawStatus === "aprobado") {
+            status = "pass";
+        } else if (rawStatus === "warning" || rawStatus === "parcial") {
+            status = "warning";
+        } else {
+            status = "fail";
+        }
+
+        finalFeedback = aiItem.feedback || (status === "pass" ? "Cumplimiento normativo acreditado por IA." : "Requiere mayor precisión técnica y desarrollo formal.");
+        finalEvidence = aiItem.evidenceFound || (status === "pass" ? "Evidencia constatada en el texto del documento." : "No se localizaron evidencias suficientes.");
+    } else if (detItem) {
+        // Suplencia determinista únicamente para criterios omitidos por la IA
+        status = detItem.status;
+        finalFeedback = detItem.feedback;
+        finalEvidence = detItem.evidence;
+    } else {
+        status = "fail";
+        finalFeedback = "Criterio sin evaluar.";
+        finalEvidence = "Sin evidencia.";
+    }
+
+    // Asignación determinista de puntos por criterio
+    let score = 0;
+    if (status === "pass") {
+        score = def.weight;
+    } else if (status === "warning") {
+        score = Math.round(def.weight * 0.5);
+    } else {
+        score = 0;
+    }
+
+    return { status, score, feedback: finalFeedback, evidenceFound: finalEvidence };
+}
+
 export async function evaluarPmcEntrega(params: {
     textoDocumento: string;
     escuelaId?: string;
@@ -803,13 +857,6 @@ Dictamina cada uno de los 11 criterios normativos con base en la evidencia textu
     }
 
     // ── CÁLCULO HÍBRIDO DETERMINISTA EN TYPESCRIPT ───────────────────────────
-    interface RawAiCriterio {
-        id?: string;
-        status?: string;
-        score?: number;
-        feedback?: string;
-        evidenceFound?: string;
-    }
     const aiCriteriosMap = new Map<string, RawAiCriterio>();
     for (const c of (rawJson.criterios as RawAiCriterio[])) {
         if (c && c.id) aiCriteriosMap.set(String(c.id).toUpperCase().trim(), c);
@@ -826,48 +873,12 @@ Dictamina cada uno de los 11 criterios normativos con base en la evidencia textu
     const evaluatedCriteria: CriterioPmcResultado[] = CRITERIOS_PMC.map(def => {
         const aiItem = aiCriteriosMap.get(def.id);
         const detItem = detAudit.checks[def.id];
-        let status: "pass" | "warning" | "fail" = "fail";
-        let finalFeedback = "";
-        let finalEvidence = "";
+        const merged = fusionarCriterioPMC(def, aiItem, detItem);
 
-        if (aiItem && (aiItem.status !== undefined || aiItem.score !== undefined)) {
-            // El dictamen de IA tiene primacía cuando evalúa este criterio
-            const rawStatus = String(aiItem.status || "").toLowerCase().trim();
-            if (rawStatus === "pass" || rawStatus === "aprobado") {
-                status = "pass";
-            } else if (rawStatus === "warning" || rawStatus === "parcial") {
-                status = "warning";
-            } else {
-                status = "fail";
-            }
-
-            finalFeedback = aiItem.feedback || (status === "pass" ? "Cumplimiento normativo acreditado por IA." : "Requiere mayor precisión técnica y desarrollo formal.");
-            finalEvidence = aiItem.evidenceFound || (status === "pass" ? "Evidencia constatada en el texto del documento." : "No se localizaron evidencias suficientes.");
-        } else if (detItem) {
-            // Suplencia determinista únicamente para criterios omitidos por la IA
-            status = detItem.status;
-            finalFeedback = detItem.feedback;
-            finalEvidence = detItem.evidence;
-        } else {
-            status = "fail";
-            finalFeedback = "Criterio sin evaluar.";
-            finalEvidence = "Sin evidencia.";
-        }
-
-        // Asignación determinista de puntos por criterio
-        let score = 0;
-        if (status === "pass") {
-            score = def.weight;
-        } else if (status === "warning") {
-            score = Math.round(def.weight * 0.5);
-        } else {
-            score = 0;
-        }
-
-        totalScore += score;
+        totalScore += merged.score;
 
         if (dimScoreMap[def.dimension]) {
-            dimScoreMap[def.dimension].score += score;
+            dimScoreMap[def.dimension].score += merged.score;
             dimScoreMap[def.dimension].maxScore += def.weight;
         }
 
@@ -877,10 +888,10 @@ Dictamina cada uno de los 11 criterios normativos con base en la evidencia textu
             nombre: def.nombre,
             dimension: def.dimension,
             weight: def.weight,
-            score,
-            status,
-            feedback: finalFeedback,
-            evidenceFound: finalEvidence,
+            score: merged.score,
+            status: merged.status,
+            feedback: merged.feedback,
+            evidenceFound: merged.evidenceFound,
         };
     });
 

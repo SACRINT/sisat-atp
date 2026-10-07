@@ -8,6 +8,7 @@ import { ESTADOS, ESTADO_LABELS, getNombrePeriodo } from "@/lib/constants";
 import { ProgramaAdmin } from "@/types";
 import { getDownloadUrl } from "@/lib/download-url";
 import PdfViewerModal from "@/app/_componentes/PdfViewerModal";
+import { calcularBadgePreDictamen, PreRevisionResultadoPersistida } from "@/lib/pre-revision-badge";
 import { mergePdfsAndDownload, MergeProgress } from "@/lib/merge-pdfs";
 
 /** Prefijo por defecto para los archivos unificados */
@@ -868,39 +869,11 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                                                                                 padding: "0.05rem 0.3rem",
                                                                                 borderRadius: "4px",
                                                                                 fontWeight: 700,
-                                                                                background: (() => {
-                                                                                    const r = (ent as any).preRevision.resultado;
-                                                                                    if (!r || !r.tipo) return '#f8fafc';
-                                                                                    const isAiType = r.tipo === 'PMC' || r.tipo === 'PAEC' || r.tipo === 'INFORME_FINAL' || r.tipo === 'PIPS';
-                                                                                    const isError = Boolean(r.error || r.errorConexo || r.tipo === 'OTROS' || (isAiType && !r.borradorCorreo && !r.reporteMarkdown));
-                                                                                    return (r.tieneIncidencias || r.aprobado === false || isError) ? '#fdf2f2' : '#f0fdf4';
-                                                                                })(),
-                                                                                color: (() => {
-                                                                                    const r = (ent as any).preRevision.resultado;
-                                                                                    if (!r || !r.tipo) return '#64748b';
-                                                                                    const isAiType = r.tipo === 'PMC' || r.tipo === 'PAEC' || r.tipo === 'INFORME_FINAL' || r.tipo === 'PIPS';
-                                                                                    const isError = Boolean(r.error || r.errorConexo || r.tipo === 'OTROS' || (isAiType && !r.borradorCorreo && !r.reporteMarkdown));
-                                                                                    return (r.tieneIncidencias || r.aprobado === false || isError) ? '#dc2626' : '#16a34a';
-                                                                                })(),
-                                                                                border: (() => {
-                                                                                    const r = (ent as any).preRevision.resultado;
-                                                                                    if (!r || !r.tipo) return '1px solid #cbd5e1';
-                                                                                    const isAiType = r.tipo === 'PMC' || r.tipo === 'PAEC' || r.tipo === 'INFORME_FINAL' || r.tipo === 'PIPS';
-                                                                                    const isError = Boolean(r.error || r.errorConexo || r.tipo === 'OTROS' || (isAiType && !r.borradorCorreo && !r.reporteMarkdown));
-                                                                                    return `1px solid ${(r.tieneIncidencias || r.aprobado === false || isError) ? '#f87171' : '#86efac'}`;
-                                                                                })()
-                                                                            }}>
-                                                                                🔍 Pre-dictamen: {
-                                                                                    (() => {
-                                                                                        const r = (ent as any).preRevision.resultado;
-                                                                                        if (!r || !r.tipo) return 'Pendiente';
-                                                                                        const isAiType = r.tipo === 'PMC' || r.tipo === 'PAEC' || r.tipo === 'INFORME_FINAL' || r.tipo === 'PIPS';
-                                                                                        if (r.error || r.errorConexo || r.tipo === 'OTROS' || (isAiType && !r.borradorCorreo && !r.reporteMarkdown)) return '⚠️ Error (Re-evaluar)';
-                                                                                        if (r.tieneIncidencias) return '⚠️ Con Incidencias';
-                                                                                        if (r.aprobado === false) return '⚠️ Firma/Sello Faltante';
-                                                                                        return '✓ Correcto';
-                                                                                    })()
-                                                                                }
+                                                                                background: calcularBadgePreDictamen((ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision?.resultado).bg,
+                                                                                 color: calcularBadgePreDictamen((ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision?.resultado).color,
+                                                                                 border: calcularBadgePreDictamen((ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision?.resultado).border
+                                                                             }}>
+                                                                                 🔍 Pre-dictamen: {calcularBadgePreDictamen((ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision?.resultado).texto}
                                                                             </span>
                                                                             {!readOnly && (
                                                                                 <button

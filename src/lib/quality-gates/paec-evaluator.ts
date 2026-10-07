@@ -784,6 +784,65 @@ function construirResultadoDesdeAuditoriaDeterministaPaec(
 
 // ── Función Principal de Evaluación PAEC-PEC ─────────────────────────────────
 
+export interface RawPaecAiCriterio {
+    id?: string;
+    score?: number | string;
+    status?: string;
+    feedback?: string;
+    evidenceFound?: string;
+}
+
+export function fusionarCriterioPAEC(
+    def: CriterioPaec,
+    aiItem: RawPaecAiCriterio | undefined,
+    detItem: DeterministicPaecCheck | undefined
+): { status: "pass" | "warning" | "fail"; score: number; feedback: string; evidenceFound: string } {
+    let score = 1;
+    let status: "pass" | "warning" | "fail" = "fail";
+    let finalFeedback = "";
+    let finalEvidence = "";
+
+    if (aiItem && (aiItem.score !== undefined || aiItem.status !== undefined)) {
+        // El dictamen emitido por IA tiene primacía para el criterio evaluado
+        const parsedScore = Number(aiItem.score);
+        if (!isNaN(parsedScore) && parsedScore >= 1 && parsedScore <= 4) {
+            score = Math.round(parsedScore);
+        } else if (aiItem.score === "4" || aiItem.score === 4) {
+            score = 4;
+        } else if (aiItem.score === "3" || aiItem.score === 3) {
+            score = 3;
+        } else if (aiItem.score === "2" || aiItem.score === 2) {
+            score = 2;
+        } else {
+            score = 1;
+        }
+
+        if (score === 4) {
+            status = "pass";
+        } else if (score === 3 || score === 2) {
+            status = "warning";
+        } else {
+            status = "fail";
+        }
+
+        finalFeedback = aiItem.feedback || (score >= 3 ? "Cumplimiento normativo acreditado por IA." : "Requiere mayor desarrollo y alineación metodológica.");
+        finalEvidence = aiItem.evidenceFound || (score >= 3 ? "Evidencia constatada en el cuerpo del documento." : "No se localizaron elementos verificables suficientes.");
+    } else if (detItem) {
+        // Suplencia determinista: solo aplica si la IA omitió este criterio en su respuesta
+        score = detItem.score;
+        status = detItem.status;
+        finalFeedback = detItem.feedback;
+        finalEvidence = detItem.evidence;
+    } else {
+        score = 1;
+        status = "fail";
+        finalFeedback = "Criterio sin evaluar.";
+        finalEvidence = "Sin evidencia.";
+    }
+
+    return { status, score, feedback: finalFeedback, evidenceFound: finalEvidence };
+}
+
 export async function evaluarPaecEntrega(params: {
     textoDocumento: string;
     escuelaId?: string;
@@ -889,13 +948,6 @@ Evalúa cada uno de los 23 criterios (C1 a C23) con base en la evidencia textual
     }
 
     // ── CÁLCULO HÍBRIDO CUANTITATIVO EN TYPESCRIPT ────────────────────────────
-    interface RawPaecAiCriterio {
-        id?: string;
-        score?: number | string;
-        status?: string;
-        feedback?: string;
-        evidenceFound?: string;
-    }
     const aiCriteriosMap = new Map<string, RawPaecAiCriterio>();
     for (const c of (rawJson.criterios as RawPaecAiCriterio[])) {
         if (c && c.id) {
@@ -915,54 +967,12 @@ Evalúa cada uno de los 23 criterios (C1 a C23) con base en la evidencia textual
     const evaluatedCriteria: CriterioPaecResultado[] = CRITERIOS_PAEC.map((def) => {
         const aiItem = aiCriteriosMap.get(def.id);
         const detItem = detAudit.checks[def.id];
-        
-        let score = 1;
-        let status: "pass" | "warning" | "fail" = "fail";
-        let finalFeedback = "";
-        let finalEvidence = "";
+        const merged = fusionarCriterioPAEC(def, aiItem, detItem);
 
-        if (aiItem && (aiItem.score !== undefined || aiItem.status !== undefined)) {
-            // El dictamen emitido por IA tiene primacía para el criterio evaluado
-            const parsedScore = Number(aiItem.score);
-            if (!isNaN(parsedScore) && parsedScore >= 1 && parsedScore <= 4) {
-                score = Math.round(parsedScore);
-            } else if (aiItem.score === "4" || aiItem.score === 4) {
-                score = 4;
-            } else if (aiItem.score === "3" || aiItem.score === 3) {
-                score = 3;
-            } else if (aiItem.score === "2" || aiItem.score === 2) {
-                score = 2;
-            } else {
-                score = 1;
-            }
-
-            if (score === 4) {
-                status = "pass";
-            } else if (score === 3 || score === 2) {
-                status = "warning";
-            } else {
-                status = "fail";
-            }
-
-            finalFeedback = aiItem.feedback || (score >= 3 ? "Cumplimiento normativo acreditado por IA." : "Requiere mayor desarrollo y alineación metodológica.");
-            finalEvidence = aiItem.evidenceFound || (score >= 3 ? "Evidencia constatada en el cuerpo del documento." : "No se localizaron elementos verificables suficientes.");
-        } else if (detItem) {
-            // Suplencia determinista: solo aplica si la IA omitió este criterio en su respuesta
-            score = detItem.score;
-            status = detItem.status;
-            finalFeedback = detItem.feedback;
-            finalEvidence = detItem.evidence;
-        } else {
-            score = 1;
-            status = "fail";
-            finalFeedback = "Criterio sin evaluar.";
-            finalEvidence = "Sin evidencia.";
-        }
-
-        totalRawScore += score;
+        totalRawScore += merged.score;
 
         if (dimScoreMap[def.dimension]) {
-            dimScoreMap[def.dimension].score += score;
+            dimScoreMap[def.dimension].score += merged.score;
             dimScoreMap[def.dimension].maxScore += 4;
         }
 
@@ -972,10 +982,10 @@ Evalúa cada uno de los 23 criterios (C1 a C23) con base en la evidencia textual
             nombre: def.nombre,
             dimension: def.dimension,
             maxScore: def.maxScore,
-            score,
-            status,
-            feedback: finalFeedback,
-            evidenceFound: finalEvidence,
+            score: merged.score,
+            status: merged.status,
+            feedback: merged.feedback,
+            evidenceFound: merged.evidenceFound,
         };
     });
 
