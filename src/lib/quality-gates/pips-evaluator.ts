@@ -584,19 +584,13 @@ Dictamina cada uno de los 7 criterios normativos con base en la evidencia textua
         console.log(`[pips-evaluator] Respuesta IA recibida (${rawResponse.length} chars).`);
     } catch (aiErr: any) {
         console.warn("[pips-evaluator] IA no disponible, recurriendo a auditoría determinista de código:", aiErr?.message || String(aiErr));
-        if (detAudit.totalScore >= 40) {
-            return construirResultadoDesdeAuditoriaDeterministaPips(detAudit, escuelaNombre, cct);
-        }
-        return generarResultadoFallbackPips(`Fallo al evaluar con IA: ${aiErr?.message || String(aiErr)}`, escuelaNombre, cct);
+        return construirResultadoDesdeAuditoriaDeterministaPips(detAudit, escuelaNombre, cct);
     }
 
     const rawJson = parsearRespuestaGemini(rawResponse);
     if (!rawJson || !Array.isArray(rawJson.criterios) || rawJson.criterios.length < 4) {
         console.warn("[pips-evaluator] Respuesta de IA incompleta, recurriendo a auditoría determinista de código.");
-        if (detAudit.totalScore >= 40) {
-            return construirResultadoDesdeAuditoriaDeterministaPips(detAudit, escuelaNombre, cct);
-        }
-        return generarResultadoFallbackPips("Respuesta de IA malformada o incompleta (JSON inválido o criterios insuficientes).", escuelaNombre, cct);
+        return construirResultadoDesdeAuditoriaDeterministaPips(detAudit, escuelaNombre, cct);
     }
 
     // ── CÁLCULO HÍBRIDO DETERMINISTA EN TYPESCRIPT ───────────────────────────
@@ -614,17 +608,31 @@ Dictamina cada uno de los 7 criterios normativos con base en la evidencia textua
     }
 
     const evaluatedCriteria: CriterioPipsResultado[] = CRITERIOS_PIPS.map(def => {
-        const aiItem = aiCriteriosMap.get(def.id) || {};
+        const aiItem = aiCriteriosMap.get(def.id);
         const detItem = detAudit.checks[def.id];
         let status: "pass" | "warning" | "fail" = "fail";
-        const rawStatus = String(aiItem.status || "").toLowerCase().trim();
+        let finalFeedback = "";
+        let finalEvidence = "";
 
-        if (rawStatus === "pass" || rawStatus === "aprobado") {
-            status = "pass";
-        } else if (rawStatus === "warning" || rawStatus === "parcial") {
-            status = "warning";
+        if (aiItem && (aiItem.status !== undefined || aiItem.score !== undefined)) {
+            const rawStatus = String(aiItem.status || "").toLowerCase().trim();
+            if (rawStatus === "pass" || rawStatus === "aprobado") {
+                status = "pass";
+            } else if (rawStatus === "warning" || rawStatus === "parcial") {
+                status = "warning";
+            } else {
+                status = "fail";
+            }
+            finalFeedback = aiItem.feedback || (status === "pass" ? "Cumplimiento normativo acreditado por IA." : "Área de oportunidad para fortalecimiento del plan zonal.");
+            finalEvidence = aiItem.evidenceFound || (status === "pass" ? "Evidencia constatada en el texto del documento." : "No se localizaron evidencias suficientes.");
+        } else if (detItem) {
+            status = detItem.status;
+            finalFeedback = detItem.feedback;
+            finalEvidence = detItem.evidence;
         } else {
             status = "fail";
+            finalFeedback = "Criterio sin evaluar.";
+            finalEvidence = "Sin evidencia.";
         }
 
         let score = 0;
@@ -634,12 +642,6 @@ Dictamina cada uno de los 7 criterios normativos con base en la evidencia textua
             score = Math.round(def.weight * 0.5);
         } else {
             score = 0;
-        }
-
-        // Híbrido: el chequeo determinista validado por código actúa como piso de certeza
-        if (detItem && detItem.score > score) {
-            score = detItem.score;
-            status = detItem.status;
         }
 
         totalScore += score;
@@ -657,8 +659,8 @@ Dictamina cada uno de los 7 criterios normativos con base en la evidencia textua
             weight: def.weight,
             score,
             status,
-            feedback: aiItem.feedback || detItem?.feedback || (status === "pass" ? "Cumplimiento normativo acreditado." : "Área de oportunidad para fortalecimiento del plan zonal."),
-            evidenceFound: aiItem.evidenceFound || detItem?.evidence || (status === "pass" ? "Evidencias constatadas en el cuerpo del PIPS." : "No se localizaron elementos suficientes en el texto."),
+            feedback: finalFeedback,
+            evidenceFound: finalEvidence,
         };
     });
 

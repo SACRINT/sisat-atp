@@ -404,7 +404,7 @@ export function auditarPmcDeterminista(texto: string, escuelaNombre: string, cct
 
     // C6: Priorización de Categorías y Ámbitos (8 pts)
     const hasCategorias = /categor[ií]a|apropiaci[oó]n\s+curricular|permanencia|gesti[oó]n\s+comunitaria|[aá]mbito|priorizaci[oó]n|cuadro\s+2/i.test(texto);
-    if (hasCategorias) {
+    if (hasCategorias && texto.length > 3000) {
         checks["C6"] = {
             id: "C6",
             status: "pass",
@@ -412,13 +412,21 @@ export function auditarPmcDeterminista(texto: string, escuelaNombre: string, cct
             evidence: "Categorías estratégicas y ámbitos prioritarios delimitados conforme a los lineamientos.",
             feedback: "Priorización temática clara articulada con los resultados del diagnóstico."
         };
-    } else {
+    } else if (hasCategorias) {
         checks["C6"] = {
             id: "C6",
             status: "warning",
             score: 4,
-            evidence: "No se detectó tabla formal de categorías priorizadas.",
+            evidence: "Mención preliminar de categorías o ámbitos sin desarrollo tabular completo.",
             feedback: "Defina formalmente al menos dos categorías estratégicas de intervención institucional."
+        };
+    } else {
+        checks["C6"] = {
+            id: "C6",
+            status: "fail",
+            score: 0,
+            evidence: "No se identificaron categorías ni ámbitos estratégicos priorizados.",
+            feedback: "Debe incorporar las categorías estratégicas de intervención institucional conforme al Cuadro 2."
         };
     }
 
@@ -432,13 +440,21 @@ export function auditarPmcDeterminista(texto: string, escuelaNombre: string, cct
             evidence: "Estructura narrativa articulada y secuenciada con rigor metodológico.",
             feedback: "Coherencia argumentativa destacada a lo largo de las secciones del plan."
         };
-    } else {
+    } else if (hasArticulacion) {
         checks["C7"] = {
             id: "C7",
             status: "warning",
             score: 4,
-            evidence: "Estructura narrativa básica.",
+            evidence: "Estructura narrativa básica o síntesis general.",
             feedback: "Fortalezca la articulación entre la presentación del PMC y sus metas."
+        };
+    } else {
+        checks["C7"] = {
+            id: "C7",
+            status: "fail",
+            score: 0,
+            evidence: "No se identificó estructura narrativa ni presentación institucional.",
+            feedback: "Debe incorporar la presentación, misión y objetivos institucionales del plan."
         };
     }
 
@@ -718,19 +734,13 @@ Dictamina cada uno de los 10 criterios normativos con base en la evidencia textu
         console.log(`[pmc-evaluator] Respuesta IA recibida (${rawResponse.length} chars).`);
     } catch (aiErr: any) {
         console.warn("[pmc-evaluator] IA no disponible, recurriendo a auditoría determinista:", aiErr?.message || String(aiErr));
-        if (detAudit.totalScore >= 40) {
-            return construirResultadoDesdeAuditoriaDeterminista(detAudit, escuelaNombre, cct);
-        }
-        return generarResultadoFallbackPmc(`Error de conexión al evaluar: ${aiErr?.message || String(aiErr)}`, escuelaNombre, cct);
+        return construirResultadoDesdeAuditoriaDeterminista(detAudit, escuelaNombre, cct);
     }
 
     const rawJson = parsearRespuestaGemini(rawResponse);
     if (!rawJson || !Array.isArray(rawJson.criterios) || rawJson.criterios.length < 5) {
         console.warn("[pmc-evaluator] Respuesta de IA inválida o incompleta, recurriendo a auditoría determinista.");
-        if (detAudit.totalScore >= 40) {
-            return construirResultadoDesdeAuditoriaDeterminista(detAudit, escuelaNombre, cct);
-        }
-        return generarResultadoFallbackPmc("Respuesta de IA malformada o incompleta (JSON inválido o criterios insuficientes).", escuelaNombre, cct);
+        return construirResultadoDesdeAuditoriaDeterminista(detAudit, escuelaNombre, cct);
     }
 
     // ── CÁLCULO HÍBRIDO DETERMINISTA EN TYPESCRIPT ───────────────────────────
@@ -748,30 +758,34 @@ Dictamina cada uno de los 10 criterios normativos con base en la evidencia textu
     }
 
     const evaluatedCriteria: CriterioPmcResultado[] = CRITERIOS_PMC.map(def => {
-        const aiItem = aiCriteriosMap.get(def.id) || {};
+        const aiItem = aiCriteriosMap.get(def.id);
         const detItem = detAudit.checks[def.id];
         let status: "pass" | "warning" | "fail" = "fail";
-        const rawStatus = String(aiItem.status || "").toLowerCase().trim();
+        let finalFeedback = "";
+        let finalEvidence = "";
 
-        let aiStatus: "pass" | "warning" | "fail" = "fail";
-        if (rawStatus === "pass" || rawStatus === "aprobado") {
-            aiStatus = "pass";
-        } else if (rawStatus === "warning" || rawStatus === "parcial") {
-            aiStatus = "warning";
-        }
+        if (aiItem && (aiItem.status !== undefined || aiItem.score !== undefined)) {
+            // El dictamen de IA tiene primacía cuando evalúa este criterio
+            const rawStatus = String(aiItem.status || "").toLowerCase().trim();
+            if (rawStatus === "pass" || rawStatus === "aprobado") {
+                status = "pass";
+            } else if (rawStatus === "warning" || rawStatus === "parcial") {
+                status = "warning";
+            } else {
+                status = "fail";
+            }
 
-        // Calificación híbrida: el motor determinista de código garantiza que hechos comprobados
-        // no se degraden por corte o sesgo de IA
-        if (detItem && detItem.status === "pass") {
-            status = "pass";
-        } else if (aiStatus === "pass") {
-            status = "pass";
-        } else if (detItem && detItem.status === "warning") {
-            status = "warning";
-        } else if (aiStatus === "warning") {
-            status = "warning";
+            finalFeedback = aiItem.feedback || (status === "pass" ? "Cumplimiento normativo acreditado por IA." : "Requiere mayor precisión técnica y desarrollo formal.");
+            finalEvidence = aiItem.evidenceFound || (status === "pass" ? "Evidencia constatada en el texto del documento." : "No se localizaron evidencias suficientes.");
+        } else if (detItem) {
+            // Suplencia determinista únicamente para criterios omitidos por la IA
+            status = detItem.status;
+            finalFeedback = detItem.feedback;
+            finalEvidence = detItem.evidence;
         } else {
             status = "fail";
+            finalFeedback = "Criterio sin evaluar.";
+            finalEvidence = "Sin evidencia.";
         }
 
         // Asignación determinista de puntos por criterio
@@ -790,12 +804,6 @@ Dictamina cada uno de los 10 criterios normativos con base en la evidencia textu
             dimScoreMap[def.dimension].score += score;
             dimScoreMap[def.dimension].maxScore += def.weight;
         }
-
-        const finalFeedback = (status === "pass" && detItem?.status === "pass" && !aiItem.feedback ? detItem.feedback : aiItem.feedback) ||
-            (status === "pass" ? "Cumplimiento normativo acreditado." : "Requiere mayor precisión técnica y desarrollo formal.");
-
-        const finalEvidence = (status === "pass" && detItem?.status === "pass" && (!aiItem.evidenceFound || aiItem.evidenceFound.length < 15) ? detItem.evidence : aiItem.evidenceFound) ||
-            (status === "pass" ? "Evidencia constatada en el texto del documento." : "No se localizaron evidencias suficientes.");
 
         return {
             id: def.id,
