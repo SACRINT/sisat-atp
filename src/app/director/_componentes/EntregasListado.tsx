@@ -680,7 +680,6 @@ function PreRevisionDirector({ entregaId, onSetMessage, entregaEstado, hasUpload
 
     const { resultado, intentosUsados, limiteIntentos } = data;
     const isApproved = Boolean(resultado?.aprobado && !resultado?.errorConexo && !resultado?.error);
-    const score = resultado?.puntuacion || "N/A";
     const observations = resultado?.borradorCorreo || "Sin observaciones específicas.";
     const hasRemainingAttempts = intentosUsados < limiteIntentos;
     const pill = calcularPillDirector(resultado);
