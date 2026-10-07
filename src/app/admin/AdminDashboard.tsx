@@ -92,6 +92,7 @@ import { ProgramaAdmin, EscuelaAdmin, Stats, ZonaStat } from "@/types";
 
 import { MESES, ESTADOS, ESTADO_LABELS, ESTADO_COLORS } from "@/lib/constants";
 import { getDownloadUrl } from "@/lib/download-url";
+import { calcularHasErrorAdmin } from "@/lib/pre-revision-badge";
 
 export default function AdminDashboard({
     programas,
@@ -1857,7 +1858,7 @@ export default function AdminDashboard({
                                 }
 
                                 if (res.tipo === "PMC" || res.tipo === "PAEC" || res.tipo === "INFORME_FINAL" || res.tipo === "PIPS") {
-                                    const hasError = Boolean(res.errorConexo || res.error || res.explicacion?.includes("Failed to download") || !res.borradorCorreo);
+                                    const hasError = calcularHasErrorAdmin(res);
                                     return (
                                         <div style={{
                                             marginBottom: "1rem", padding: "0.75rem", borderRadius: "8px",
