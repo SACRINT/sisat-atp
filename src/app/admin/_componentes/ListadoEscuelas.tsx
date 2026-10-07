@@ -463,6 +463,9 @@ export default function ListadoEscuelas({ escuelas, onSetMessage, onSetCorreccio
                                 }).map((ent) => {
                                     const styles = getEstadoStyles(ent.estado);
                                     const periodoLabel = getNombrePeriodo(ent.periodoEntrega, ent.periodoEntrega.programa.nombre);
+                                    const badge = (ent as any).preRevision
+                                        ? calcularBadgePreDictamen((ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision?.resultado)
+                                        : null;
 
                                     return (
                                         <div key={ent.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)", gap: "0.5rem", flexWrap: "wrap" }}>
@@ -470,17 +473,17 @@ export default function ListadoEscuelas({ escuelas, onSetMessage, onSetCorreccio
                                                  <div>
                                                      <span style={{ fontWeight: 500 }}>{ent.periodoEntrega.programa.nombre}</span>
                                                      {periodoLabel && <span style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}> ({periodoLabel})</span>}
-                                                     {(ent as any).preRevision && (
+                                                     {badge && (
                                                          <div style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem", marginLeft: "0.5rem" }}>
                                                              <span style={{
                                                                  fontSize: "0.68rem",
                                                                  padding: "0.05rem 0.3rem",
                                                                  borderRadius: "4px",
-                                                                 background: calcularBadgePreDictamen((ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision?.resultado).bg,
-                                                                  color: calcularBadgePreDictamen((ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision?.resultado).color,
-                                                                  border: calcularBadgePreDictamen((ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision?.resultado).border
-                                                              }}>
-                                                                  🔍 Pre-dictamen: {calcularBadgePreDictamen((ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision?.resultado).texto}
+                                                                 background: badge.bg,
+                                                                 color: badge.color,
+                                                                 border: badge.border
+                                                             }}>
+                                                                  🔍 Pre-dictamen: {badge.texto}
                                                              </span>
                                                              {!readOnly && (
                                                                  <button

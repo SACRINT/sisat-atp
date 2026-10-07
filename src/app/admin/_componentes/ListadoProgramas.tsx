@@ -856,24 +856,25 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                                                     return a.escuela.nombre.localeCompare(b.escuela.nombre);
                                                 }).map((ent) => {
                                                     const styles = getEstadoStyles(ent.estado);
+                                                    const badge = (ent as any).preRevision ? calcularBadgePreDictamen((ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision?.resultado) : null;
                                                     return (
                                                         <div key={ent.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)", gap: "0.5rem", flexWrap: "wrap" }}>
                                                             <div style={{ fontSize: "0.875rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
                                                                 <div style={{ fontWeight: 500 }}>{ent.escuela.nombre}</div>
                                                                 <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
                                                                     <span>{ent.escuela.cct}</span>
-                                                                    {(ent as any).preRevision && (
+                                                                    {badge && (
                                                                         <div style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
                                                                             <span style={{
                                                                                 fontSize: "0.68rem",
                                                                                 padding: "0.05rem 0.3rem",
                                                                                 borderRadius: "4px",
                                                                                 fontWeight: 700,
-                                                                                background: calcularBadgePreDictamen((ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision?.resultado).bg,
-                                                                                 color: calcularBadgePreDictamen((ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision?.resultado).color,
-                                                                                 border: calcularBadgePreDictamen((ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision?.resultado).border
+                                                                                background: badge.bg,
+                                                                                color: badge.color,
+                                                                                border: badge.border
                                                                              }}>
-                                                                                 🔍 Pre-dictamen: {calcularBadgePreDictamen((ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision?.resultado).texto}
+                                                                                🔍 Pre-dictamen: {badge.texto}
                                                                             </span>
                                                                             {!readOnly && (
                                                                                 <button
