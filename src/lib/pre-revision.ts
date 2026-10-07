@@ -10,7 +10,8 @@ import {
     evaluarPmcEntrega,
     evaluarInformeFinalPMC,
     generarReportePmcMarkdown,
-    generarReporteInformeFinalMarkdown
+    generarReporteInformeFinalMarkdown,
+    CRITERIOS_PMC
 } from "./quality-gates/pmc-evaluator";
 import { evaluarPipsEntrega, generarReportePipsMarkdown } from "./quality-gates/pips-evaluator";
 
@@ -844,11 +845,11 @@ Responde únicamente en formato JSON con la siguiente estructura:
                                 tipo: "PMC",
                                 aprobado: resultadoPmc.overallStatus === "EXCELENTE" || resultadoPmc.overallStatus === "SATISFACTORIO",
                                 puntuacion: `${resultadoPmc.percentage}%`,
-                                explicacion: `Evaluación normativa DBEPA: ${resultadoPmc.passedCriteria}/10 criterios acreditados (${resultadoPmc.percentage}% de cumplimiento global - ${resultadoPmc.overallStatus})`,
+                                explicacion: `Evaluación normativa DBEPA: ${resultadoPmc.passedCriteria}/${CRITERIOS_PMC.length} criterios acreditados (${resultadoPmc.percentage}% de cumplimiento global - ${resultadoPmc.overallStatus})`,
                                 borradorCorreo: generarReportePmcMarkdown(resultadoPmc, { nombre: escuelaNombre, cct: escuelaCct }),
                                 tieneIncidencias: resultadoPmc.overallStatus === "REQUIERE_REVISION" || resultadoPmc.overallStatus === "EN_DESARROLLO",
                                 scoreNumerico: resultadoPmc.percentage,
-                                totalPuntosBrutos: `${resultadoPmc.totalScore}/100`,
+                                totalPuntosBrutos: `${resultadoPmc.totalScore}/${resultadoPmc.maxPossibleScore}`,
                                 estatusOficial: resultadoPmc.overallStatus,
                                 dimensionesDesglose: resultadoPmc.dimensionScores,
                                 criteriosEvaluados: resultadoPmc.criteria,
