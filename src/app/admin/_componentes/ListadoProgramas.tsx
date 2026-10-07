@@ -78,7 +78,7 @@ export function obtenerBotonesUnificacion(prog: ProgramaAdmin): BotonUnificacion
 interface ListadoProgramasProps {
     programas: ProgramaAdmin[];
     onSetMessage: (msg: { type: "success" | "error"; text: string } | null) => void;
-    onSetCorreccionModal: (modal: { entregaId: string; escuelaNombre: string; history?: any[]; preRevision?: any; archivos?: any[] } | null) => void;
+    onSetCorreccionModal: (modal: { entregaId: string; escuelaNombre: string; history?: unknown[]; preRevision?: unknown; archivos?: unknown[] } | null) => void;
     readOnly?: boolean;
 }
 
@@ -150,9 +150,10 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
 
             onSetMessage({ type: "success", text: "✅ Pre-evaluación completada con éxito." });
             router.refresh();
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
-            onSetMessage({ type: "error", text: err.message || "Error al conectar con el servidor" });
+            const msg = err instanceof Error ? err.message : "Error al conectar con el servidor";
+            onSetMessage({ type: "error", text: msg });
         } finally {
             setReEvaluatingId(null);
         }
@@ -315,8 +316,9 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                 const errData = await confirmRes.json().catch(() => ({}));
                 onSetMessage({ type: "error", text: errData.error || "Error al guardar el archivo." });
             }
-        } catch (error: any) {
-            onSetMessage({ type: "error", text: error.message || "Error al conectar con el servidor." });
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : "Error al conectar con el servidor.";
+            onSetMessage({ type: "error", text: msg });
         } finally {
             setUploading(null);
             setSelectedEntrega(null);
@@ -370,8 +372,9 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
             a.click();
             setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 0);
             onSetMessage({ type: "success", text: "Descarga completada." });
-        } catch (e: any) {
-            onSetMessage({ type: "error", text: e.message });
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : "Error al descargar.";
+            onSetMessage({ type: "error", text: msg });
         } finally {
             setDownloadingZip(null);
         }
@@ -839,7 +842,7 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                                                                     title="Marcar mes como No Aplica para todas las escuelas"
                                                                 >
                                                                     {updatingPeriodo === periodo.id ? <Loader2 size={10} className="spin" /> : <span>🚫</span>}
-                                                                    Marcar "No Aplica"
+                                                                    Marcar &quot;No Aplica&quot;
                                                                 </button>
                                                             </div>
                                                         );
@@ -856,7 +859,7 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                                                     return a.escuela.nombre.localeCompare(b.escuela.nombre);
                                                 }).map((ent) => {
                                                     const styles = getEstadoStyles(ent.estado);
-                                                    const badge = (ent as any).preRevision ? calcularBadgePreDictamen((ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision?.resultado) : null;
+                                                    const badge = (ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision ? calcularBadgePreDictamen((ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision?.resultado) : null;
                                                     return (
                                                         <div key={ent.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)", gap: "0.5rem", flexWrap: "wrap" }}>
                                                             <div style={{ fontSize: "0.875rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
@@ -1055,7 +1058,7 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                                                                     ))}
                                                                 </select>
                                                                 <button
-                                                                    onClick={() => onSetCorreccionModal({ entregaId: ent.id, escuelaNombre: ent.escuela.nombre, history: ent.correcciones, preRevision: (ent as any).preRevision, archivos: ent.archivos })}
+                                                                    onClick={() => onSetCorreccionModal({ entregaId: ent.id, escuelaNombre: ent.escuela.nombre, history: ent.correcciones, preRevision: (ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision, archivos: ent.archivos })}
                                                                     style={{ background: "none", border: "none", cursor: "pointer", color: "#e67e22", padding: "0.25rem" }}
                                                                     title="Enviar corrección / Ver historial"
                                                                 >

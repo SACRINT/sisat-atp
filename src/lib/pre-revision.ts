@@ -56,8 +56,9 @@ export async function extractTextFromDocx(buffer: Buffer): Promise<string> {
 
 export async function extractTextFromPdf(
     buffer: Buffer,
-    pageOptions?: { start?: number; end?: number }
+    _pageOptions?: { start?: number; end?: number }
 ): Promise<{ text: string; total: number }> {
+    void _pageOptions;
     try {
         console.log("[pre-revision] Starting local PDF text extraction, buffer size:", buffer.length);
         const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default;
@@ -178,18 +179,18 @@ export interface PreRevisionResult {
     scoreNumerico?: number;
     totalPuntosBrutos?: string;
     estatusOficial?: string;
-    dimensionesDesglose?: any;
-    criteriosEvaluados?: any[];
+    dimensionesDesglose?: Record<string, unknown>;
+    criteriosEvaluados?: unknown[];
     fortalezas?: string[];
     recomendaciones?: string[];
 }
 
-function parsePercentage(scoreStr: string): number {
+export function parsePercentage(scoreStr: string): number {
     const match = scoreStr.match(/(\d+)/);
     return match ? parseInt(match[1], 10) : 0;
 }
 
-function obtenerPartesEvaluacion(
+export function obtenerPartesEvaluacion(
     modulo: "PMC" | "PAEC" | "INFORME_FINAL" | "PIPS",
     templateContent: string,
     escuelaNombre: string,
@@ -421,7 +422,7 @@ export async function downloadFile(url: string): Promise<Buffer> {
                     }
                 }
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error("[pre-revision] Error generating signed Cloudinary URL:", e);
         }
     }
@@ -490,7 +491,7 @@ export async function analizarEntregaConIA(entregaId: string, textoCompletoInput
         if (programaNombre.includes("DÍA NARANJA") || programaNombre.includes("DIA NARANJA")) {
             // --- DÍA NARANJA PRE-REVISION ---
             const pdfFiles = entrega.archivos.filter(a => a.tipo === "ENTREGA" && a.driveUrl);
-            const reportes: any[] = [];
+            const reportes: Array<{ nombre: string; etiqueta: string; firmado: boolean; sellado: boolean; explicacion: string }> = [];
 
             for (const file of pdfFiles) {
                 try {
@@ -519,14 +520,15 @@ Responde únicamente en formato JSON con la siguiente estructura:
                         sellado: !!parsed.sealed,
                         explicacion: parsed.explanation || "Analizado correctamente."
                     });
-                } catch (e: any) {
+                } catch (e: unknown) {
                     console.error(`Error analyzing file ${file.nombre}:`, e);
+                    const msg = e instanceof Error ? e.message : String(e);
                     reportes.push({
                         nombre: file.nombre,
                         etiqueta: file.etiqueta || "Archivo",
                         firmado: false,
                         sellado: false,
-                        explicacion: `Error de análisis: ${e.message}`
+                        explicacion: `Error de análisis: ${msg}`
                     });
                 }
             }
@@ -550,11 +552,11 @@ Responde únicamente en formato JSON con la siguiente estructura:
                     const buffer = await downloadFile(file.driveUrl!);
                     const workbook = XLSX.read(buffer, { type: "buffer" });
                     const sheetNames = workbook.SheetNames;
-                    const incidencias: any[] = [];
+                    const incidencias: Array<Record<string, unknown>> = [];
 
                     for (const sheetName of sheetNames) {
                         const sheet = workbook.Sheets[sheetName];
-                        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[];
+                        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
                         
                         let currentCategoria = "";
                         for (let r = 7; r < rows.length; r++) {
@@ -634,12 +636,13 @@ Responde únicamente en formato JSON con la siguiente estructura:
                         borradorCorreo: borradorCorreo || "No se pudo generar el borrador."
                     };
 
-                } catch (e: any) {
+                } catch (e: unknown) {
                     console.error("Error parsing acoso Excel:", e);
+                    const msg = e instanceof Error ? e.message : String(e);
                     resultado = {
                         tipo: "ACOSO_ESCOLAR",
                         tieneIncidencias: true,
-                        error: `Error al leer Excel: ${e.message}`,
+                        error: `Error al leer Excel: ${msg}`,
                         borradorCorreo: "Error al leer el archivo Excel."
                     };
                 }
@@ -671,7 +674,7 @@ Responde únicamente en formato JSON con la siguiente estructura:
                         sellado: !!parsed.sealed,
                         explicacion: parsed.explanation || "Reporte sin incidencias validado correctamente."
                     };
-                } catch (e: any) {
+                } catch (e: unknown) {
                     console.error("Error analyzing acoso PDF:", e);
                     resultado = {
                         tipo: "ACOSO_ESCOLAR",
@@ -700,13 +703,14 @@ Responde únicamente en formato JSON con la siguiente estructura:
                     where: { modulo, activo: true }
                 });
 
-                const templateContent = template?.contenido || (modulo === "PIPS"
+                const _templateContent = template?.contenido || (modulo === "PIPS"
                     ? "Evalúa este Plan de Intervención Pedagógica de Supervisión Escolar (PIPS) conforme a sus 5 Fases Normativas y Anexos A-F."
                     : modulo === "INFORME_FINAL"
                         ? "Evalúa este Informe Final del PMC y comprueba que se justifiquen las metas no cumplidas y se reporten evidencias de las cumplidas."
                         : modulo === "PMC"
                             ? "Evalúa este Plan de Mejora Continua (PMC) y verifica si cuenta con objetivos, metas y responsables."
                             : "Evalúa este Proyecto Escolar Comunitario (PEC) y verifica que cumpla con los lineamientos del PAEC.");
+                void _templateContent;
 
                 try {
                     console.log(`[pre-revision] Starting evaluation of ${modulo} for delivery ${entregaId}...`);
@@ -757,12 +761,12 @@ Responde únicamente en formato JSON con la siguiente estructura:
                                     } catch (err) {
                                         console.error("[pre-revision] Failed to extract text from original PMC:", err);
                                         if (pmcEntrega.preRevision?.resultado) {
-                                            const resObj = pmcEntrega.preRevision.resultado as any;
+                                            const resObj = pmcEntrega.preRevision.resultado as PreRevisionResultadoPersistida;
                                             textoOriginalPMC = `Observaciones y Metas del PMC Original:\n${resObj.borradorCorreo || ""}`;
                                         }
                                     }
                                 } else if (pmcEntrega.preRevision?.resultado) {
-                                    const resObj = pmcEntrega.preRevision.resultado as any;
+                                    const resObj = pmcEntrega.preRevision.resultado as PreRevisionResultadoPersistida;
                                     textoOriginalPMC = `Observaciones y Metas del PMC Original:\n${resObj.borradorCorreo || ""}`;
                                 }
                             }
@@ -994,7 +998,7 @@ Responde únicamente en formato JSON con la siguiente estructura:
                         };
                     }
 
-                } catch (e: any) {
+                } catch (e: unknown) {
                     console.error(`Error analyzing PMC/PAEC delivery ${entregaId}:`, e);
                     throw e;
                 }
@@ -1023,9 +1027,10 @@ Responde únicamente en formato JSON con la siguiente estructura:
                             puntuacion: `${score}%`,
                             explicacion: `Registros: ${resultadoValidacion.totalRegistros} | H: ${resultadoValidacion.totalHombres} | M: ${resultadoValidacion.totalMujeres} | Inconsistencias: ${resultadoValidacion.inconsistencias.length} (${erroresCriticos} críticas)`,
                         };
-                    } catch (e: any) {
+                    } catch (e: unknown) {
                         console.error("Error validating concentrado Excel:", e);
-                        resultado = { tipo: "CONCENTRADO_INSCRITOS", aprobado: false, error: e.message };
+                        const msg = e instanceof Error ? e.message : String(e);
+                        resultado = { tipo: "CONCENTRADO_INSCRITOS", aprobado: false, error: msg };
                     }
                 }
             }
@@ -1074,9 +1079,10 @@ Responde únicamente en formato JSON:
                         explicacion: parsed.observaciones,
                         tieneIncidencias: parsed.estadoRecomendado === "REQUIERE_CORRECCION",
                     };
-                } catch (e: any) {
+                } catch (e: unknown) {
                     console.error("Error analyzing cartas compromiso:", e);
-                    resultado = { tipo: "CARTAS_COMPROMISO", aprobado: false, error: e.message };
+                    const msg = e instanceof Error ? e.message : String(e);
+                    resultado = { tipo: "CARTAS_COMPROMISO", aprobado: false, error: msg };
                 }
             }
 
@@ -1124,9 +1130,10 @@ Responde únicamente en formato JSON:
                         explicacion: parsed.observaciones,
                         tieneIncidencias: parsed.estadoRecomendado === "REQUIERE_CORRECCION",
                     };
-                } catch (e: any) {
+                } catch (e: unknown) {
                     console.error("Error analyzing informe bimestral:", e);
-                    resultado = { tipo: "INFORMES_BIMESTRALES", aprobado: false, error: e.message };
+                    const msg = e instanceof Error ? e.message : String(e);
+                    resultado = { tipo: "INFORMES_BIMESTRALES", aprobado: false, error: msg };
                 }
             }
 
@@ -1172,9 +1179,10 @@ Responde únicamente en formato JSON:
                         explicacion: parsed.observaciones,
                         tieneIncidencias: parsed.estadoRecomendado === "REQUIERE_CORRECCION",
                     };
-                } catch (e: any) {
+                } catch (e: unknown) {
                     console.error("Error analyzing simulacro:", e);
-                    resultado = { tipo: "SIMULACRO", aprobado: false, error: e.message };
+                    const msg = e instanceof Error ? e.message : String(e);
+                    resultado = { tipo: "SIMULACRO", aprobado: false, error: msg };
                 }
             }
 
@@ -1216,9 +1224,10 @@ Responde únicamente en formato JSON:
                         explicacion: evaluacion.observaciones,
                         tieneIncidencias: evaluacion.estadoRecomendado === "REQUIERE_CORRECCION",
                     };
-                } catch (e: any) {
+                } catch (e: unknown) {
                     console.error("Error analyzing cultura de paz:", e);
-                    resultado = { tipo: "CULTURA_PAZ", aprobado: false, error: e.message };
+                    const msg = e instanceof Error ? e.message : String(e);
+                    resultado = { tipo: "CULTURA_PAZ", aprobado: false, error: msg };
                 }
             }
 
@@ -1256,9 +1265,10 @@ Responde únicamente en formato JSON:
                         explicacion: evaluacion.observaciones,
                         tieneIncidencias: evaluacion.estadoRecomendado === "REQUIERE_CORRECCION",
                     };
-                } catch (e: any) {
+                } catch (e: unknown) {
                     console.error("Error analyzing PIPC:", e);
-                    resultado = { tipo: "PIPC", aprobado: false, error: e.message };
+                    const msg = e instanceof Error ? e.message : String(e);
+                    resultado = { tipo: "PIPC", aprobado: false, error: msg };
                 }
             }
 
@@ -1295,9 +1305,10 @@ Responde únicamente en formato JSON:
                         explicacion: evaluacion.observaciones,
                         tieneIncidencias: evaluacion.estadoRecomendado === "REQUIERE_CORRECCION",
                     };
-                } catch (e: any) {
+                } catch (e: unknown) {
                     console.error("Error analyzing seguros:", e);
-                    resultado = { tipo: "SEGUROS", aprobado: false, error: e.message };
+                    const msg = e instanceof Error ? e.message : String(e);
+                    resultado = { tipo: "SEGUROS", aprobado: false, error: msg };
                 }
             }
         }
@@ -1307,11 +1318,11 @@ Responde únicamente en formato JSON:
             await prisma.preRevision.upsert({
                 where: { entregaId },
                 update: {
-                    resultado: resultado as any
+                    resultado: resultado as unknown as import("@prisma/client").Prisma.InputJsonValue
                 },
                 create: {
                     entregaId,
-                    resultado: resultado as any
+                    resultado: resultado as unknown as import("@prisma/client").Prisma.InputJsonValue
                 }
             });
             console.log(`Pre-revision results saved successfully for delivery ${entregaId}`);

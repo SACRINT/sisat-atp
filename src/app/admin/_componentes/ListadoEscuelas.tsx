@@ -14,7 +14,7 @@ import { calcularBadgePreDictamen, PreRevisionResultadoPersistida } from "@/lib/
 interface ListadoEscuelasProps {
     escuelas: EscuelaAdmin[];
     onSetMessage: (msg: { type: "success" | "error"; text: string } | null) => void;
-    onSetCorreccionModal: (modal: { entregaId: string; escuelaNombre: string; history?: any[]; preRevision?: any; archivos?: any[] } | null) => void;
+    onSetCorreccionModal: (modal: { entregaId: string; escuelaNombre: string; history?: unknown[]; preRevision?: unknown; archivos?: unknown[] } | null) => void;
     readOnly?: boolean;
 }
 
@@ -111,9 +111,10 @@ export default function ListadoEscuelas({ escuelas, onSetMessage, onSetCorreccio
 
             onSetMessage({ type: "success", text: "✅ Pre-evaluación completada con éxito." });
             router.refresh();
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
-            onSetMessage({ type: "error", text: err.message || "Error al conectar con el servidor" });
+            const msg = err instanceof Error ? err.message : "Error al conectar con el servidor";
+            onSetMessage({ type: "error", text: msg });
         } finally {
             setReEvaluatingId(null);
         }
@@ -247,8 +248,9 @@ export default function ListadoEscuelas({ escuelas, onSetMessage, onSetCorreccio
                 const errData = await confirmRes.json().catch(() => ({}));
                 onSetMessage({ type: "error", text: errData.error || "Error al guardar el archivo." });
             }
-        } catch (error: any) {
-            onSetMessage({ type: "error", text: error.message || "Error al conectar con el servidor." });
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : "Error al conectar con el servidor.";
+            onSetMessage({ type: "error", text: msg });
         } finally {
             setUploading(null);
             setSelectedEntrega(null);
@@ -269,8 +271,9 @@ export default function ListadoEscuelas({ escuelas, onSetMessage, onSetCorreccio
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Error al enviar");
             onSetMessage({ type: "success", text: data.message });
-        } catch (e: any) {
-            onSetMessage({ type: "error", text: e.message });
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : "Error al enviar recordatorio.";
+            onSetMessage({ type: "error", text: msg });
         } finally {
             setSendingReminder(null);
         }
@@ -332,7 +335,7 @@ export default function ListadoEscuelas({ escuelas, onSetMessage, onSetCorreccio
                 headStyles: { fillColor: [12, 90, 142] }
             });
 
-            const finalY = (doc as any).lastAutoTable.finalY || 60;
+            const finalY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || 60;
             doc.text("___________________________", 14, finalY + 30);
             doc.text("Sello / Firma Supervisión", 14, finalY + 36);
 
@@ -463,7 +466,7 @@ export default function ListadoEscuelas({ escuelas, onSetMessage, onSetCorreccio
                                 }).map((ent) => {
                                     const styles = getEstadoStyles(ent.estado);
                                     const periodoLabel = getNombrePeriodo(ent.periodoEntrega, ent.periodoEntrega.programa.nombre);
-                                    const badge = (ent as any).preRevision
+                                    const badge = (ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision
                                         ? calcularBadgePreDictamen((ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision?.resultado)
                                         : null;
 
@@ -509,10 +512,11 @@ export default function ListadoEscuelas({ escuelas, onSetMessage, onSetCorreccio
                                                 {/* Administrative Upload Buttons */}
                                                 {ent.estado !== "APROBADO" && !readOnly && (
                                                     <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", marginTop: "0.35rem", marginBottom: "0.35rem" }}>
-                                                        {Array.from({ length: (ent.periodoEntrega.programa as any).numArchivos || 1 }).map((_, i) => {
-                                                            const etiquetas = (ent.periodoEntrega.programa as any).etiquetasArchivos || [];
+                                                        {Array.from({ length: (ent.periodoEntrega.programa as unknown as { numArchivos?: number; etiquetasArchivos?: string[] }).numArchivos || 1 }).map((_, i) => {
+                                                            const progTyped = ent.periodoEntrega.programa as unknown as { numArchivos?: number; etiquetasArchivos?: string[] };
+                                                            const etiquetas = progTyped.etiquetasArchivos || [];
                                                             const defaultLabel = etiquetas[i] && etiquetas[i].trim() !== "" ? etiquetas[i] : `Archivo ${i + 1}`;
-                                                            const displayLabel = ((ent.periodoEntrega.programa as any).numArchivos || 1) === 1 ? "" : defaultLabel;
+                                                            const displayLabel = (progTyped.numArchivos || 1) === 1 ? "" : defaultLabel;
                                                             const hasFileAlready = displayLabel !== ""
                                                                 ? ent.archivos.some(a => a.etiqueta === displayLabel)
                                                                 : ent.archivos.length > 0;
@@ -682,7 +686,7 @@ export default function ListadoEscuelas({ escuelas, onSetMessage, onSetCorreccio
                                                     ))}
                                                 </select>
                                                  <button
-                                                     onClick={(e) => { e.stopPropagation(); e.preventDefault(); onSetCorreccionModal({ entregaId: ent.id, escuelaNombre: esc.nombre, history: ent.correcciones, preRevision: (ent as any).preRevision, archivos: ent.archivos }); }}
+                                                     onClick={(e) => { e.stopPropagation(); e.preventDefault(); onSetCorreccionModal({ entregaId: ent.id, escuelaNombre: esc.nombre, history: ent.correcciones, preRevision: (ent as { preRevision?: { resultado?: PreRevisionResultadoPersistida } }).preRevision, archivos: ent.archivos }); }}
                                                      style={{ background: "none", border: "none", cursor: "pointer", color: "#e67e22", padding: "0.25rem" }}
                                                      title="Enviar corrección / Ver historial"
                                                  >
