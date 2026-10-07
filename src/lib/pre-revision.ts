@@ -133,6 +133,7 @@ export interface PreRevisionResult {
     tipo: "DIA_NARANJA" | "ACOSO_ESCOLAR" | "PMC" | "PAEC" | "INFORME_FINAL" | "PIPS" | "CONCENTRADO_INSCRITOS" | "CARTAS_COMPROMISO" | "INFORMES_BIMESTRALES" | "SIMULACRO" | "CULTURA_PAZ" | "PIPC" | "SEGUROS" | "OTROS";
     aprobado?: boolean;
     error?: string;
+    errorConexo?: boolean;
     estadoError?: string;
     // Día Naranja fields
     archivos?: {
@@ -797,11 +798,21 @@ Responde únicamente en formato JSON con la siguiente estructura:
                         if (resultadoPaec.errorConexo) {
                             resultado = {
                                 tipo: "PAEC",
-                                aprobado: false,
+                                aprobado: resultadoPaec.overallStatus !== "requiere_ajustes",
+                                puntuacion: `${resultadoPaec.percentage}%`,
+                                explicacion: `Evaluación preliminar determinista (IA no disponible: ${resultadoPaec.errorMessage || "Error de conexión"}). Reintente para dictamen definitivo.`,
+                                borradorCorreo: generarReportePaecMarkdown(resultadoPaec, { nombre: escuelaNombre, cct: escuelaCct }),
+                                tieneIncidencias: true,
+                                errorConexo: true,
                                 error: resultadoPaec.errorMessage || "Error de comunicación con motor de IA",
                                 estadoError: "ERROR_CONEXION",
-                                explicacion: `Error de procesamiento o conexión: ${resultadoPaec.errorMessage || "No se pudo obtener dictamen de IA"}. Reintente la evaluación.`,
-                                tieneIncidencias: false,
+                                scoreNumerico: resultadoPaec.percentage,
+                                totalPuntosBrutos: `${resultadoPaec.totalScore}/92`,
+                                estatusOficial: resultadoPaec.overallStatus,
+                                dimensionesDesglose: resultadoPaec.dimensionScores,
+                                criteriosEvaluados: resultadoPaec.criteria,
+                                fortalezas: resultadoPaec.strengths,
+                                recomendaciones: resultadoPaec.criticalRecommendations,
                             };
                         } else {
                             resultado = {
@@ -834,11 +845,21 @@ Responde únicamente en formato JSON con la siguiente estructura:
                         if (resultadoPmc.errorConexo) {
                             resultado = {
                                 tipo: "PMC",
-                                aprobado: false,
+                                aprobado: resultadoPmc.overallStatus === "EXCELENTE" || resultadoPmc.overallStatus === "SATISFACTORIO",
+                                puntuacion: `${resultadoPmc.percentage}%`,
+                                explicacion: `Evaluación preliminar determinista (IA no disponible: ${resultadoPmc.errorMessage || "Error de conexión"}). Reintente para dictamen definitivo.`,
+                                borradorCorreo: generarReportePmcMarkdown(resultadoPmc, { nombre: escuelaNombre, cct: escuelaCct }),
+                                tieneIncidencias: true,
+                                errorConexo: true,
                                 error: resultadoPmc.errorMessage || "Error de comunicación con motor de IA",
                                 estadoError: "ERROR_CONEXION",
-                                explicacion: `Error de procesamiento o conexión: ${resultadoPmc.errorMessage || "No se pudo obtener dictamen de IA"}. Reintente la evaluación.`,
-                                tieneIncidencias: false,
+                                scoreNumerico: resultadoPmc.percentage,
+                                totalPuntosBrutos: `${resultadoPmc.totalScore}/${resultadoPmc.maxPossibleScore}`,
+                                estatusOficial: resultadoPmc.overallStatus,
+                                dimensionesDesglose: resultadoPmc.dimensionScores,
+                                criteriosEvaluados: resultadoPmc.criteria,
+                                fortalezas: resultadoPmc.strengths,
+                                recomendaciones: resultadoPmc.criticalRecommendations,
                             };
                         } else {
                             resultado = {
@@ -907,11 +928,21 @@ Responde únicamente en formato JSON con la siguiente estructura:
                         if (resultadoPips.errorConexo) {
                             resultado = {
                                 tipo: "PIPS",
-                                aprobado: false,
+                                aprobado: resultadoPips.overallStatus === "EXCELENTE" || resultadoPips.overallStatus === "SATISFACTORIO",
+                                puntuacion: `${resultadoPips.percentage}%`,
+                                explicacion: `Evaluación preliminar determinista (IA no disponible: ${resultadoPips.errorMessage || "Error de conexión"}). Reintente para dictamen definitivo.`,
+                                borradorCorreo: generarReportePipsMarkdown(resultadoPips, { nombre: escuelaNombre, cct: escuelaCct }),
+                                tieneIncidencias: true,
+                                errorConexo: true,
                                 error: resultadoPips.errorMessage || "Error de comunicación con motor de IA",
                                 estadoError: "ERROR_CONEXION",
-                                explicacion: `Error de procesamiento o conexión: ${resultadoPips.errorMessage || "No se pudo obtener dictamen de IA"}. Reintente la evaluación.`,
-                                tieneIncidencias: false,
+                                scoreNumerico: resultadoPips.percentage,
+                                totalPuntosBrutos: `${resultadoPips.totalScore}/100`,
+                                estatusOficial: resultadoPips.overallStatus,
+                                dimensionesDesglose: resultadoPips.dimensionScores,
+                                criteriosEvaluados: resultadoPips.criteria,
+                                fortalezas: resultadoPips.strengths,
+                                recomendaciones: resultadoPips.criticalRecommendations,
                             };
                         } else {
                             resultado = {

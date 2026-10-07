@@ -869,13 +869,23 @@ Evalúa cada uno de los 23 criterios (C1 a C23) con base en la evidencia textual
         console.log(`[paec-evaluator] Respuesta de IA recibida (${rawResponse.length} caracteres).`);
     } catch (aiErr: unknown) {
         console.warn("[paec-evaluator] IA no disponible, recurriendo a auditoría determinista de código:", aiErr instanceof Error ? aiErr.message : String(aiErr));
-        return construirResultadoDesdeAuditoriaDeterministaPaec(detAudit, escuelaNombre, cct);
+        const detRes = construirResultadoDesdeAuditoriaDeterministaPaec(detAudit, escuelaNombre, cct);
+        return {
+            ...detRes,
+            errorConexo: true,
+            errorMessage: aiErr instanceof Error ? aiErr.message : String(aiErr),
+        };
     }
 
     const rawJson = parsearRespuestaGemini(rawResponse);
     if (!rawJson || !Array.isArray(rawJson.criterios) || rawJson.criterios.length < 10) {
         console.warn("[paec-evaluator] Respuesta de IA incompleta, recurriendo a auditoría determinista de código.");
-        return construirResultadoDesdeAuditoriaDeterministaPaec(detAudit, escuelaNombre, cct);
+        const detRes = construirResultadoDesdeAuditoriaDeterministaPaec(detAudit, escuelaNombre, cct);
+        return {
+            ...detRes,
+            errorConexo: true,
+            errorMessage: "Respuesta de IA incompleta o inválida",
+        };
     }
 
     // ── CÁLCULO HÍBRIDO CUANTITATIVO EN TYPESCRIPT ────────────────────────────

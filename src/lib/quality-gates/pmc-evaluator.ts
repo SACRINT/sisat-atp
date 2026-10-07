@@ -783,13 +783,23 @@ Dictamina cada uno de los 11 criterios normativos con base en la evidencia textu
         console.log(`[pmc-evaluator] Respuesta IA recibida (${rawResponse.length} chars).`);
     } catch (aiErr: unknown) {
         console.warn("[pmc-evaluator] IA no disponible, recurriendo a auditoría determinista:", aiErr instanceof Error ? aiErr.message : String(aiErr));
-        return construirResultadoDesdeAuditoriaDeterminista(detAudit, escuelaNombre, cct);
+        const detRes = construirResultadoDesdeAuditoriaDeterminista(detAudit, escuelaNombre, cct);
+        return {
+            ...detRes,
+            errorConexo: true,
+            errorMessage: aiErr instanceof Error ? aiErr.message : String(aiErr),
+        };
     }
 
     const rawJson = parsearRespuestaGemini(rawResponse);
     if (!rawJson || !Array.isArray(rawJson.criterios) || rawJson.criterios.length < 5) {
         console.warn("[pmc-evaluator] Respuesta de IA inválida o incompleta, recurriendo a auditoría determinista.");
-        return construirResultadoDesdeAuditoriaDeterminista(detAudit, escuelaNombre, cct);
+        const detRes = construirResultadoDesdeAuditoriaDeterminista(detAudit, escuelaNombre, cct);
+        return {
+            ...detRes,
+            errorConexo: true,
+            errorMessage: "Respuesta de IA inválida o incompleta",
+        };
     }
 
     // ── CÁLCULO HÍBRIDO DETERMINISTA EN TYPESCRIPT ───────────────────────────

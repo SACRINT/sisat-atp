@@ -588,13 +588,23 @@ Dictamina cada uno de los 7 criterios normativos con base en la evidencia textua
         console.log(`[pips-evaluator] Respuesta IA recibida (${rawResponse.length} chars).`);
     } catch (aiErr: unknown) {
         console.warn("[pips-evaluator] IA no disponible, recurriendo a auditoría determinista de código:", aiErr instanceof Error ? aiErr.message : String(aiErr));
-        return construirResultadoDesdeAuditoriaDeterministaPips(detAudit, escuelaNombre, cct);
+        const detRes = construirResultadoDesdeAuditoriaDeterministaPips(detAudit, escuelaNombre, cct);
+        return {
+            ...detRes,
+            errorConexo: true,
+            errorMessage: aiErr instanceof Error ? aiErr.message : String(aiErr),
+        };
     }
 
     const rawJson = parsearRespuestaGemini(rawResponse);
     if (!rawJson || !Array.isArray(rawJson.criterios) || rawJson.criterios.length < 4) {
         console.warn("[pips-evaluator] Respuesta de IA incompleta, recurriendo a auditoría determinista de código.");
-        return construirResultadoDesdeAuditoriaDeterministaPips(detAudit, escuelaNombre, cct);
+        const detRes = construirResultadoDesdeAuditoriaDeterministaPips(detAudit, escuelaNombre, cct);
+        return {
+            ...detRes,
+            errorConexo: true,
+            errorMessage: "Respuesta de IA incompleta o inválida",
+        };
     }
 
     // ── CÁLCULO HÍBRIDO DETERMINISTA EN TYPESCRIPT ───────────────────────────
