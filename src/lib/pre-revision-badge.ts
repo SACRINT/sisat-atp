@@ -73,3 +73,47 @@ export function calcularBadgePreDictamen(
         border: `1px solid ${hasProblem ? "#f87171" : "#86efac"}`
     };
 }
+
+export interface PillDirectorInfo {
+    isApproved: boolean;
+    texto: string;
+    bg: string;
+    color: string;
+    border: string;
+}
+
+export function calcularPillDirector(
+    r?: PreRevisionResultadoPersistida | null
+): PillDirectorInfo {
+    const isApproved = Boolean(r?.aprobado && !r?.errorConexo && !r?.error);
+    const score = r?.puntuacion || "N/A";
+
+    if (r?.errorConexo || r?.error) {
+        return {
+            isApproved: false,
+            texto: `Puntuación: ${score} · Preliminar (IA no disponible)`,
+            bg: "#fef3c7",
+            color: "#b45309",
+            border: "1px solid #fde68a"
+        };
+    }
+
+    if (isApproved) {
+        return {
+            isApproved: true,
+            texto: `Puntuación: ${score} · Aprobado`,
+            bg: "#dcfce7",
+            color: "#15803d",
+            border: "1px solid #bbf7d0"
+        };
+    }
+
+    return {
+        isApproved: false,
+        texto: `Puntuación: ${score} · Requiere Ajustes`,
+        bg: "#fee2e2",
+        color: "#b91c1c",
+        border: "1px solid #fecaca"
+    };
+}
+

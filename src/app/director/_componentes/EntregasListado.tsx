@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { ProgramaGroup, EntregaDirector } from "@/types/director";
 import { getDownloadUrl } from "@/lib/download-url";
+import { calcularPillDirector } from "@/lib/pre-revision-badge";
 import PdfViewerModal from "@/app/_componentes/PdfViewerModal";
 
 const MESES = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -678,18 +679,20 @@ function PreRevisionDirector({ entregaId, onSetMessage, entregaEstado, hasUpload
     }
 
     const { resultado, intentosUsados, limiteIntentos } = data;
-    const isApproved = resultado?.aprobado;
+    const isApproved = Boolean(resultado?.aprobado && !resultado?.errorConexo && !resultado?.error);
     const score = resultado?.puntuacion || "N/A";
     const observations = resultado?.borradorCorreo || "Sin observaciones específicas.";
     const hasRemainingAttempts = intentosUsados < limiteIntentos;
+    const pill = calcularPillDirector(resultado);
+    const isErrorOrUnavailable = Boolean(resultado?.errorConexo || resultado?.error);
 
     return (
         <div style={{
             marginTop: "0.75rem",
             padding: "0.75rem 1rem",
             borderRadius: "8px",
-            border: `1px solid ${isApproved ? "#86efac" : "#fca5a5"}`,
-            background: isApproved ? "rgba(240, 253, 244, 0.7)" : "rgba(254, 242, 242, 0.7)",
+            border: `1px solid ${isErrorOrUnavailable ? "#fde68a" : isApproved ? "#86efac" : "#fca5a5"}`,
+            background: isErrorOrUnavailable ? "rgba(254, 243, 199, 0.7)" : isApproved ? "rgba(240, 253, 244, 0.7)" : "rgba(254, 242, 242, 0.7)",
             fontSize: "0.8125rem",
             boxShadow: "0 1px 2px rgba(0,0,0,0.02)"
         }}>
@@ -708,12 +711,12 @@ function PreRevisionDirector({ entregaId, onSetMessage, entregaEstado, hasUpload
                         borderRadius: "9999px",
                         fontSize: "0.725rem",
                         fontWeight: 700,
-                        background: isApproved ? "#dcfce7" : "#fee2e2",
-                        color: isApproved ? "#15803d" : "#b91c1c",
-                        border: `1px solid ${isApproved ? "#bbf7d0" : "#fecaca"}`
+                        background: pill.bg,
+                        color: pill.color,
+                        border: pill.border,
                     }}>
                         <Sparkles size={10} />
-                        Puntuación: {score} · {isApproved ? "Aprobado" : "Requiere Ajustes"}
+                        {pill.texto}
                     </span>
                 )}
             </div>
