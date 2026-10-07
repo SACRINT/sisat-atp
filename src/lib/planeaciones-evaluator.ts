@@ -81,7 +81,7 @@ const CRITERIOS_DEF_1_4: CriterioDefinicion[] = [
     // Rubro III (140 pts)
     { id: "c11", categoria: "Rubro III", puntajeMax: 20, criterio: "Coherencia en evaluación formativa y sumativa", descripcion: "Alineación entre momentos de evaluación, instrumentos socioformativos y porcentajes de acreditación." },
     { id: "c12", categoria: "Rubro III", puntajeMax: 20, criterio: "Adaptaciones y retroalimentación oportuna", descripcion: "Mecanismos continuos de retroalimentación formativa y adecuaciones curriculares." },
-    { id: "c13", categoria: "Rubro III", puntajeMax: 5, criterio: "Transparencia en comunicación de resultados", descripcion: "Criterios claros, públicos y transparentes acordados con el estudiantado." },
+    { id: "c13", categoria: "Rubro III", puntajeMax: 20, criterio: "Transparencia en comunicación de resultados", descripcion: "Criterios claros, públicos y transparentes acordados con el estudiantado." },
     { id: "c14", categoria: "Rubro III", puntajeMax: 10, criterio: "Estrategias para estudiantes en riesgo", descripcion: "Protocolos de atención, tutoría remedial y rescate académico para rezago." },
     { id: "c15", categoria: "Rubro III", puntajeMax: 20, criterio: "Evidencias de contribución al PAEC", descripcion: "Vinculación directa y tangible de los productos de aprendizaje con el proyecto comunitario escolar." },
     { id: "c16", categoria: "Rubro III", puntajeMax: 20, criterio: "Autoevaluación y metacognición docente", descripcion: "Enfoque de metacognición en los estudiantes y autorreflexión de la práctica docente." },
@@ -157,17 +157,15 @@ export async function evaluarPlaneacion(input: InputEvaluacion): Promise<Resulta
 
     let defs: CriterioDefinicion[] = CRITERIOS_DEF_1_4;
     let rubricaNombre = "Anexo 12 USICAMM (1° a 4° Semestre — Propósitos Formativos)";
-    let puntajeMaximoTotal = 300;
 
     if (tipoEvaluacion === "FUNDAMENTAL_5_6") {
         defs = CRITERIOS_DEF_5_6;
         rubricaNombre = "Anexo 12 USICAMM (5° y 6° Semestre — Progresiones)";
-        puntajeMaximoTotal = 300;
     } else if (tipoEvaluacion === "LABORAL") {
         defs = CRITERIOS_DEF_LABORAL;
         rubricaNombre = "Guía de Evaluación de Formación Laboral (Actividades Clave y Saberes)";
-        puntajeMaximoTotal = 200;
     }
+    const puntajeMaximoTotal = defs.reduce((acc, d) => acc + d.puntajeMax, 0);
 
     const criteriosListPrompt = defs
         .map(d => `- ID "${d.id}" | ${d.categoria} | ${d.criterio} (Ponderación máxima: ${d.puntajeMax} pts): ${d.descripcion}`)
