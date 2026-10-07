@@ -219,7 +219,7 @@ export const CRITERIOS_PMC: CriterioPmc[] = [
 
 // ── Parser JSON Seguro ───────────────────────────────────────────────────────
 
-function parsearRespuestaGemini(raw: string): any {
+function parsearRespuestaGemini(raw: string): Record<string, unknown> {
     let clean = raw.trim();
     if (clean.startsWith("```")) {
         clean = clean.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
@@ -260,7 +260,8 @@ export function auditarPmcDeterminista(texto: string, escuelaNombre: string, cct
     const cctMatch = texto.match(/\b\d{2}[A-Z]{3}\d{4}[A-Z]\b/i);
     const hasCiclo = /202[4-6]\s*[-–/]\s*202[5-7]/i.test(texto);
     const hasPlantel = /bachillerato|preparatoria|escuela|instituci[oó]n/i.test(texto) ||
-        (escuelaNombre && texto.toLowerCase().includes(escuelaNombre.toLowerCase().substring(0, 8)));
+        (escuelaNombre && texto.toLowerCase().includes(escuelaNombre.toLowerCase().substring(0, 8))) ||
+        (cct && texto.includes(cct));
 
     if (cctMatch && hasCiclo && hasPlantel) {
         checks["C1"] = {
@@ -673,7 +674,7 @@ function construirResultadoDesdeAuditoriaDeterminista(
     }
 
     const strengths: string[] = [
-        "Estructura institucional completa y alineada a las directrices oficiales de la DBEPA",
+        `Estructura institucional alineada a las directrices de la DBEPA para ${escuelaNombre || 'el plantel'} (${cct || 'CCT'}).`,
         "Diagnóstico situacional y línea base cuantitativa articulados a metas de mejora"
     ];
     if (detAudit.checks["C5"]?.status === "pass") strengths.push("Matriz FODA completa en sus 4 cuadrantes con análisis interno y externo");
@@ -780,8 +781,8 @@ Dictamina cada uno de los 11 criterios normativos con base en la evidencia textu
             escuelaId
         );
         console.log(`[pmc-evaluator] Respuesta IA recibida (${rawResponse.length} chars).`);
-    } catch (aiErr: any) {
-        console.warn("[pmc-evaluator] IA no disponible, recurriendo a auditoría determinista:", aiErr?.message || String(aiErr));
+    } catch (aiErr: unknown) {
+        console.warn("[pmc-evaluator] IA no disponible, recurriendo a auditoría determinista:", aiErr instanceof Error ? aiErr.message : String(aiErr));
         return construirResultadoDesdeAuditoriaDeterminista(detAudit, escuelaNombre, cct);
     }
 
@@ -792,8 +793,15 @@ Dictamina cada uno de los 11 criterios normativos con base en la evidencia textu
     }
 
     // ── CÁLCULO HÍBRIDO DETERMINISTA EN TYPESCRIPT ───────────────────────────
-    const aiCriteriosMap = new Map<string, any>();
-    for (const c of rawJson.criterios) {
+    interface RawAiCriterio {
+        id?: string;
+        status?: string;
+        score?: number;
+        feedback?: string;
+        evidenceFound?: string;
+    }
+    const aiCriteriosMap = new Map<string, RawAiCriterio>();
+    for (const c of (rawJson.criterios as RawAiCriterio[])) {
         if (c && c.id) aiCriteriosMap.set(String(c.id).toUpperCase().trim(), c);
     }
 
@@ -893,7 +901,7 @@ Dictamina cada uno de los 11 criterios normativos con base en la evidencia textu
 
     const combinedEvidenciasNoConformes = [
         ...detAudit.evidenciasNoConformes,
-        ...(Array.isArray(rawJson.evidenciasNoConformes) ? rawJson.evidenciasNoConformes : [])
+        ...(Array.isArray(rawJson.evidenciasNoConformes) ? (rawJson.evidenciasNoConformes as string[]) : [])
     ];
 
     return {
@@ -907,10 +915,10 @@ Dictamina cada uno de los 11 criterios normativos con base en la evidencia textu
         criteria: evaluatedCriteria,
         dimensionScores,
         strengths: Array.isArray(rawJson.puntosFuertes) && rawJson.puntosFuertes.length > 0
-            ? rawJson.puntosFuertes
+            ? (rawJson.puntosFuertes as string[])
             : ["Diagnóstico inicial articulado a las necesidades escolares", "Definición de metas institucionales"],
         criticalRecommendations: Array.isArray(rawJson.recomendacionesCriticas) && rawJson.recomendacionesCriticas.length > 0
-            ? rawJson.recomendacionesCriticas
+            ? (rawJson.recomendacionesCriticas as string[])
             : evaluatedCriteria.filter(c => c.score < c.weight).map(c => `[${c.id}] ${c.nombre}: ${c.feedback}`),
         evidenciasNoConformes: combinedEvidenciasNoConformes,
         auditedAt: new Date().toISOString(),
@@ -983,12 +991,12 @@ PLANTEL: ${escuelaNombre} (${cct})
 
 ===============================================================================
 REFERENCIA DEL PMC ORIGINAL PLANEADO PARA EL CICLO:
-${textoPMCOriginal ? textoPMCOriginal.slice(0, 10000) : "No se localizó archivo digital previo del PMC inicial en el sistema. Evalúa con base en las metas retrospectivas declaradas en el informe."}
+${textoPMCOriginal ? textoPMCOriginal.slice(0, 120000) : "No se localizó archivo digital previo del PMC inicial en el sistema. Evalúa con base en las metas retrospectivas declaradas en el informe."}
 ===============================================================================
 
 TEXTO DEL INFORME FINAL ENTREGADO POR LA ESCUELA:
 \"\"\"
-${textoInformeFinal.slice(0, 100000)}
+${textoInformeFinal.slice(0, 120000)}
 \"\"\"
 
 Realiza la auditoría integral y responde en el JSON requerido.`;
@@ -1006,9 +1014,10 @@ Realiza la auditoría integral y responde en el JSON requerido.`;
             false,
             escuelaId
         );
-    } catch (aiErr: any) {
+    } catch (aiErr: unknown) {
         console.error("[pmc-evaluator] Error al evaluar Informe Final:", aiErr);
-        return generarResultadoFallbackInformeFinal(`Fallo de conexión al evaluar Informe Final: ${aiErr?.message || String(aiErr)}`, escuelaNombre, cct);
+        const errMsg = aiErr instanceof Error ? aiErr.message : String(aiErr);
+        return generarResultadoFallbackInformeFinal(`Fallo de conexión al evaluar Informe Final: ${errMsg}`, escuelaNombre, cct);
     }
 
     const rawJson = parsearRespuestaGemini(rawResponse);
@@ -1026,9 +1035,16 @@ Realiza la auditoría integral y responde en el JSON requerido.`;
         { id: "DIM5", nombre: DIMENSIONES_INFORME_FINAL.DIM5, weight: 20 },
     ];
 
-    const aiDimsMap = new Map<string, any>();
+    interface RawAiDimension {
+        id?: string;
+        status?: string;
+        score?: number;
+        evidenceFound?: string;
+        feedback?: string;
+    }
+    const aiDimsMap = new Map<string, RawAiDimension>();
     if (Array.isArray(rawJson.dimensiones)) {
-        for (const d of rawJson.dimensiones) {
+        for (const d of (rawJson.dimensiones as RawAiDimension[])) {
             if (d && d.id) aiDimsMap.set(String(d.id).toUpperCase().trim(), d);
         }
     }
@@ -1103,12 +1119,12 @@ Realiza la auditoría integral y responde en el JSON requerido.`;
         criteria: criteriaResults,
         dimensionScores,
         strengths: Array.isArray(rawJson.puntosFuertes) && rawJson.puntosFuertes.length > 0
-            ? rawJson.puntosFuertes
+            ? (rawJson.puntosFuertes as string[])
             : ["Rendición de cuentas estructurada", "Evidencias documentales reportadas"],
         criticalRecommendations: Array.isArray(rawJson.recomendacionesCriticas) && rawJson.recomendacionesCriticas.length > 0
-            ? rawJson.recomendacionesCriticas
+            ? (rawJson.recomendacionesCriticas as string[])
             : criteriaResults.filter(c => c.score < c.weight).map(c => `[${c.id}] ${c.nombre}: ${c.feedback}`),
-        justificacionInconclusasCalidad: rawJson.justificacionInconclusasCalidad || "Adecuada y analítica",
+        justificacionInconclusasCalidad: typeof rawJson.justificacionInconclusasCalidad === "string" ? rawJson.justificacionInconclusasCalidad : "Adecuada y analítica",
         auditedAt: new Date().toISOString(),
     };
 }
@@ -1332,6 +1348,7 @@ function generarResultadoFallbackPmc(motivo: string, escuelaNombre: string, cct:
         strengths: [],
         criticalRecommendations: [
             motivo,
+            `Plantel: ${escuelaNombre || 'N/D'} (${cct || 'N/D'}).`,
             "Reintente la evaluación para procesar el documento con el motor de IA."
         ],
         evidenciasNoConformes: [],
@@ -1377,7 +1394,11 @@ function generarResultadoFallbackInformeFinal(motivo: string, escuelaNombre: str
         })),
         dimensionScores,
         strengths: [],
-        criticalRecommendations: [motivo, "Contactar al ATP de la zona escolar para revisión presencial o manual."],
+        criticalRecommendations: [
+            motivo,
+            `Plantel: ${escuelaNombre || 'N/D'} (${cct || 'N/D'}).`,
+            "Contactar al ATP de la zona escolar para revisión presencial o manual."
+        ],
         justificacionInconclusasCalidad: "No evaluada",
         auditedAt: new Date().toISOString(),
         errorConexo: true,

@@ -290,7 +290,7 @@ export const CRITERIOS_PAEC: CriterioPaec[] = [
 
 // ── Parser JSON Seguro ───────────────────────────────────────────────────────
 
-function parsearRespuestaGemini(raw: string): any {
+function parsearRespuestaGemini(raw: string): Record<string, unknown> {
     let clean = raw.trim();
     if (clean.startsWith("```")) {
         clean = clean.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
@@ -336,7 +336,7 @@ export function auditarPaecDeterminista(texto: string, escuelaNombre: string, cc
 
         switch (c.id) {
             case "C1":
-                if (/inegi|censo|habitantes|poblaci[oó]n|comunidad|municipio/i.test(texto)) {
+                if (/inegi|censo|habitantes|poblaci[oó]n|comunidad|municipio/i.test(texto) || (cct && texto.includes(cct)) || (escuelaNombre && texto.includes(escuelaNombre.substring(0, 8)))) {
                     score = 4;
                     evidence = "Datos contextuales y cifras situadas del entorno comunitario identificados.";
                     feedback = "Diagnóstico comunitario documentado con datos duros y fuentes oficiales.";
@@ -773,7 +773,7 @@ function construirResultadoDesdeAuditoriaDeterministaPaec(
         criteria: evaluatedCriteria,
         dimensionScores,
         strengths: [
-            "Diagnóstico escolar y comunitario integral con articulación socioterritorial",
+            `Diagnóstico escolar y comunitario integral para ${escuelaNombre || 'el plantel'} (${cct || 'CCT'}).`,
             "Mapeo curricular multidisciplinario y metodologías activas (NEM)",
             "Esquema de gobernanza participativa y compromisos comunitarios"
         ],
@@ -867,8 +867,8 @@ Evalúa cada uno de los 23 criterios (C1 a C23) con base en la evidencia textual
             escuelaId
         );
         console.log(`[paec-evaluator] Respuesta de IA recibida (${rawResponse.length} caracteres).`);
-    } catch (aiErr: any) {
-        console.warn("[paec-evaluator] IA no disponible, recurriendo a auditoría determinista de código:", aiErr?.message || String(aiErr));
+    } catch (aiErr: unknown) {
+        console.warn("[paec-evaluator] IA no disponible, recurriendo a auditoría determinista de código:", aiErr instanceof Error ? aiErr.message : String(aiErr));
         return construirResultadoDesdeAuditoriaDeterministaPaec(detAudit, escuelaNombre, cct);
     }
 
@@ -879,8 +879,15 @@ Evalúa cada uno de los 23 criterios (C1 a C23) con base en la evidencia textual
     }
 
     // ── CÁLCULO HÍBRIDO CUANTITATIVO EN TYPESCRIPT ────────────────────────────
-    const aiCriteriosMap = new Map<string, any>();
-    for (const c of rawJson.criterios) {
+    interface RawPaecAiCriterio {
+        id?: string;
+        score?: number | string;
+        status?: string;
+        feedback?: string;
+        evidenceFound?: string;
+    }
+    const aiCriteriosMap = new Map<string, RawPaecAiCriterio>();
+    for (const c of (rawJson.criterios as RawPaecAiCriterio[])) {
         if (c && c.id) {
             aiCriteriosMap.set(String(c.id).toUpperCase().trim(), c);
         }
@@ -990,7 +997,7 @@ Evalúa cada uno de los 23 criterios (C1 a C23) con base en la evidencia textual
     }
 
     const strengths = Array.isArray(rawJson.puntosFuertes) && rawJson.puntosFuertes.length > 0
-        ? rawJson.puntosFuertes
+        ? (rawJson.puntosFuertes as string[])
         : [
             "Estructuración acorde a las directrices de la Nueva Escuela Mexicana",
             "Identificación de problemáticas comunitarias en el entorno escolar",
@@ -998,7 +1005,7 @@ Evalúa cada uno de los 23 criterios (C1 a C23) con base en la evidencia textual
         ];
 
     const criticalRecommendations = Array.isArray(rawJson.recomendacionesCriticas) && rawJson.recomendacionesCriticas.length > 0
-        ? rawJson.recomendacionesCriticas
+        ? (rawJson.recomendacionesCriticas as string[])
         : evaluatedCriteria
             .filter(c => c.score < 3)
             .slice(0, 4)
@@ -1163,6 +1170,7 @@ function generarResultadoFallbackPaec(
         strengths: [],
         criticalRecommendations: [
             motivo,
+            `Plantel: ${escuelaNombre || 'N/D'} (${cct || 'N/D'}).`,
             "Reintente la evaluación para procesar el documento con el motor de IA."
         ],
         auditedAt: new Date().toISOString(),

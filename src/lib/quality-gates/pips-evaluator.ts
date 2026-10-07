@@ -158,7 +158,7 @@ export const CRITERIOS_PIPS: CriterioPips[] = [
 
 // ── Parser JSON Seguro ───────────────────────────────────────────────────────
 
-function parsearRespuestaGemini(raw: string): any {
+function parsearRespuestaGemini(raw: string): Record<string, unknown> {
     let clean = raw.trim();
     if (clean.startsWith("```")) {
         clean = clean.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
@@ -198,7 +198,9 @@ export function auditarPipsDeterminista(texto: string, escuelaNombre: string, cc
     const hasZona = /zona\s*(escolar)?\s*[:\s#0-9A-Z]|zona\s*004|zona\s*\d+/i.test(texto);
     const hasSupervisor = /supervisor|titular|supervisi[oó]n|asesor[ií]a\s+t[eé]cnica/i.test(texto);
     const hasCiclo = /202[4-6]\s*[-–/]\s*202[5-7]/i.test(texto);
-    const hasSubsistema = /subsistema|bachillerato|dgb|dbepa|preparatoria|sems/i.test(texto);
+    const hasSchool = escuelaNombre ? texto.toLowerCase().includes(escuelaNombre.toLowerCase().substring(0, 8)) : false;
+    const hasCct = cct ? texto.includes(cct) : false;
+    const hasSubsistema = /subsistema|bachillerato|dgb|dbepa|preparatoria|sems/i.test(texto) || hasSchool || hasCct;
     const c1Matches = [hasZona, hasSupervisor, hasCiclo, hasSubsistema].filter(Boolean).length;
 
     if (c1Matches >= 3) {
@@ -481,7 +483,9 @@ function construirResultadoDesdeAuditoriaDeterministaPips(
         };
     }
 
-    const strengths: string[] = [];
+    const strengths: string[] = [
+        `Plan de Intervención y Acompañamiento Pedagógico (PIPS) para ${escuelaNombre || 'el plantel'} (${cct || 'CCT'}).`
+    ];
     if (detAudit.checks["C1"]?.status === "pass") strengths.push("Identificación zonal y encuadre institucional completo");
     if (detAudit.checks["C3"]?.status === "pass") strengths.push("Censo exhaustivo de centros escolares y matrícula desagregada");
     if (detAudit.checks["C4"]?.status === "pass") strengths.push("Diagnóstico territorial articulado y jerarquización de problemáticas");
@@ -563,7 +567,7 @@ ${criteriosPromptText}
 
 TEXTO EXTRAÍDO DEL DOCUMENTO PIPS ENTREGADO:
 """
-${textoDocumento.slice(0, 100000)}
+${textoDocumento.slice(0, 120000)}
 """
 
 Dictamina cada uno de los 7 criterios normativos con base en la evidencia textual.`;
@@ -582,8 +586,8 @@ Dictamina cada uno de los 7 criterios normativos con base en la evidencia textua
             escuelaId
         );
         console.log(`[pips-evaluator] Respuesta IA recibida (${rawResponse.length} chars).`);
-    } catch (aiErr: any) {
-        console.warn("[pips-evaluator] IA no disponible, recurriendo a auditoría determinista de código:", aiErr?.message || String(aiErr));
+    } catch (aiErr: unknown) {
+        console.warn("[pips-evaluator] IA no disponible, recurriendo a auditoría determinista de código:", aiErr instanceof Error ? aiErr.message : String(aiErr));
         return construirResultadoDesdeAuditoriaDeterministaPips(detAudit, escuelaNombre, cct);
     }
 
@@ -594,8 +598,15 @@ Dictamina cada uno de los 7 criterios normativos con base en la evidencia textua
     }
 
     // ── CÁLCULO HÍBRIDO DETERMINISTA EN TYPESCRIPT ───────────────────────────
-    const aiCriteriosMap = new Map<string, any>();
-    for (const c of rawJson.criterios) {
+    interface RawPipsAiCriterio {
+        id?: string;
+        score?: number;
+        status?: string;
+        feedback?: string;
+        evidenceFound?: string;
+    }
+    const aiCriteriosMap = new Map<string, RawPipsAiCriterio>();
+    for (const c of (rawJson.criterios as RawPipsAiCriterio[])) {
         if (c && c.id) aiCriteriosMap.set(String(c.id).toUpperCase().trim(), c);
     }
 
@@ -700,10 +711,10 @@ Dictamina cada uno de los 7 criterios normativos con base en la evidencia textua
         criteria: evaluatedCriteria,
         dimensionScores,
         strengths: Array.isArray(rawJson.puntosFuertes) && rawJson.puntosFuertes.length > 0
-            ? rawJson.puntosFuertes
+            ? (rawJson.puntosFuertes as string[])
             : ["Articulación territorial de la zona escolar", "Plan de acompañamiento técnico-pedagógico"],
         criticalRecommendations: Array.isArray(rawJson.recomendacionesCriticas) && rawJson.recomendacionesCriticas.length > 0
-            ? rawJson.recomendacionesCriticas
+            ? (rawJson.recomendacionesCriticas as string[])
             : evaluatedCriteria.filter(c => c.score < c.weight).map(c => `[${c.id}] ${c.nombre}: ${c.feedback}`),
         auditedAt: new Date().toISOString(),
     };
@@ -842,6 +853,7 @@ function generarResultadoFallbackPips(motivo: string, escuelaNombre: string, cct
         strengths: [],
         criticalRecommendations: [
             motivo,
+            `Plantel: ${escuelaNombre || 'N/D'} (${cct || 'N/D'}).`,
             "Reintente la evaluación para procesar el documento con el motor de IA."
         ],
         auditedAt: new Date().toISOString(),
