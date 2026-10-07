@@ -49,11 +49,62 @@ describe("Motor Determinista PMC (auditarPmcDeterminista)", () => {
         `;
 
         const audit = auditarPmcDeterminista(sampleText, "MOISÉS SÁENZ GARZA", "21EBH0465E");
-        expect(audit.totalScore).toBeGreaterThanOrEqual(85);
+        expect(audit.totalScore).toBeGreaterThanOrEqual(95);
         expect(audit.checks["C1"].status).toBe("pass");
         expect(audit.checks["C2"].status).toBe("pass");
         expect(audit.checks["C3"].status).toBe("pass");
         expect(audit.checks["C5"].status).toBe("pass");
         expect(audit.checks["C8"].status).toBe("pass");
+        expect(audit.checks["C8"].score).toBe(14);
+        expect(audit.checks["C11"].status).toBe("pass");
+        expect(audit.checks["C11"].score).toBe(10);
+    });
+
+    it("C11: debe reprobar con 0 pts y registrar evidencia no conforme si contiene SIGPDA o SIGPDA-EMS", () => {
+        const textWithForbidden = `
+            BACHILLERATO GENERAL OFICIAL
+            CCT: 21EBH0465E
+            Ciclo escolar 2025-2026
+            Director y docentes presentes.
+            Matrícula 120 alumnos, aprobación 90%.
+            Diagnóstico territorial amplio.
+            El documento fue generado con la plataforma SIGPDA-EMS en el módulo SIGPDA.
+        `;
+        const audit = auditarPmcDeterminista(textWithForbidden, "Plantel", "21EBH0465E");
+        expect(audit.checks["C11"]).toBeDefined();
+        expect(audit.checks["C11"].status).toBe("fail");
+        expect(audit.checks["C11"].score).toBe(0);
+        expect(audit.evidenciasNoConformes.length).toBeGreaterThan(0);
+        expect(audit.evidenciasNoConformes[0]).toContain("referencias a la plataforma técnica");
+    });
+
+    it("C8: debe verificar la fórmula sintáctica CREAA (Verbo + Magnitud % + Temporalidad)", () => {
+        // Texto con metas puramente declarativas (sin verbo de acción o sin % o sin ciclo)
+        const textMetasPobres = `
+            BACHILLERATO GENERAL CCT 21EBH0001X Ciclo 2025-2026
+            Director y profesores.
+            Meta 1: Queremos que los alumnos estén mejor y más contentos en la escuela.
+            Meta 2: Atender a los estudiantes en sus necesidades escolares.
+        `;
+        const auditPobres = auditarPmcDeterminista(textMetasPobres, "Plantel", "21EBH0001X");
+        expect(auditPobres.checks["C8"].status).toBe("warning");
+        expect(auditPobres.checks["C8"].score).toBe(7);
+
+        // Texto con metas CREAA estructuradas completas
+        const textMetasCreaa = `
+            BACHILLERATO GENERAL CCT 21EBH0001X Ciclo 2025-2026
+            Director y profesores.
+            Meta 1: Incrementar en 8.5% la aprobación escolar para el ciclo 2025-2026.
+            Meta 2: Reducir en 4% el abandono escolar durante el ciclo 2025-2026.
+        `;
+        const auditCreaa = auditarPmcDeterminista(textMetasCreaa, "Plantel", "21EBH0001X");
+        expect(auditCreaa.checks["C8"].status).toBe("pass");
+        expect(auditCreaa.checks["C8"].score).toBe(14);
+    });
+
+    it("Catálogo oficial debe contemplar exactamente 11 criterios que suman 110 puntos", () => {
+        expect(CRITERIOS_PMC.length).toBe(11);
+        const totalMax = CRITERIOS_PMC.reduce((acc, c) => acc + c.weight, 0);
+        expect(totalMax).toBe(110);
     });
 });

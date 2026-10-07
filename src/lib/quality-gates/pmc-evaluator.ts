@@ -6,8 +6,8 @@
  * Homologado con Proyecto_SIGPDA_EMS bajo la normativa oficial DBEPA / MCCEMS.
  * 
  * PMC (Programa de Mejora Continua):
- *  - 5 Dimensiones Normativas
- *  - 10 Criterios Oficiales (Pesos ponderados = 100 puntos brutos máximos)
+ *  - 6 Dimensiones Normativas
+ *  - 11 Criterios Oficiales (Pesos ponderados = 110 puntos brutos máximos)
  *  - Dictamen: >=85% EXCELENTE, >=70% SATISFACTORIO, >=50% EN_DESARROLLO, <50% REQUIERE_REVISION
  * 
  * INFORME FINAL (Cierre de Ciclo Escolar):
@@ -27,12 +27,12 @@ function isBufferPdf(buf?: Buffer): boolean {
 // ── Tipos y Rúbricas para PMC ────────────────────────────────────────────────
 
 export interface CriterioPmc {
-    id: string;              // "C1" ... "C10"
-    numero: number;          // 1 a 10
+    id: string;              // "C1" ... "C11"
+    numero: number;          // 1 a 11
     dimension: string;       // Nombre de la dimensión
     nombre: string;          // Título del criterio
     descripcion: string;     // Requerimiento normativo
-    weight: number;          // Puntos máximos asignados (total = 100)
+    weight: number;          // Puntos máximos asignados (total = 110)
 }
 
 export interface CriterioPmcResultado {
@@ -54,8 +54,8 @@ export interface DimensionPmcScore {
 }
 
 export interface ResultadoPmcAudit {
-    totalScore: number;        // 0 a 100 puntos
-    maxPossibleScore: number;  // 100 puntos
+    totalScore: number;        // 0 a 110 puntos
+    maxPossibleScore: number;  // 110 puntos
     percentage: number;        // 0 a 100%
     overallStatus: "EXCELENTE" | "SATISFACTORIO" | "EN_DESARROLLO" | "REQUIERE_REVISION";
     passedCriteria: number;
@@ -112,6 +112,7 @@ export const DIMENSIONES_PMC = {
     DIM3: "Dimensión 3: Análisis Situacional FODA y Priorización",
     DIM4: "Dimensión 4: Plan de Acción y Metas Institucionales",
     DIM5: "Dimensión 5: Corresponsabilidad y Metas del Personal",
+    DIM6: "Dimensión 6: Neutralidad y Cumplimiento Normativo",
 } as const;
 
 export const CRITERIOS_PMC: CriterioPmc[] = [
@@ -203,6 +204,16 @@ export const CRITERIOS_PMC: CriterioPmc[] = [
         nombre: "Corresponsabilidad y Metas Individuales del Personal",
         descripcion: "Al menos 3 compromisos individuales de docentes y directivos vinculados a los objetivos del PMC con entregables tangibles.",
         weight: 14,
+    },
+
+    // --- Dimensión 6: Neutralidad y Cumplimiento Normativo (C11) [10 pts] ---
+    {
+        id: "C11",
+        numero: 11,
+        dimension: DIMENSIONES_PMC.DIM6,
+        nombre: "Neutralidad Institucional y Ausencia de Términos Prohibidos",
+        descripcion: "Redacción formal libre de referencias a nombres de plataformas de software externas o términos técnicos no institucionales (ej. SIGPDA-EMS / SIGPDA).",
+        weight: 10,
     },
 ];
 
@@ -458,34 +469,46 @@ export function auditarPmcDeterminista(texto: string, escuelaNombre: string, cct
         };
     }
 
-    // C8: Metas SMART / CREAA (14 pts) - Incluye verificación de fórmula CREAA (H-2)
+    // C8: Metas SMART / CREAA (14 pts) - Incluye verificación sintáctica de fórmula CREAA (H-2)
     const hasMetas = /meta/i.test(texto);
-    const quantMetas = (texto.match(/meta\s*\d*[\s\S]{1,120}?\d+%/gi) || []).length;
-    const hasCreaa = /creaa|f[oó]rmula\s+creaa|smart/i.test(texto) || quantMetas >= 2;
+    const actionVerbRegex = /\b(aumentar|incrementar|reducir|disminuir|elevar|consolidar|fortalecer|mejorar|lograr|garantizar|promover|atender|desarrollar|implementar)\b/i;
+    const magnitudeRegex = /\b\d+(\.\d+)?\s*%/;
+    const temporalityRegex = /ciclo|202[4-7]|semestre|escolar|bimestre/i;
 
-    if (hasMetas && (quantMetas >= 2 || hasCreaa)) {
+    const lineasOMetas = texto.split(/\r?\n|(?<=[.!?])\s+/);
+    let validCreaaCount = 0;
+    for (const seg of lineasOMetas) {
+        if (/meta/i.test(seg) || seg.length < 300) {
+            if (actionVerbRegex.test(seg) && magnitudeRegex.test(seg) && temporalityRegex.test(seg)) {
+                validCreaaCount++;
+            }
+        }
+    }
+    const hasCreaaMention = /creaa|f[oó]rmula\s+creaa|smart/i.test(texto);
+
+    if (validCreaaCount >= 2 || (validCreaaCount >= 1 && hasCreaaMention)) {
         checks["C8"] = {
             id: "C8",
             status: "pass",
             score: 14,
-            evidence: `Metas cuantificables verificadas (${quantMetas} formulaciones cuantitativas con % y entregables).`,
-            feedback: "Metas institucionales formuladas con rigor técnico, medibles y calendarizadas."
+            evidence: `Metas sintácticas CREAA validadas (${validCreaaCount} formulaciones con verbo de acción, magnitud % y temporalidad).`,
+            feedback: "Metas institucionales formuladas con rigor técnico, medibles y calendarizadas bajo la fórmula CREAA."
         };
-    } else if (hasMetas) {
+    } else if (validCreaaCount === 1 || hasMetas || magnitudeRegex.test(texto)) {
         checks["C8"] = {
             id: "C8",
             status: "warning",
             score: 7,
-            evidence: "Metas con formulación declarativa o sin suficientes parámetros cuantificables.",
-            feedback: "Formule metas con la fórmula sintáctica CREAA (Verbo + Magnitud % + Temporalidad)."
+            evidence: `Metas con formulación parcial (${validCreaaCount} meta estructurada identificada; faltan parámetros de magnitud o temporalidad).`,
+            feedback: "Formule metas con la fórmula sintáctica CREAA completa: Verbo de acción + Magnitud (%) + Temporalidad."
         };
     } else {
         checks["C8"] = {
             id: "C8",
             status: "fail",
             score: 0,
-            evidence: "No se identificaron metas cuantificables en el documento.",
-            feedback: "Debe incorporar al menos 2 metas institucionales medibles conforme a la rúbrica."
+            evidence: "No se identificaron metas cuantificables ni sintaxis CREAA en el documento.",
+            feedback: "Debe incorporar al menos 2 metas institucionales medibles conforme a la fórmula CREAA."
         };
     }
 
@@ -546,10 +569,35 @@ export function auditarPmcDeterminista(texto: string, escuelaNombre: string, cct
         };
     }
 
-    // Auditoría de términos prohibidos de la plataforma (H-1)
+    // C11: Neutralidad Institucional y Ausencia de Términos Prohibidos (10 pts) (H-1)
+    const isInstitutional = Boolean(hasPlantel || cctMatch || hasCiclo || hasMat || hasContext || (plantillaCount > 0));
     const forbiddenMatches = texto.match(/SIGPDA[\s-]?EMS|\bSIGPDA\b/gi);
-    if (forbiddenMatches && forbiddenMatches.length > 0) {
+
+    if (!texto || texto.trim().length < 50 || !isInstitutional) {
+        checks["C11"] = {
+            id: "C11",
+            status: "fail",
+            score: 0,
+            evidence: "No se identificó documento ni redacción institucional válida para auditar neutralidad.",
+            feedback: "El documento debe contener la redacción institucional completa para su dictaminación."
+        };
+    } else if (forbiddenMatches && forbiddenMatches.length > 0) {
+        checks["C11"] = {
+            id: "C11",
+            status: "fail",
+            score: 0,
+            evidence: `Se detectaron ${forbiddenMatches.length} referencias a la plataforma técnica ('${forbiddenMatches[0]}') en el cuerpo del documento institucional.`,
+            feedback: "Debe sustituir términos y nomenclaturas de software ajenos al lenguaje normativo institucional de la SEMS/DBEPA."
+        };
         evidenciasNoConformes.push(`Se detectaron ${forbiddenMatches.length} referencias a la plataforma técnica ('${forbiddenMatches[0]}') en el cuerpo del documento institucional.`);
+    } else {
+        checks["C11"] = {
+            id: "C11",
+            status: "pass",
+            score: 10,
+            evidence: "Neutralidad institucional verificada: redacción libre de nombres de software técnico o plataformas externas.",
+            feedback: "Cumplimiento normativo acreditado en neutralidad y formalidad institucional."
+        };
     }
 
     let totalScore = 0;
@@ -598,7 +646,7 @@ function construirResultadoDesdeAuditoriaDeterminista(
     });
 
     const totalScore = detAudit.totalScore;
-    const maxPossibleScore = 100;
+    const maxPossibleScore = CRITERIOS_PMC.reduce((acc, c) => acc + c.weight, 0);
     const percentage = Math.round((totalScore / maxPossibleScore) * 100);
     const passedCriteria = evaluatedCriteria.filter(c => c.status === "pass").length;
     const warningCriteria = evaluatedCriteria.filter(c => c.status === "warning").length;
@@ -675,9 +723,9 @@ export async function evaluarPmcEntrega(params: {
     const detAudit = auditarPmcDeterminista(textoDocumento, escuelaNombre, cct);
 
     const systemPrompt = `Eres un Asesor Técnico Pedagógico (ATP) y Auditor de Planes de Mejora Continua (PMC) de la Subsecretaría de Educación Media Superior (SEMS / DBEPA Puebla).
-Tu tarea es auditar de forma objetiva y rigurosa el Plan de Mejora Continua (PMC) de un bachillerato general con base en los 10 criterios oficiales de la Rúbrica Institucional DBEPA.
+Tu tarea es auditar de forma objetiva y rigurosa el Plan de Mejora Continua (PMC) de un bachillerato general con base en los 11 criterios oficiales de la Rúbrica Institucional DBEPA.
 
-Para cada uno de los 10 criterios (C1 a C10), debes asignar un estado:
+Para cada uno de los 11 criterios (C1 a C11), debes asignar un estado:
 - "pass": Cumplimiento pleno y satisfactorio según el peso máximo del criterio.
 - "warning": Cumplimiento parcial, formulación genérica o datos incompletos (recibe aprox. el 50% de los puntos).
 - "fail": Omisión total o información ausente/inverificable (recibe 0 puntos).
@@ -706,7 +754,7 @@ Responde ÚNICAMENTE con un JSON con este esquema exacto:
     const userPrompt = `AUDITORÍA NORMATIVA DEL PLAN DE MEJORA CONTINUA (PMC)
 PLANTEL: ${escuelaNombre} (${cct})
 
-RÚBRICA DE LOS 10 CRITERIOS INSTITUCIONALES DBEPA:
+RÚBRICA DE LOS 11 CRITERIOS INSTITUCIONALES DBEPA:
 -------------------------------------------------------------------------------
 ${criteriosPromptText}
 -------------------------------------------------------------------------------
@@ -716,7 +764,7 @@ TEXTO EXTRAÍDO DEL PLAN DE MEJORA CONTINUA ENTREGADO:
 ${textoDocumento.slice(0, 120000)}
 """
 
-Dictamina cada uno de los 10 criterios normativos con base en la evidencia textual.`;
+Dictamina cada uno de los 11 criterios normativos con base en la evidencia textual.`;
 
     let rawResponse = "";
     try {
@@ -750,7 +798,7 @@ Dictamina cada uno de los 10 criterios normativos con base en la evidencia textu
     }
 
     let totalScore = 0;
-    const maxPossibleScore = 100;
+    const maxPossibleScore = CRITERIOS_PMC.reduce((acc, c) => acc + c.weight, 0);
 
     const dimScoreMap: Record<string, { score: number; maxScore: number }> = {};
     for (const d of Object.values(DIMENSIONES_PMC)) {
@@ -1093,11 +1141,11 @@ export function generarReportePmcMarkdown(
     md += `### RESULTADO GLOBAL DE LA PLANEACIÓN ESCOLAR\n\n`;
     md += `| Métrica Normativa | Valor Obtenido |\n`;
     md += `| :--- | :--- |\n`;
-    md += `| **Puntaje Global Ponderado** | **${resultado.totalScore} / 100 pts (${resultado.percentage}%)** |\n`;
+    md += `| **Puntaje Global Ponderado** | **${resultado.totalScore} / ${resultado.maxPossibleScore} pts (${resultado.percentage}%)** |\n`;
     md += `| **Estatus Técnico Oficial** | ${dictamenBadge} |\n`;
-    md += `| **Criterios Acreditados Plenamente** | ${resultado.passedCriteria} de 10 |\n`;
-    md += `| **Criterios con Observación / Parciales** | ${resultado.warningCriteria} de 10 |\n`;
-    md += `| **Criterios Omisos o No Conformes** | ${resultado.failedCriteria} de 10 |\n\n`;
+    md += `| **Criterios Acreditados Plenamente** | ${resultado.passedCriteria} de ${resultado.criteria.length} |\n`;
+    md += `| **Criterios con Observación / Parciales** | ${resultado.warningCriteria} de ${resultado.criteria.length} |\n`;
+    md += `| **Criterios Omisos o No Conformes** | ${resultado.failedCriteria} de ${resultado.criteria.length} |\n\n`;
 
     md += `---\n\n`;
     md += `### DESGLOSE DE EVALUACIÓN POR DIMENSIÓN Y CRITERIO\n\n`;
@@ -1273,12 +1321,12 @@ function generarResultadoFallbackPmc(motivo: string, escuelaNombre: string, cct:
 
     return {
         totalScore: 0,
-        maxPossibleScore: 100,
+        maxPossibleScore: CRITERIOS_PMC.reduce((acc, c) => acc + c.weight, 0),
         percentage: 0,
         overallStatus: "REQUIERE_REVISION",
         passedCriteria: 0,
         warningCriteria: 0,
-        failedCriteria: 10,
+        failedCriteria: CRITERIOS_PMC.length,
         criteria: defaultCriteria,
         dimensionScores,
         strengths: [],

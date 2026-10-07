@@ -20,21 +20,21 @@ async function main() {
 
     // 1. Verificación del catálogo oficial PMC
     console.log(`[1] Verificando catálogo oficial de criterios PMC:`);
-    console.log(`- Total de criterios configurados: ${CRITERIOS_PMC.length} (esperado: 10)`);
+    console.log(`- Total de criterios configurados: ${CRITERIOS_PMC.length} (esperado: 11)`);
     const totalWeights = CRITERIOS_PMC.reduce((sum, c) => sum + c.weight, 0);
-    console.log(`- Suma ponderada de puntos brutos: ${totalWeights} pts (esperado: 100)`);
+    console.log(`- Suma ponderada de puntos brutos: ${totalWeights} pts (esperado: 110)`);
 
-    if (CRITERIOS_PMC.length !== 10) {
-        throw new Error(`Error: Se esperaban 10 criterios y se obtuvieron ${CRITERIOS_PMC.length}`);
+    if (CRITERIOS_PMC.length !== 11) {
+        throw new Error(`Error: Se esperaban 11 criterios y se obtuvieron ${CRITERIOS_PMC.length}`);
     }
-    if (totalWeights !== 100) {
-        throw new Error(`Error: La suma de pesos debe ser exactamente 100 pts, obtenido: ${totalWeights}`);
+    if (totalWeights !== 110) {
+        throw new Error(`Error: La suma de pesos debe ser exactamente 110 pts, obtenido: ${totalWeights}`);
     }
 
     const dimensionesUnicas = new Set(CRITERIOS_PMC.map(c => c.dimension));
-    console.log(`- Dimensiones normativas cubiertas: ${dimensionesUnicas.size} (esperado: 5)\n`);
-    if (dimensionesUnicas.size !== 5) {
-        throw new Error(`Error: Se esperaban 5 dimensiones y se obtuvieron ${dimensionesUnicas.size}`);
+    console.log(`- Dimensiones normativas cubiertas: ${dimensionesUnicas.size} (esperado: 6)\n`);
+    if (dimensionesUnicas.size !== 6) {
+        throw new Error(`Error: Se esperaban 6 dimensiones y se obtuvieron ${dimensionesUnicas.size}`);
     }
 
     // 2. Prueba con documento con texto insuficiente (Fallback PMC)
@@ -47,8 +47,8 @@ async function main() {
 
     console.log(`- Estatus obtenido: ${fallbackPmc.overallStatus} (esperado: REQUIERE_REVISION)`);
     console.log(`- Score obtenido: ${fallbackPmc.percentage}% (esperado: 0%)`);
-    console.log(`- Criterios en fail: ${fallbackPmc.failedCriteria} (esperado: 10)`);
-    console.log(`- Criterios configurados en fallback: ${fallbackPmc.criteria.length} (esperado: 10)\n`);
+    console.log(`- Criterios en fail: ${fallbackPmc.failedCriteria} (esperado: 11)`);
+    console.log(`- Criterios configurados en fallback: ${fallbackPmc.criteria.length} (esperado: 11)\n`);
 
     // 3. Prueba de fallback Informe Final
     console.log(`[3] Probando fallback de contingencia INFORME FINAL:`);
@@ -66,11 +66,11 @@ async function main() {
     // 4. Generación de Reportes Markdown de muestra
     console.log(`[4] Generando reporte Markdown oficial de PMC:`);
     const mockAuditPmc = {
-        totalScore: 88,
-        maxPossibleScore: 100,
-        percentage: 88,
+        totalScore: 98,
+        maxPossibleScore: 110,
+        percentage: 89,
         overallStatus: "EXCELENTE" as const,
-        passedCriteria: 8,
+        passedCriteria: 9,
         warningCriteria: 2,
         failedCriteria: 0,
         criteria: CRITERIOS_PMC.map((c, idx) => ({
@@ -79,9 +79,9 @@ async function main() {
             nombre: c.nombre,
             dimension: c.dimension,
             weight: c.weight,
-            score: idx < 8 ? c.weight : Math.round(c.weight * 0.5),
-            status: (idx < 8 ? "pass" : "warning") as "pass" | "warning",
-            feedback: idx < 8 ? "Cumplimiento normativo pleno." : "Observación técnica menor de precisión.",
+            score: idx < 9 ? c.weight : Math.round(c.weight * 0.5),
+            status: (idx < 9 ? "pass" : "warning") as "pass" | "warning",
+            feedback: idx < 9 ? "Cumplimiento normativo pleno." : "Observación técnica menor de precisión.",
             evidenceFound: "Datos debidamente documentados en la entrega escolar.",
         })),
         dimensionScores: {
@@ -90,6 +90,7 @@ async function main() {
             [DIMENSIONES_PMC.DIM3]: { score: 22, maxScore: 26, percentage: 85 },
             [DIMENSIONES_PMC.DIM4]: { score: 19, maxScore: 24, percentage: 79 },
             [DIMENSIONES_PMC.DIM5]: { score: 14, maxScore: 14, percentage: 100 },
+            [DIMENSIONES_PMC.DIM6]: { score: 10, maxScore: 10, percentage: 100 },
         },
         strengths: [
             "Línea base integral con 5 indicadores académicos históricos y metas cuantificables",
