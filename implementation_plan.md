@@ -182,3 +182,21 @@ Los 51 problemas reportados en ESLint sobre los 13 archivos tocados corresponden
   6. **[P3 Consistencia y Métricas]**: Se aclaró el rol vinculante del puntaje $\ge 70$ en Día Naranja determinista para certificar formalidad de firmas y sellos, manteniendo `PreRevisionResult` sin drift.
   7. **[F-4B-6 Integración de Respaldos y Puerta 6]**: Se especificó en §1.2 la Tarea 4 definiendo los call sites exactos de suplencia desde los `catch` de fallo de IA en `src/lib/pre-revision.ts:523-533` (Día Naranja), `:633-636` (Acoso Excel), `:684-694` (Acoso PDF) y `:1276-1279` (PIPC) (semántica: IA manda en operación normal, determinista suple ante fallo sin degradar el expediente a error conexo), y se incorporó en §7 la Puerta 6 (test de integración `respaldo-ia-fallo.test.ts`).
 
+---
+
+## 6. Ejecución y Cierre de Fase 4B: Motores Deterministas de Respaldo
+
+- **Estado de Ejecución**: Completado al 100% en 4 commits quirúrgicos y 6 puertas verificadas.
+- **Commits en `main`**:
+  1. `429ad4d`: `feat(acoso): implementar motor determinista de respaldo y paridad de dictamen`
+  2. `e388874`: `feat(dia-naranja): implementar motor determinista de respaldo ante fallo de vision`
+  3. `1e38bdb`: `feat(pipc): implementar motor determinista de respaldo y enforcement de brigadas`
+  4. `833d4a9`: `test(integracion): verificar suplencia determinista ante indisponibilidad de IA (Puerta 6)`
+- **Puertas de Verificación (Resultados Literales)**:
+  - **Puerta 1 (TypeScript estricto)**: `npx tsc --noEmit` → Código de salida 0.
+  - **Puerta 2 (Unitarias motores)**: `acoso-determinista`, `dia-naranja-determinista`, `pipc-determinista` → 15/15 passed (3 suites).
+  - **Puerta 3 (Regresión completa)**: `npm test` → Test Files 10 passed (10) / Tests 47 passed (47) (28 preexistentes + 19 nuevas).
+  - **Puerta 4 (ESLint focalizado)**: 0 errores, 0 advertencias sobre archivos tocados.
+  - **Puerta 5 (Build Turbopack)**: `npm run build` → 81/81 rutas optimizadas, código de salida 0.
+  - **Puerta 6 (Integración IA caída)**: `respaldo-ia-fallo.test.ts` → 4/4 passed (mock de `callGemini` rechazando; dictámenes deterministas completos sin cadenas de error).
+
