@@ -175,6 +175,7 @@ export interface PreRevisionResult {
     tieneFirmasSellos?: boolean;
     // PIPC fields
     tieneBrigadas?: boolean;
+    tieneDiagnosticoRiesgos?: boolean;
     tienePlanEvacuacion?: boolean;
     tieneCroquisSenaletica?: boolean;
     tieneDirectorioEmergencias?: boolean;
@@ -1331,6 +1332,7 @@ Responde únicamente en formato JSON:
                         estatusOficial: evaluacion.estatusOficial || (evaluacion.aprobado ? "APROBADO" : "REQUIERE_CORRECCION"),
                         puntuacion: evaluacion.puntuacion,
                         tieneBrigadas: evaluacion.tieneBrigadas,
+                        tieneDiagnosticoRiesgos: evaluacion.tieneDiagnosticoRiesgos,
                         tienePlanEvacuacion: evaluacion.tienePlanEvacuacion,
                         tieneCroquisSenaletica: evaluacion.tieneCroquisSenaletica,
                         tieneDirectorioEmergencias: evaluacion.tieneDirectorioEmergencias,

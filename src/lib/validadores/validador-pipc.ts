@@ -6,6 +6,7 @@ export interface EvaluacionPIPC {
   puntuacion: string;
   estatusOficial?: string;
   tieneBrigadas: boolean;
+  tieneDiagnosticoRiesgos: boolean;
   tienePlanEvacuacion: boolean;
   tieneCroquisSenaletica: boolean;
   tieneDirectorioEmergencias: boolean;
@@ -36,6 +37,7 @@ Responde ÚNICAMENTE en formato JSON con la siguiente estructura:
   "aprobado": true/false,
   "puntuacion": "Porcentaje de cumplimiento (ej. '85%')",
   "tieneBrigadas": true/false,
+  "tieneDiagnosticoRiesgos": true/false,
   "tienePlanEvacuacion": true/false,
   "tieneCroquisSenaletica": true/false,
   "tieneDirectorioEmergencias": true/false,
@@ -81,7 +83,6 @@ Responde ÚNICAMENTE en formato JSON con la siguiente estructura:
   let scoreDerivado = 0;
   if (parsed.tieneBrigadas) scoreDerivado += 25;
   if (parsed.tieneDiagnosticoRiesgos) scoreDerivado += 20;
-  else if (parsed.aprobado && parsed.tieneBrigadas && parsed.tienePlanEvacuacion) scoreDerivado += 20;
   if (parsed.tienePlanEvacuacion) scoreDerivado += 20;
   if (parsed.tieneDirectorioEmergencias) scoreDerivado += 10;
   if (parsed.tieneCroquisSenaletica) scoreDerivado += 10;
@@ -107,6 +108,7 @@ Responde ÚNICAMENTE en formato JSON con la siguiente estructura:
     puntuacion: `${scoreNumerico}%`,
     estatusOficial,
     tieneBrigadas,
+    tieneDiagnosticoRiesgos: !!parsed.tieneDiagnosticoRiesgos,
     tienePlanEvacuacion: !!parsed.tienePlanEvacuacion,
     tieneCroquisSenaletica: !!parsed.tieneCroquisSenaletica,
     tieneDirectorioEmergencias: !!parsed.tieneDirectorioEmergencias,

@@ -125,6 +125,7 @@ export function auditarPipcDeterminista(
         puntuacion: `${scoreNumerico}%`,
         estatusOficial,
         tieneBrigadas,
+        tieneDiagnosticoRiesgos,
         tienePlanEvacuacion,
         tieneCroquisSenaletica,
         tieneDirectorioEmergencias,
