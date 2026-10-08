@@ -24,6 +24,9 @@ export function getReferenceAcosoPdfBuffer(): Buffer | null {
     return null;
 }
 
+export const hasReferenceAcosoExcelFixture = Boolean(getReferenceAcosoExcelBuffer());
+export const hasReferenceAcosoPdfFixture = Boolean(getReferenceAcosoPdfBuffer());
+
 /**
  * Genera en memoria un buffer de Excel de Acoso Escolar con la estructura oficial de pestañas mensuales.
  */

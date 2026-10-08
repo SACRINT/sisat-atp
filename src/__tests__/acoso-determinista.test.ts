@@ -9,6 +9,8 @@ import {
     createMockAcosoExcelBuffer,
     getReferenceAcosoExcelBuffer,
     getReferenceAcosoPdfBuffer,
+    hasReferenceAcosoExcelFixture,
+    hasReferenceAcosoPdfFixture,
 } from "./fixtures/acoso-excel-fixture";
 import { extractTextFromPdf } from "../lib/pre-revision";
 
@@ -103,7 +105,7 @@ describe("Motor Determinista de Acoso Escolar (Excel y PDF)", () => {
     });
 
     describe("Fixture Oficial de Referencia (si existe en disco)", () => {
-        it("debe procesar el archivo Excel oficial sin lanzar excepciones", () => {
+        it.skipIf(!hasReferenceAcosoExcelFixture)("debe procesar el archivo Excel oficial sin lanzar excepciones", () => {
             const refBuffer = getReferenceAcosoExcelBuffer();
             expect(refBuffer).not.toBeNull();
             const incidencias = extraerIncidenciasAcosoExcel(refBuffer!);
@@ -146,7 +148,7 @@ describe("Motor Determinista de Acoso Escolar (Excel y PDF)", () => {
             expect(res.explicacion).toContain("carece de elementos formales");
         });
 
-        it("debe validar exitosamente un PDF real con compresión FlateDecode extrayendo su texto con extractTextFromPdf", async () => {
+        it.skipIf(!hasReferenceAcosoPdfFixture)("debe validar exitosamente un PDF real con compresión FlateDecode extrayendo su texto con extractTextFromPdf", async () => {
             const realPdfBuffer = getReferenceAcosoPdfBuffer();
             expect(realPdfBuffer).not.toBeNull();
             const { text } = await extractTextFromPdf(realPdfBuffer!);

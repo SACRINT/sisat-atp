@@ -40,6 +40,7 @@ import { analizarEntregaConIA } from "../lib/pre-revision";
 import {
     createMockAcosoExcelBuffer,
     getReferenceAcosoPdfBuffer,
+    hasReferenceAcosoPdfFixture,
 } from "./fixtures/acoso-excel-fixture";
 
 describe("Puerta 6: Suplencia Determinista ante Fallo Crítico de IA", () => {
@@ -111,7 +112,7 @@ describe("Puerta 6: Suplencia Determinista ante Fallo Crítico de IA", () => {
         expect(savedResultado.borradorCorreo).toContain(escuelaBase.cct);
     });
 
-    it("Acoso Escolar (PDF): ante fallo de IA de visión, debe emitir dictamen determinista de firmas y sellos sin error de análisis usando PDF real", async () => {
+    it.skipIf(!hasReferenceAcosoPdfFixture)("Acoso Escolar (PDF): ante fallo de IA de visión, debe emitir dictamen determinista de firmas y sellos sin error de análisis usando PDF real", async () => {
         const entregaId = "entrega-acoso-pdf-fallo-ia";
         const realPdf = getReferenceAcosoPdfBuffer();
         expect(realPdf).not.toBeNull();
