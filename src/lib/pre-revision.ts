@@ -19,6 +19,7 @@ import {
     auditarAcosoDeterministaPdf,
 } from "./quality-gates/acoso-evaluator";
 import { evaluarArchivoDiaNaranjaDeterminista } from "./quality-gates/dia-naranja-evaluator";
+import { auditarPipcDeterminista } from "./quality-gates/pipc-evaluator";
 import { PreRevisionResultadoPersistida } from "./pre-revision-badge";
 
 function parseCloudinaryUrl(url: string) {
@@ -1285,10 +1286,10 @@ Responde únicamente en formato JSON:
             // --- PIPC ---
             const file = entrega.archivos.find(a => a.tipo === "ENTREGA" && a.driveUrl);
             if (file) {
+                let extractedText = "";
                 try {
                     const { evaluarPIPC } = await import("@/lib/validadores/validador-pipc");
                     const buffer = await downloadFile(file.driveUrl!);
-                    let extractedText = "";
                     if (file.nombre.toLowerCase().endsWith(".pdf")) {
                         const pdfRes = await extractTextFromPdf(buffer);
                         extractedText = pdfRes.text;
@@ -1306,6 +1307,8 @@ Responde únicamente en formato JSON:
                     resultado = {
                         tipo: "PIPC",
                         aprobado: evaluacion.aprobado,
+                        scoreNumerico: evaluacion.scoreNumerico,
+                        estatusOficial: evaluacion.estatusOficial || (evaluacion.aprobado ? "APROBADO" : "REQUIERE_AJUSTES"),
                         puntuacion: evaluacion.puntuacion,
                         tieneBrigadas: evaluacion.tieneBrigadas,
                         tienePlanEvacuacion: evaluacion.tienePlanEvacuacion,
@@ -1316,9 +1319,17 @@ Responde únicamente en formato JSON:
                         tieneIncidencias: evaluacion.estadoRecomendado === "REQUIERE_CORRECCION",
                     };
                 } catch (e: unknown) {
-                    console.error("Error analyzing PIPC:", e);
-                    const msg = e instanceof Error ? e.message : String(e);
-                    resultado = { tipo: "PIPC", aprobado: false, error: msg };
+                    console.error("Error analyzing PIPC with Gemini, falling back to deterministic evaluator:", e);
+                    if (extractedText && extractedText.length > 20) {
+                        const detFallback = auditarPipcDeterminista(extractedText, {
+                            nombre: escuelaNombre,
+                            cct: escuelaCct
+                        });
+                        resultado = detFallback;
+                    } else {
+                        const msg = e instanceof Error ? e.message : String(e);
+                        resultado = { tipo: "PIPC", aprobado: false, error: msg };
+                    }
                 }
             }
 

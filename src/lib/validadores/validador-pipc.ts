@@ -2,7 +2,9 @@ import { callGemini } from "../gemini";
 
 export interface EvaluacionPIPC {
   aprobado: boolean;
+  scoreNumerico?: number;
   puntuacion: string;
+  estatusOficial?: string;
   tieneBrigadas: boolean;
   tienePlanEvacuacion: boolean;
   tieneCroquisSenaletica: boolean;
@@ -71,15 +73,34 @@ Responde ÚNICAMENTE en formato JSON con la siguiente estructura:
   }
   const parsed = JSON.parse(text);
 
+  // Extracción y cálculo del puntaje cuantitativo
+  const rawPuntuacionStr = String(parsed.puntuacion || "");
+  const numMatch = rawPuntuacionStr.match(/(\d+)/);
+  const parsedScore = numMatch ? parseInt(numMatch[1], 10) : (parsed.aprobado ? 75 : 50);
+  const scoreNumerico = Math.min(100, Math.max(0, parsedScore));
+
+  // Regla vinculante oficial (F-4B-4): Aprobado = score >= 70 && tieneBrigadas === true
+  const tieneBrigadas = !!parsed.tieneBrigadas;
+  const aprobado = scoreNumerico >= 70 && tieneBrigadas;
+  const estadoRecomendado: "APROBADO" | "REQUIERE_CORRECCION" = aprobado ? "APROBADO" : "REQUIERE_CORRECCION";
+  const estatusOficial = aprobado ? "APROBADO" : "REQUIERE_AJUSTES";
+
+  let observaciones = parsed.observaciones || "Revisión de PIPC completada.";
+  if (!tieneBrigadas && scoreNumerico >= 70) {
+    observaciones += "\n\n**Nota de supervisión técnica:** Pese al puntaje alcanzado, el expediente no es aprobatorio debido a la omisión en la integración de las 4 brigadas escolares obligatorias.";
+  }
+
   return {
-    aprobado: !!parsed.aprobado,
-    puntuacion: parsed.puntuacion || "N/D",
-    tieneBrigadas: !!parsed.tieneBrigadas,
+    aprobado,
+    scoreNumerico,
+    puntuacion: `${scoreNumerico}%`,
+    estatusOficial,
+    tieneBrigadas,
     tienePlanEvacuacion: !!parsed.tienePlanEvacuacion,
     tieneCroquisSenaletica: !!parsed.tieneCroquisSenaletica,
     tieneDirectorioEmergencias: !!parsed.tieneDirectorioEmergencias,
     tieneFirmasSellos: !!parsed.tieneFirmasSellos,
-    observaciones: parsed.observaciones || "Revisión de PIPC completada.",
-    estadoRecomendado: parsed.estadoRecomendado === "APROBADO" ? "APROBADO" : "REQUIERE_CORRECCION",
+    observaciones,
+    estadoRecomendado,
   };
 }
