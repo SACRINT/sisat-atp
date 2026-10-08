@@ -24,10 +24,21 @@ export interface Inconsistencia911 {
     detalles?: Record<string, unknown>;
 }
 
+export interface ResultadoCruceSicep {
+    matricula911Total: number;
+    matriculaSicepTotal: number;
+    diferencia: number;
+    porcentajeVariacion: number;
+    hayDiscrepancia: boolean;
+    inconsistencia?: Inconsistencia911;
+}
+
 export interface DatosFormato911 {
     cct?: string;
     nombreEscuela?: string;
     tipoCorte?: "INICIO_DE_CURSOS" | "FIN_DE_CURSOS";
+    totalAlumnos?: number;
+    matriculaSicep?: number;
     totalDocentes?: number;
     totalAprobados?: number;
     totalReprobados?: number;
@@ -57,6 +68,45 @@ export interface ResultadoValidacion911 {
  */
 export function calcularSha256(buffer: Buffer): string {
     return crypto.createHash("sha256").update(buffer).digest("hex");
+}
+
+/**
+ * Valida la consistencia entre la matrícula reportada en el formato 911 y el padrón de SICEP.
+ * Emite una inconsistencia tipo DISCREPANCIA_SICEP si la variación relativa supera el umbral (10% por defecto).
+ */
+export function validarCruceSicep(
+    matricula911Total: number,
+    matriculaSicepTotal: number,
+    toleranciaPorcentaje = 0.10
+): ResultadoCruceSicep {
+    const diff = Math.abs(matriculaSicepTotal - matricula911Total);
+    const variacion = matricula911Total > 0 ? (diff / matricula911Total) : (matriculaSicepTotal > 0 ? 1 : 0);
+    const hayDiscrepancia = variacion > toleranciaPorcentaje;
+
+    let inconsistencia: Inconsistencia911 | undefined;
+    if (hayDiscrepancia) {
+        inconsistencia = {
+            tipo: "DISCREPANCIA_SICEP",
+            severidad: "ADVERTENCIA",
+            campo: "Matrícula SICEP vs 911",
+            descripcion: `Variación del ${Math.round(variacion * 100)}% entre matrícula 911 (${matricula911Total}) y SICEP (${matriculaSicepTotal}) excede la tolerancia del ${Math.round(toleranciaPorcentaje * 100)}%.`,
+            detalles: {
+                matricula911Total,
+                matriculaSicepTotal,
+                diferencia: diff,
+                porcentajeVariacion: Math.round(variacion * 100)
+            }
+        };
+    }
+
+    return {
+        matricula911Total,
+        matriculaSicepTotal,
+        diferencia: diff,
+        porcentajeVariacion: variacion,
+        hayDiscrepancia,
+        inconsistencia
+    };
 }
 
 /**
@@ -161,6 +211,25 @@ export function validarAritmetica911(datos: DatosFormato911, sha256 = ""): Resul
         });
     }
 
+    // Regla 6: Descuadre Total Global
+    if (typeof datos.totalAlumnos === "number" && datos.totalAlumnos !== calcTotal) {
+        inconsistencias.push({
+            tipo: "DESCUADRE_TOTAL",
+            severidad: "ERROR_CRITICO",
+            campo: "Matrícula Total Global",
+            descripcion: `Descuadre global: la suma de grados (${calcTotal}) no coincide con la matrícula total reportada (${datos.totalAlumnos}).`,
+            detalles: { sumaCalculada: calcTotal, totalReportado: datos.totalAlumnos }
+        });
+    }
+
+    // Regla 7: Cruce con SICEP si se provee matrícula de control
+    if (typeof datos.matriculaSicep === "number") {
+        const cruce = validarCruceSicep(calcTotal, datos.matriculaSicep);
+        if (cruce.inconsistencia) {
+            inconsistencias.push(cruce.inconsistencia);
+        }
+    }
+
     const tieneCriticos = inconsistencias.some(i => i.severidad === "ERROR_CRITICO");
 
     return {
@@ -188,10 +257,10 @@ export function procesarFormato911Excel(buffer: Buffer): ResultadoValidacion911 
     const workbook = XLSX.read(buffer, { type: "buffer" });
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
-    const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+    const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
     let cct = "";
-    let nombreEscuela = "";
+    const nombreEscuela = "";
     let totalDocentes = 0;
     const grados: DetalleGradoInput[] = [];
 
