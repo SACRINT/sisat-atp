@@ -186,17 +186,44 @@ Los 51 problemas reportados en ESLint sobre los 13 archivos tocados corresponden
 
 ## 6. Ejecución y Cierre de Fase 4B: Motores Deterministas de Respaldo
 
-- **Estado de Ejecución**: Completado al 100% en 4 commits quirúrgicos y 6 puertas verificadas.
+- **Estado de Ejecución**: Implementación inicial de motores completada en 4 commits quirúrgicos.
 - **Commits en `main`**:
   1. `429ad4d`: `feat(acoso): implementar motor determinista de respaldo y paridad de dictamen`
   2. `e388874`: `feat(dia-naranja): implementar motor determinista de respaldo ante fallo de vision`
   3. `1e38bdb`: `feat(pipc): implementar motor determinista de respaldo y enforcement de brigadas`
   4. `833d4a9`: `test(integracion): verificar suplencia determinista ante indisponibilidad de IA (Puerta 6)`
-- **Puertas de Verificación (Resultados Literales)**:
-  - **Puerta 1 (TypeScript estricto)**: `npx tsc --noEmit` → Código de salida 0.
-  - **Puerta 2 (Unitarias motores)**: `acoso-determinista`, `dia-naranja-determinista`, `pipc-determinista` → 15/15 passed (3 suites).
-  - **Puerta 3 (Regresión completa)**: `npm test` → Test Files 10 passed (10) / Tests 47 passed (47) (28 preexistentes + 19 nuevas).
-  - **Puerta 4 (ESLint focalizado)**: 0 errores, 0 advertencias sobre archivos tocados.
-  - **Puerta 5 (Build Turbopack)**: `npm run build` → 81/81 rutas optimizadas, código de salida 0.
-  - **Puerta 6 (Integración IA caída)**: `respaldo-ia-fallo.test.ts` → 4/4 passed (mock de `callGemini` rechazando; dictámenes deterministas completos sin cadenas de error).
+
+---
+
+## 7. Resolución de Auditoría Adversarial — Fase 4B Ronda 4 (F-4B-7 a F-4B-12)
+
+- **Estado de Auditoría**: Informe de Auditoría OpenCode Fase 4B Ronda 4 recibido con veredicto APTO CON RESERVAS (0 P0, 1 P1, 1 P2, 4 P3).
+- **Resolución Quirúrgica Ítem por Ítem**:
+  1. **[F-4B-7 (P1) Extracción de FlateDecode en Respaldo PDF]**:
+     - Causa: Escaneo de bytes crudos (`latin1`) fallaba ante streams comprimidos (`FlateDecode`) en PDFs escolares reales.
+     - Solución: En los bloques `catch` de `src/lib/pre-revision.ts` (Día Naranja y Acoso PDF), se extrae el texto mediante `await extractTextFromPdf(buffer)` (vía `pdf-parse`) con fallback a `latin1`.
+     - Test: Inclusión de fixture de PDF real (`documentos_referencia/reportes_escuelas/INFORME DE ACOSO ESCOLAR_21EBH0682T.pdf`) en `acoso-determinista.test.ts` y en `respaldo-ia-fallo.test.ts`.
+     - Commit: `43bcef2` (`fix(pdf): extraer texto con pdf-parse en fallbacks para soportar flatedecode (F-4B-7)`).
+  2. **[F-4B-8 (P2) Rúbrica PIPC Alineada a Plan §3.3]**:
+     - Causa: Discrepancia entre código (40 pts brigadas) y plan aprobado (25 pts brigadas no lineales + 20 pts Diagnóstico de Riesgos + 20 pts Plan Evacuación + 20 pts Directorio/Croquis + 15 pts Formalidad).
+     - Solución: Implementación estricta de la ponderación de 5 componentes en `src/lib/quality-gates/pipc-evaluator.ts` con regla vinculante `scoreNumerico >= 70 && tieneBrigadas === true`. Actualización de tests unitarios y de fallo de IA para validar la sección de Diagnóstico de Riesgos.
+     - Commit: `fb94ca4` (`fix(pipc): alinear rubrica con plan seccion 3.3 e incorporar diagnostico de riesgos (F-4B-8)`).
+  3. **[F-4B-9 (P3) Eliminación de Duplicación en Parser Excel]**:
+     - Causa: Duplicación de lógica de parseo Excel inline en `src/lib/pre-revision.ts:583-642` y subconsumo de `auditarAcosoDeterministaExcel`.
+     - Solución: Reemplazo del bloque inline por llamada modular a `extraerIncidenciasAcosoExcel(buffer)`. Enrutamiento del fallback en contingencia de redacción IA a `auditarAcosoDeterministaExcel`.
+  4. **[F-4B-10 (P3) Homologación de estatusOficial a REQUIERE_CORRECCION]**:
+     - Causa: Inconsistencia entre `"REQUIERE_AJUSTES"` y `"REQUIERE_CORRECCION"` especificado en plan:222 y `validador-pipc.ts`.
+     - Solución: Homologación exhaustiva a `"REQUIERE_CORRECCION"` en `pre-revision.ts`, `dia-naranja-evaluator.ts`, `validador-pipc.ts`, y suites de tests.
+  5. **[F-4B-11 (P3) Aprobación de Acoso Escolar Excel con Incidencias]**:
+     - Causa: `acoso-evaluator.ts:169` emitía `aprobado: false` al detectar incidencias, en contraposición a plan:155 (aprobado formal al extraer exitosamente datos y generar borrador ministerial).
+     - Solución: Emisión de `aprobado: true` con `tieneIncidencias: true` y borrador formal en `auditarAcosoDeterministaExcel`.
+  6. **[F-4B-12 (P3) Eliminación de Constantes Mágicas 75/50 en PIPC]**:
+     - Causa: `validador-pipc.ts:79` asignaba `parsed.aprobado ? 75 : 50` cuando Gemini omitía el campo cuantitativo.
+     - Solución: Cálculo determinista derivado a partir de los booleanos de componentes evaluados por la IA ponderados con la rúbrica oficial §3.3.
+     - Commit P3 agrupado: `11f6f77` (`fix(quality-gates): resolver deuda tecnica P3 en acoso, pipc y homologar estatus oficial (F-4B-9 a F-4B-12)`).
+- **Validación Final de Calidad**:
+  - `npx tsc --noEmit` = Código 0 (0 errores).
+  - `npm test` = 10 suites / 48 tests pasados (100% verde).
+  - `npx eslint` = 0 errores, 0 advertencias en todos los archivos modificados.
+
 
