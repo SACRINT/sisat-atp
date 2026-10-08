@@ -235,5 +235,56 @@ Los 51 problemas reportados en ESLint sobre los 13 archivos tocados corresponden
   - `npm test` = 10 suites / 49 tests pasados (100% verde).
   - `npx eslint` = 0 errores, 0 advertencias en todos los archivos modificados.
   - `npm run build` = 81/81 rutas optimizadas exitosamente, código de salida 0.
+---
 
+## 8. Plan de Auditoría de Completitud Solo Lectura — ATP-MOD-03 (Estadística 911 / SICEP)
 
+- **Objetivo**: Realizar una auditoría exhaustiva en modalidad estrictamente de SOLO LECTURA para el módulo ATP-MOD-03 (Estadística 911 / SICEP) contrastando especificación técnica, plan maestro y la base de código real en producción.
+- **Fuentes de Verificación**:
+  1. Especificación: `BaseConocimiento/Resultados/especificaciones/modulo_estadistica_911_sicep.md` (§4 UI, §5 endpoints).
+  2. Plan maestro: `BaseConocimiento/Resultados/plan_maestro.md` (Fase 2 entregables: validador aritmético 911.8, cruce contra matrícula SICEP, exportadores de concentrados zonales a Excel en formato oficial SEP).
+  3. Código real:
+     - `src/lib/estadistica-911-engine.ts`
+     - `src/lib/estadistica-911-predictivo.ts`
+     - `src/app/api/admin/estadistica-911/**` (`route.ts`, `config/route.ts`, `upload/route.ts`, `exportar/route.ts`, `predictivo/route.ts`, `[id]/estado/route.ts`)
+     - `src/app/api/director/estadistica-911/**`
+     - `src/app/admin/_componentes/Estadistica911Panel.tsx`
+     - `src/app/director/_componentes/Estadistica911Director.tsx`
+     - `prisma/schema.prisma:1591-1696`
+     - `src/lib/vigilancia/vigilancia-engine.ts:356-416`
+     - `src/lib/tramites/agentic-tools.ts:80,220`
+- **Criterios Específicos Evaluados**:
+  - a) **Cuadre aritmético 911.8**: Conexión de `validarAritmetica911` (H+M, sumas por edad, totales, grupos/docentes) a la subida de archivos y al alta manual (`api/admin/estadistica-911/route.ts:6,114`).
+  - b) **Cruce 911 vs SICEP**: Flujo de población de la tabla `EstadisticaCruceSicep` y renderizado en tablero (`Estadistica911Director.tsx:54`).
+  - c) **Exportador de concentrado zonal Excel**: Verificación de `generarConcentradoZonal911Excel` (`exportar/route.ts`) contra formato oficial SEP (literales de cabecera y hojas).
+  - d) **Dashboard de indicadores zonal**: Cobertura de matrícula, deserción y eficiencia terminal (spec §4).
+  - e) **Generador del informe estadístico oficial de supervisión**: Estado de implementación contra spec §4.
+  - f) **Reglas maestras de arquitectura y seguridad**: Validación de `tenantId` obtenido exclusivamente de la sesión (`organizacionId || tenantId`, 401 si falta), cero cadenas hardcodeadas, y zero-payload (solo SHA-256 + metadatos).
+  - g) **Coherencia de estado**: Verificación de estado en `ModulePlan` (Neon) y `MEMORIA_DESARROLLO.md`.
+- **Restricciones Operativas**:
+  - CERO cambios en código productivo o lógica de negocio durante esta fase.
+  - No crear rutas duplicadas ni alterar el esquema Prisma real.
+  - No modificar estados en base de datos ni tocar etiquetas desalineadas (ej. CTE/MOD-04).
+  - Reporte 100% honesto: marcar explícitamente como `NO VERIFICADO` o `FALTANTE` lo que no se sustente con evidencia.
+- **Entregable**: `scratch/reporte_mod03_auditoria.md` con tabla Dicho-vs-Hecho (`ruta:línea`), clasificación P0-P3, y reporte de puertas.
+- **Puertas Obligatorias de Verificación**:
+  - `npx tsc --noEmit` = 0 errores
+  - `npm test` = 100% verde
+  - `npx eslint <archivos_tocados>` = 0 problemas nuevos
+  - `npm run build` = 81 rutas compiladas con éxito
+
+### Resultados de la Auditoría Solo Lectura (Fase 1 Completada):
+- **Entregable Generado**: `scratch/reporte_mod03_auditoria.md`.
+- **Diagnóstico General**: **PARCIAL CON HUECOS CRÍTICOS EN SICEP Y REPORTES (NO APTO PARA CIERRE SIN FIXES)**.
+- **Hallazgos Principales**:
+  - **[P1 - Cruce SICEP Incompleto]**: `EstadisticaCruceSicep` no se popula en ningún punto del sistema (0 llamadas a creación en BD); `Estadistica911Director.tsx:54` declara `crucesSicep` pero no lo renderiza en su JSX.
+  - **[P2 - Mapeo de Registro en Director]**: `Estadistica911Director.tsx:127-130` busca `miEscuela.registro` pero `/api/admin/estadistica-911` entrega `registros` en lista independiente, provocando vista en blanco de inicio.
+  - **[P2 - KPIs de Deserción y Eficiencia Terminal Ausentes en UI]**: El panel ATP omite en sus tarjetas las métricas acumuladas de deserción y eficiencia terminal.
+  - **[P2 - Informe Oficial de Supervisión Faltante]**: Solo existe exportador a Excel; falta el generador de informe institucional oficial (spec §4).
+  - **[P3 - Desalineación de Nomenclatura]**: `AdminDashboard.tsx:1667` etiqueta CTE como `(ATP-MOD-04)`.
+- **Puertas Validadas Literalmente**:
+  - `npx tsc --noEmit` = Código 0 (0 errores).
+  - `npm test` = 10 suites / 49 tests pasados (100% verde).
+  - `npx eslint` = 0 errores nuevos en archivos tocados.
+  - `npm run build` = 81/81 rutas optimizadas exitosamente (código 0).
+- **Estado Actual**: Auditoría de solo lectura entregada. Esperando veredicto adversarial de OpenCode antes de autorizar la Fase 2 (fixes quirúrgicos).
