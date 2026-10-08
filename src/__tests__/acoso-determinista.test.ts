@@ -105,14 +105,11 @@ describe("Motor Determinista de Acoso Escolar (Excel y PDF)", () => {
     describe("Fixture Oficial de Referencia (si existe en disco)", () => {
         it("debe procesar el archivo Excel oficial sin lanzar excepciones", () => {
             const refBuffer = getReferenceAcosoExcelBuffer();
-            if (refBuffer) {
-                const incidencias = extraerIncidenciasAcosoExcel(refBuffer);
-                expect(Array.isArray(incidencias)).toBe(true);
-                const res = auditarAcosoDeterministaExcel(refBuffer, escuelaInfo);
-                expect(res.tipo).toBe("ACOSO_ESCOLAR");
-            } else {
-                expect(true).toBe(true);
-            }
+            expect(refBuffer).not.toBeNull();
+            const incidencias = extraerIncidenciasAcosoExcel(refBuffer!);
+            expect(Array.isArray(incidencias)).toBe(true);
+            const res = auditarAcosoDeterministaExcel(refBuffer!, escuelaInfo);
+            expect(res.tipo).toBe("ACOSO_ESCOLAR");
         });
     });
 
