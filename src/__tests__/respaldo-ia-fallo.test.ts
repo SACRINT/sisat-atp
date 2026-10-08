@@ -242,16 +242,19 @@ describe("Puerta 6: Suplencia Determinista ante Fallo Crítico de IA", () => {
             - Brigada de Evacuación de Inmuebles (rutas de repliegue y punto de reunión).
             - Brigada de Búsqueda y Rescate (salvamento de aulas).
             
-            2. PLAN DE EVACUACIÓN Y CONTINGENCIA:
+            2. DIAGNÓSTICO Y ANÁLISIS DE RIESGOS:
+            Evaluación de riesgos internos, externos y vulnerabilidad del inmueble escolar.
+            
+            3. PLAN DE EVACUACIÓN Y CONTINGENCIA:
             Rutas de evacuación señalizadas hacia el punto de reunión.
             
-            3. CROQUIS Y SEÑALIZACIÓN:
+            4. CROQUIS Y SEÑALIZACIÓN:
             Croquis general del edificio escolar.
             
-            4. DIRECTORIO DE EMERGENCIAS:
+            5. DIRECTORIO DE EMERGENCIAS:
             911, Cruz Roja y Bomberos del Estado.
             
-            5. FORMALIDAD:
+            6. FORMALIDAD:
             DIRECTOR DEL PLANTEL Y SELLO OFICIAL.
         `;
         const buffer = Buffer.from(docxContent, "utf-8");

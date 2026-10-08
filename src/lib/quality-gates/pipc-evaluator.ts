@@ -51,36 +51,45 @@ export function auditarPipcDeterminista(
 
     const tieneBrigadas = brigadasDetectadas === 4;
 
-    // 2. Plan de Evacuación y Contingencia
-    const tienePlanEvacuacion = /plan\s+de\s+evacuaci[oó]n|ruta[s]?\s+de\s+evacuaci[oó]n|protocolo\s+de\s+actuaci[oó]n|procedimiento\s+de\s+emergencia|simulacro/i.test(tLower);
+    // 2. Diagnóstico y Análisis de Riesgos Internos y Externos (Comp 2: 20 pts)
+    const tieneDiagnosticoRiesgos = /diagn[oó]stico|an[aá]lisis\s+de\s+riesgos?|riesgos?\s+(?:internos?|externos?)|vulnerabilidad|amenaza|instalaciones|sismicidad/i.test(tLower);
 
-    // 3. Croquis y Señalética
+    // 3. Plan de Evacuación y Protocolos de Contingencia (Comp 3: 20 pts)
+    const tienePlanEvacuacion = /plan\s+de\s+evacuaci[oó]n|ruta[s]?\s+de\s+evacuaci[oó]n|protocolo|contingencia|simulacro|repliegue/i.test(tLower);
+
+    // 4. Directorio de Emergencias y Croquis de Evacuación (Comp 4: 20 pts = 10 + 10)
+    const tieneDirectorioEmergencias = /directorio|n[uú]meros\s+de\s+emergencia|911|cruz\s+roja|bomberos|protecci[oó]n\s+civil|seguridad\s+p[uú]blica/i.test(tLower);
     const tieneCroquisSenaletica = /croquis|plano|se[ñn]al[eé]tica|se[ñn]alizaci[oó]n|distribuci[oó]n\s+del\s+inmueble/i.test(tLower);
 
-    // 4. Directorio de Emergencias
-    const tieneDirectorioEmergencias = /directorio|n[uú]meros\s+de\s+emergencia|911|cruz\s+roja|bomberos|protecci[oó]n\s+civil|seguridad\s+p[uú]blica/i.test(tLower);
-
-    // 5. Formalidad de Firmas y Sellos
+    // 5. Formalidad de Firmas y Acreditación Institucional (Comp 5: 15 pts)
     const tieneFirmasSellos = /director|directora|responsable|titular|firma|sello|comit[eé]|unidad\s+interna/i.test(tLower);
 
-    // Ponderación cuantitativa determinista (Total: 100 pts)
-    // Brigadas: 40 pts (10 por brigada)
-    // Plan de Evacuación: 20 pts
-    // Directorio de Emergencias: 15 pts
-    // Croquis y Señalética: 15 pts
-    // Formalidad y Acreditación: 10 pts
-    let score = 0;
-    score += brigadasDetectadas * 10;
-    if (tienePlanEvacuacion) score += 20;
-    if (tieneDirectorioEmergencias) score += 15;
-    if (tieneCroquisSenaletica) score += 15;
-    if (tieneFirmasSellos) score += 10;
+    // Ponderación cuantitativa oficial conforme a plan §3.3 (Total: 100 pts)
+    // Comp 1: Brigadas (25 pts no lineales: 4 brigadas = 25 pts, 2-3 brigadas = 15 pts, 1 brigada = 5 pts)
+    let ptsBrigadas = 0;
+    if (brigadasDetectadas === 4) ptsBrigadas = 25;
+    else if (brigadasDetectadas >= 2) ptsBrigadas = 15;
+    else if (brigadasDetectadas === 1) ptsBrigadas = 5;
 
-    const scoreNumerico = Math.min(100, Math.max(0, score));
+    // Comp 2: Diagnóstico de Riesgos (20 pts)
+    const ptsDiagnostico = tieneDiagnosticoRiesgos ? 20 : 0;
+
+    // Comp 3: Plan de Evacuación y Contingencia (20 pts)
+    const ptsPlan = tienePlanEvacuacion ? 20 : 0;
+
+    // Comp 4: Directorio (10 pts) + Croquis (10 pts) = 20 pts
+    let ptsDirectorioCroquis = 0;
+    if (tieneDirectorioEmergencias) ptsDirectorioCroquis += 10;
+    if (tieneCroquisSenaletica) ptsDirectorioCroquis += 10;
+
+    // Comp 5: Formalidad y Firmas (15 pts)
+    const ptsFormalidad = tieneFirmasSellos ? 15 : 0;
+
+    const scoreNumerico = Math.min(100, Math.max(0, ptsBrigadas + ptsDiagnostico + ptsPlan + ptsDirectorioCroquis + ptsFormalidad));
 
     // Regla de aprobación vinculante
     const aprobado = scoreNumerico >= 70 && tieneBrigadas;
-    const estatusOficial = aprobado ? "APROBADO" : "REQUIERE_AJUSTES";
+    const estatusOficial = aprobado ? "APROBADO" : "REQUIERE_CORRECCION";
 
     // Construcción de la explicación técnica
     const escuelaNombre = escuela?.nombre || escuela?.escuelaNombre || "Plantel Educativo";
@@ -100,6 +109,7 @@ export function auditarPipcDeterminista(
             if (!tieneBrigadaBusquedaRescate) faltantesBrigadas.push("Búsqueda y Rescate");
             omisiones.push(`Integración incompleta de brigadas (${brigadasDetectadas}/4 identificadas; faltan: ${faltantesBrigadas.join(", ")})`);
         }
+        if (!tieneDiagnosticoRiesgos) omisiones.push("Diagnóstico y análisis de riesgos internos y externos");
         if (!tienePlanEvacuacion) omisiones.push("Plan formal de evacuación y contingencias");
         if (!tieneDirectorioEmergencias) omisiones.push("Directorio telefónico de emergencias (911 / Bomberos / Cruz Roja)");
         if (!tieneCroquisSenaletica) omisiones.push("Croquis o señalamientos de protección civil");

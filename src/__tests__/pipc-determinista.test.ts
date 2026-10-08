@@ -34,7 +34,10 @@ describe("Motor Determinista de PIPC y Enforcement Vinculante", () => {
         - H. Cuerpo de Bomberos del Estado: 222-245-1234
         - Protección Civil Municipal: 222-309-4500
         
-        5. FORMALIDAD Y ACREDITACIÓN:
+        5. DIAGNÓSTICO Y ANÁLISIS DE RIESGOS:
+        Identificación de riesgos internos (instalaciones de gas, eléctricas) y riesgos externos perimetrales con evaluación de sismicidad.
+
+        6. FORMALIDAD Y ACREDITACIÓN:
         MTRO. CARLOS SÁNCHEZ - DIRECTOR DEL PLANTEL Y RESPONSABLE DEL COMITÉ
         SELLO OFICIAL DEL PLANTEL EDUCATIVO
     `;
@@ -65,6 +68,9 @@ describe("Motor Determinista de PIPC y Enforcement Vinculante", () => {
             - Brigada de Primeros Auxilios con botiquín escolar.
             - Brigada de Prevención de Incendios con extintores vigentes.
             
+            DIAGNÓSTICO DE RIESGOS:
+            Análisis de riesgos internos del inmueble.
+
             PLAN DE EVACUACIÓN Y CONTINGENCIA:
             Rutas de evacuación hacia la plaza cívica.
             
@@ -82,7 +88,7 @@ describe("Motor Determinista de PIPC y Enforcement Vinculante", () => {
         expect(res.tieneBrigadas).toBe(false);
         // Debe ser desaprobado por regla vinculante: aprobado = score >= 70 && tieneBrigadas
         expect(res.aprobado).toBe(false);
-        expect(res.estatusOficial).toBe("REQUIERE_AJUSTES");
+        expect(res.estatusOficial).toBe("REQUIERE_CORRECCION");
         expect(res.tieneIncidencias).toBe(true);
         expect(res.explicacion).toContain("Integración incompleta de brigadas");
     });
@@ -94,6 +100,6 @@ describe("Motor Determinista de PIPC y Enforcement Vinculante", () => {
         expect(res.aprobado).toBe(false);
         expect(res.scoreNumerico).toBeLessThan(70);
         expect(res.tieneBrigadas).toBe(false);
-        expect(res.estatusOficial).toBe("REQUIERE_AJUSTES");
+        expect(res.estatusOficial).toBe("REQUIERE_CORRECCION");
     });
 });
