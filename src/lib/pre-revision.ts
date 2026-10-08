@@ -14,6 +14,10 @@ import {
     CRITERIOS_PMC
 } from "./quality-gates/pmc-evaluator";
 import { evaluarPipsEntrega, generarReportePipsMarkdown } from "./quality-gates/pips-evaluator";
+import {
+    generarBorradorOficioAcosoDeterminista,
+    auditarAcosoDeterministaPdf,
+} from "./quality-gates/acoso-evaluator";
 import { PreRevisionResultadoPersistida } from "./pre-revision-badge";
 
 function parseCloudinaryUrl(url: string) {
@@ -631,8 +635,12 @@ Responde únicamente en formato JSON con la siguiente estructura:
                             const parsed = cleanAndParseGeminiJson(rawResponse);
                             borradorCorreo = parsed.email_draft || "";
                         } catch (e) {
-                            console.error("Error generating email draft with Gemini:", e);
-                            borradorCorreo = `Error al redactar borrador: ${e instanceof Error ? e.message : String(e)}`;
+                            console.error("Error generating email draft with Gemini, falling back to deterministic generator:", e);
+                            borradorCorreo = generarBorradorOficioAcosoDeterminista({
+                                escuelaNombre,
+                                escuelaCct,
+                                incidencias,
+                            });
                         }
                     }
 
@@ -656,8 +664,9 @@ Responde únicamente en formato JSON con la siguiente estructura:
 
             } else {
                 // PDF: Report without incidents (standard letter declaring zero cases)
+                let buffer: Buffer | null = null;
                 try {
-                    const buffer = await downloadFile(file.driveUrl!);
+                    buffer = await downloadFile(file.driveUrl!);
                     const systemInstruction = "Eres un Asesor Técnico Pedagógico experto en revisión de expedientes escolares.";
                     const prompt = `Analiza este informe de Acoso Escolar en PDF de la escuela ${escuelaNombre} (${escuelaCct}).
 Determina si:
@@ -679,18 +688,32 @@ Responde únicamente en formato JSON con la siguiente estructura:
                         tieneIncidencias: false,
                         firmado: !!parsed.signed,
                         sellado: !!parsed.sealed,
+                        aprobado: !!parsed.signed && !!parsed.sealed,
                         explicacion: parsed.explanation || "Reporte sin incidencias validado correctamente."
                     };
                 } catch (e: unknown) {
-                    console.error("Error analyzing acoso PDF:", e);
-                    const msg = e instanceof Error ? e.message : String(e);
-                    resultado = {
-                        tipo: "ACOSO_ESCOLAR",
-                        tieneIncidencias: false,
-                        firmado: false,
-                        sellado: false,
-                        explicacion: `Error de análisis visual: ${msg}`
-                    };
+                    console.error("Error analyzing acoso PDF with Gemini:", e);
+                    if (buffer) {
+                        const fallback = auditarAcosoDeterministaPdf(buffer, { escuelaNombre, escuelaCct });
+                        resultado = {
+                            tipo: "ACOSO_ESCOLAR",
+                            tieneIncidencias: false,
+                            firmado: fallback.firmado,
+                            sellado: fallback.sellado,
+                            aprobado: fallback.aprobado,
+                            explicacion: fallback.explicacion
+                        };
+                    } else {
+                        const msg = e instanceof Error ? e.message : String(e);
+                        resultado = {
+                            tipo: "ACOSO_ESCOLAR",
+                            tieneIncidencias: false,
+                            firmado: false,
+                            sellado: false,
+                            aprobado: false,
+                            explicacion: `Error de análisis visual: ${msg}`
+                        };
+                    }
                 }
             }
         } else if (programaNombre.includes("PMC") || programaNombre.includes("PAEC") || programaNombre.includes("PEC") || programaNombre.includes("PLAN DE MEJORA CONTINUA") || programaNombre.includes("PIPS") || programaNombre.includes("INTERVENCI")) {
