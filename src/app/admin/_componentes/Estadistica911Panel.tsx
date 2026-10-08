@@ -27,6 +27,15 @@ import {
 } from "lucide-react";
 import ModuloCopilotDrawer, { AccionSugerida } from "@/components/copilot/ModuloCopilotDrawer";
 
+interface CruceSicepPanelItem {
+    id?: string;
+    matricula911Total: number;
+    matriculaSicepTotal: number;
+    diferencia: number;
+    discrepancias?: unknown;
+    createdAt: string;
+}
+
 interface Estadistica911PanelProps {
     readOnly?: boolean;
 }
@@ -50,6 +59,9 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
     const [modalDetalleOpen, setModalDetalleOpen] = useState(false);
     const [modalUploadOpen, setModalUploadOpen] = useState(false);
     const [modalConfigOpen, setModalConfigOpen] = useState(false);
+    const [modalCruceOpen, setModalCruceOpen] = useState(false);
+    const [matriculaSicepInput, setMatriculaSicepInput] = useState("");
+    const [guardandoCruce, setGuardandoCruce] = useState(false);
 
     // Form upload
     const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -223,6 +235,52 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
             toast.error("Error al actualizar estado");
         } finally {
             setSavingEstado(false);
+        }
+    };
+
+    const handleGuardarCruceSicep = async () => {
+        if (!selectedRegistro) return;
+        const matriculaNum = Number(matriculaSicepInput);
+        if (isNaN(matriculaNum) || matriculaNum < 0) {
+            toast.error("Ingrese una matrícula SICEP válida mayor o igual a 0");
+            return;
+        }
+
+        setGuardandoCruce(true);
+        try {
+            const res = await fetch("/api/admin/estadistica-911/cruces", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    registroId: selectedRegistro.id,
+                    matriculaSicepTotal: matriculaNum
+                })
+            });
+
+            const json = await res.json();
+            if (res.ok && json.success) {
+                toast.success(
+                    json.evaluacion?.hayDiscrepancia
+                        ? "⚠️ Cruce registrado con discrepancia detectada (>10%)"
+                        : "✅ Cruce SICEP registrado exitosamente"
+                );
+                setModalCruceOpen(false);
+                setMatriculaSicepInput("");
+                await cargarDatos();
+                if (json.cruce) {
+                    setSelectedRegistro((prev: Record<string, unknown> | null) => (prev ? {
+                        ...prev,
+                        crucesSicep: [json.cruce, ...(((prev.crucesSicep as CruceSicepPanelItem[]) || []))]
+                    } : null));
+                }
+            } else {
+                toast.error(json.error || "Error al registrar cruce SICEP");
+            }
+        } catch (err) {
+            console.error("Error al registrar cruce SICEP:", err);
+            toast.error("Error de conexión al registrar cruce SICEP");
+        } finally {
+            setGuardandoCruce(false);
         }
     };
 
@@ -709,6 +767,38 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                                                                 </button>
                                                             )}
 
+                                                            {reg && !readOnly && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setSelectedEscuela(esc);
+                                                                        setSelectedRegistro(reg);
+                                                                        setMatriculaSicepInput(
+                                                                            reg.crucesSicep && reg.crucesSicep.length > 0
+                                                                                ? String(reg.crucesSicep[0].matriculaSicepTotal)
+                                                                                : ""
+                                                                        );
+                                                                        setModalCruceOpen(true);
+                                                                    }}
+                                                                    title="Cruce de consistencia con padrón SICEP"
+                                                                    style={{
+                                                                        background: (reg.crucesSicep && reg.crucesSicep.length > 0) ? "#f0fdf4" : "#f8fafc",
+                                                                        border: `1px solid ${(reg.crucesSicep && reg.crucesSicep.length > 0) ? "#bbf7d0" : "#e2e8f0"}`,
+                                                                        padding: "0.35rem 0.65rem",
+                                                                        borderRadius: "8px",
+                                                                        color: (reg.crucesSicep && reg.crucesSicep.length > 0) ? "#15803d" : "#475569",
+                                                                        fontWeight: 600,
+                                                                        fontSize: "0.75rem",
+                                                                        cursor: "pointer",
+                                                                        display: "flex",
+                                                                        alignItems: "center",
+                                                                        gap: "0.25rem"
+                                                                    }}
+                                                                >
+                                                                    <Layers style={{ width: "14px", height: "14px" }} />
+                                                                    {(reg.crucesSicep && reg.crucesSicep.length > 0) ? "SICEP ✓" : "SICEP"}
+                                                                </button>
+                                                            )}
+
                                                             {!readOnly && (
                                                                 <button
                                                                     onClick={() => {
@@ -1112,6 +1202,97 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                             </div>
                         )}
 
+                        {/* Cruce de Matrícula SICEP */}
+                        <div style={{ marginTop: "1.25rem" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                                <h4 style={{ fontSize: "0.85rem", fontWeight: 700, color: "#334155", margin: 0 }}>
+                                    Cruce de Consistencia con Padrón SICEP:
+                                </h4>
+                                {!readOnly && (
+                                    <button
+                                        onClick={() => {
+                                            setMatriculaSicepInput(
+                                                selectedRegistro.crucesSicep && selectedRegistro.crucesSicep.length > 0
+                                                    ? String(selectedRegistro.crucesSicep[0].matriculaSicepTotal)
+                                                    : ""
+                                            );
+                                            setModalCruceOpen(true);
+                                        }}
+                                        style={{
+                                            background: "#f1f5f9",
+                                            border: "1px solid #cbd5e1",
+                                            padding: "0.25rem 0.6rem",
+                                            borderRadius: "6px",
+                                            fontSize: "0.75rem",
+                                            fontWeight: 700,
+                                            color: "#334155",
+                                            cursor: "pointer",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "0.25rem"
+                                        }}
+                                    >
+                                        <Layers style={{ width: "13px", height: "13px" }} />
+                                        {selectedRegistro.crucesSicep && selectedRegistro.crucesSicep.length > 0 ? "Actualizar Cruce" : "Realizar Cruce"}
+                                    </button>
+                                )}
+                            </div>
+
+                            {(!selectedRegistro.crucesSicep || selectedRegistro.crucesSicep.length === 0) ? (
+                                <div style={{ background: "#f8fafc", border: "1px dashed #cbd5e1", padding: "0.85rem", borderRadius: "8px", color: "#64748b", fontSize: "0.8rem" }}>
+                                    ℹ️ No se ha registrado cruce de matrícula con SICEP para este formato 911.
+                                </div>
+                            ) : (
+                                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                                    {selectedRegistro.crucesSicep.map((cruce: CruceSicepPanelItem, idx: number) => {
+                                        const varPct = cruce.matricula911Total > 0
+                                            ? Math.round((Math.abs(cruce.matriculaSicepTotal - cruce.matricula911Total) / cruce.matricula911Total) * 100)
+                                            : 0;
+                                        const tieneDiscrepancia = varPct > 10;
+                                        return (
+                                            <div
+                                                key={cruce.id || idx}
+                                                style={{
+                                                    background: tieneDiscrepancia ? "#fef2f2" : "#f0fdf4",
+                                                    border: `1px solid ${tieneDiscrepancia ? "#fecaca" : "#bbf7d0"}`,
+                                                    borderRadius: "8px",
+                                                    padding: "0.75rem",
+                                                    fontSize: "0.8rem"
+                                                }}
+                                            >
+                                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                    <span style={{ fontWeight: 700, color: tieneDiscrepancia ? "#991b1b" : "#166534" }}>
+                                                        {tieneDiscrepancia ? "⚠️ Discrepancia Significativa (>10%)" : "✅ Matrícula Cuadrada con SICEP"}
+                                                    </span>
+                                                    <span style={{ fontSize: "0.7rem", color: "#64748b" }}>
+                                                        {new Date(cruce.createdAt).toLocaleDateString("es-MX")}
+                                                    </span>
+                                                </div>
+                                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.5rem", marginTop: "0.5rem", textAlign: "center" }}>
+                                                    <div style={{ background: "#ffffff", padding: "0.35rem", borderRadius: "6px" }}>
+                                                        <div style={{ fontSize: "0.65rem", color: "#64748b" }}>911 Total</div>
+                                                        <div style={{ fontWeight: 800 }}>{cruce.matricula911Total}</div>
+                                                    </div>
+                                                    <div style={{ background: "#ffffff", padding: "0.35rem", borderRadius: "6px" }}>
+                                                        <div style={{ fontSize: "0.65rem", color: "#64748b" }}>SICEP Total</div>
+                                                        <div style={{ fontWeight: 800, color: "#2563eb" }}>{cruce.matriculaSicepTotal}</div>
+                                                    </div>
+                                                    <div style={{ background: "#ffffff", padding: "0.35rem", borderRadius: "6px" }}>
+                                                        <div style={{ fontSize: "0.65rem", color: "#64748b" }}>Diferencia</div>
+                                                        <div style={{ fontWeight: 800, color: tieneDiscrepancia ? "#dc2626" : "#059669" }}>{cruce.diferencia}</div>
+                                                    </div>
+                                                    <div style={{ background: "#ffffff", padding: "0.35rem", borderRadius: "6px" }}>
+                                                        <div style={{ fontSize: "0.65rem", color: "#64748b" }}>Variación</div>
+                                                        <div style={{ fontWeight: 800, color: tieneDiscrepancia ? "#dc2626" : "#059669" }}>{varPct}%</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
                         {/* Notas del ATP */}
                         {!readOnly && (
                             <div style={{ marginTop: "1.25rem" }}>
@@ -1419,6 +1600,117 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                                     {savingConfig ? "Guardando..." : "Guardar Ajustes"}
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ════════════ MODAL REGISTRAR CRUCE SICEP ════════════ */}
+            {modalCruceOpen && selectedEscuela && selectedRegistro && (
+                <div style={{
+                    position: "fixed",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: "rgba(15, 23, 42, 0.6)",
+                    backdropFilter: "blur(4px)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: 10000,
+                    padding: "1rem"
+                }}>
+                    <div style={{
+                        background: "#ffffff",
+                        borderRadius: "16px",
+                        width: "100%",
+                        maxWidth: "480px",
+                        padding: "1.75rem",
+                        boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)"
+                    }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #e2e8f0", paddingBottom: "0.75rem" }}>
+                            <div>
+                                <h3 style={{ fontSize: "1.05rem", fontWeight: 800, color: "#1e293b", margin: 0 }}>
+                                    Cruce con Padrón SICEP
+                                </h3>
+                                <p style={{ fontSize: "0.75rem", color: "#64748b", margin: "0.2rem 0 0" }}>
+                                    {selectedEscuela.nombre} ({selectedEscuela.cct})
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setModalCruceOpen(false)}
+                                style={{ background: "transparent", border: "none", color: "#64748b", cursor: "pointer" }}
+                            >
+                                <X style={{ width: "20px", height: "20px" }} />
+                            </button>
+                        </div>
+
+                        <div style={{ marginTop: "1rem" }}>
+                            <div style={{ background: "#f8fafc", padding: "0.75rem", borderRadius: "8px", border: "1px solid #e2e8f0", marginBottom: "1rem" }}>
+                                <div style={{ fontSize: "0.75rem", color: "#64748b" }}>Matrícula reportada en Formato 911:</div>
+                                <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#0f172a" }}>
+                                    {selectedRegistro.totalAlumnos} alumnos
+                                </div>
+                            </div>
+
+                            <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 700, color: "#334155", marginBottom: "0.35rem" }}>
+                                Matrícula Activa en SICEP (Padrón Oficial):
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                value={matriculaSicepInput}
+                                onChange={(e) => setMatriculaSicepInput(e.target.value)}
+                                placeholder="Ej. 340"
+                                style={{
+                                    width: "100%",
+                                    padding: "0.6rem",
+                                    borderRadius: "8px",
+                                    border: "1px solid #cbd5e1",
+                                    fontSize: "0.9rem",
+                                    fontWeight: 600,
+                                    boxSizing: "border-box"
+                                }}
+                            />
+                            <p style={{ fontSize: "0.7rem", color: "#64748b", marginTop: "0.35rem" }}>
+                                * Si la discrepancia supera el 10%, el sistema emitirá automáticamente una alerta en el motor de vigilancia (Regla 5).
+                            </p>
+                        </div>
+
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "1.5rem", borderTop: "1px solid #e2e8f0", paddingTop: "1rem" }}>
+                            <button
+                                onClick={() => setModalCruceOpen(false)}
+                                style={{
+                                    background: "#f1f5f9",
+                                    border: "none",
+                                    padding: "0.5rem 1rem",
+                                    borderRadius: "8px",
+                                    color: "#475569",
+                                    fontSize: "0.8rem",
+                                    fontWeight: 600,
+                                    cursor: "pointer"
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleGuardarCruceSicep}
+                                disabled={guardandoCruce || !matriculaSicepInput}
+                                style={{
+                                    background: "#2563eb",
+                                    border: "none",
+                                    padding: "0.5rem 1rem",
+                                    borderRadius: "8px",
+                                    color: "#ffffff",
+                                    fontSize: "0.8rem",
+                                    fontWeight: 700,
+                                    cursor: guardandoCruce || !matriculaSicepInput ? "not-allowed" : "pointer",
+                                    opacity: guardandoCruce || !matriculaSicepInput ? 0.6 : 1
+                                }}
+                            >
+                                {guardandoCruce ? "Guardando..." : "Registrar y Evaluar Cruce"}
+                            </button>
                         </div>
                     </div>
                 </div>
