@@ -114,17 +114,9 @@ describe("Puerta 6: Suplencia Determinista ante Fallo Crítico de IA", () => {
     it("Acoso Escolar (PDF): ante fallo de IA de visión, debe emitir dictamen determinista de firmas y sellos sin error de análisis usando PDF real", async () => {
         const entregaId = "entrega-acoso-pdf-fallo-ia";
         const realPdf = getReferenceAcosoPdfBuffer();
-        const pdfBuffer = realPdf || Buffer.from(`
-            GOBIERNO DEL ESTADO DE PUEBLA - SECRETARÍA DE EDUCACIÓN PÚBLICA
-            BACHILLERATO VICENTE SUAREZ FERRER - 21EBH0682T
-            INFORME DE CERO CASOS DE ACOSO ESCOLAR
-            ATENTAMENTE EL DIRECTOR DEL PLANTEL
-            SELLO OFICIAL DE LA INSTITUCIÓN
-        `, "utf-8");
-
-        const escuelaPdf = realPdf
-            ? { nombre: "VICENTE SUAREZ FERRER", cct: "21EBH0682T" }
-            : escuelaBase;
+        expect(realPdf).not.toBeNull();
+        const pdfBuffer = realPdf!;
+        const escuelaPdf = { nombre: "VICENTE SUAREZ FERRER", cct: "21EBH0682T" };
 
         mockFindUniqueEntrega.mockResolvedValue({
             id: entregaId,

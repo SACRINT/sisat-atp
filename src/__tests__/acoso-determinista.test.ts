@@ -151,20 +151,17 @@ describe("Motor Determinista de Acoso Escolar (Excel y PDF)", () => {
 
         it("debe validar exitosamente un PDF real con compresión FlateDecode extrayendo su texto con extractTextFromPdf", async () => {
             const realPdfBuffer = getReferenceAcosoPdfBuffer();
-            if (realPdfBuffer) {
-                const { text } = await extractTextFromPdf(realPdfBuffer);
-                expect(text.length).toBeGreaterThan(100);
-                const res = auditarAcosoDeterministaPdf(text, {
-                    nombre: "VICENTE SUAREZ FERRER",
-                    cct: "21EBH0682T",
-                });
-                expect(res.firmado).toBe(true);
-                expect(res.sellado).toBe(true);
-                expect(res.aprobado).toBe(true);
-                expect(res.explicacion).toContain("validado deterministamente");
-            } else {
-                expect(true).toBe(true);
-            }
+            expect(realPdfBuffer).not.toBeNull();
+            const { text } = await extractTextFromPdf(realPdfBuffer!);
+            expect(text.length).toBeGreaterThan(100);
+            const res = auditarAcosoDeterministaPdf(text, {
+                nombre: "VICENTE SUAREZ FERRER",
+                cct: "21EBH0682T",
+            });
+            expect(res.firmado).toBe(true);
+            expect(res.sellado).toBe(true);
+            expect(res.aprobado).toBe(true);
+            expect(res.explicacion).toContain("validado deterministamente");
         });
     });
 });
