@@ -129,7 +129,7 @@ export function auditarDiaNaranjaDeterminista(
         archivos: reportes,
         aprobado,
         scoreNumerico: porcentajeFirmado,
-        estatusOficial: aprobado ? "APROBADO" : "REQUIERE_AJUSTES",
+        estatusOficial: aprobado ? "APROBADO" : "REQUIERE_CORRECCION",
         explicacion: aprobado
             ? "Entrega completa de Día Naranja aprobada de forma autónoma con respaldo determinista."
             : `Entrega de Día Naranja incompleta (${porcentajeFirmado}% validado). Uno o más archivos carecen de firmas o sellos oficiales.`

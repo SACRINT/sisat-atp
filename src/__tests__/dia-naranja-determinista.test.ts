@@ -111,7 +111,7 @@ describe("Motor Determinista de Día Naranja", () => {
 
             expect(res.aprobado).toBe(false);
             expect(res.scoreNumerico).toBe(50);
-            expect(res.estatusOficial).toBe("REQUIERE_AJUSTES");
+            expect(res.estatusOficial).toBe("REQUIERE_CORRECCION");
         });
     });
 });

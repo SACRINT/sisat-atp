@@ -49,7 +49,7 @@ describe("Motor Determinista de Acoso Escolar (Excel y PDF)", () => {
             const resultado = auditarAcosoDeterministaExcel(buffer, escuelaInfo);
             expect(resultado.tipo).toBe("ACOSO_ESCOLAR");
             expect(resultado.tieneIncidencias).toBe(true);
-            expect(resultado.aprobado).toBe(false);
+            expect(resultado.aprobado).toBe(true);
             expect(resultado.incidenciasDetalle).toBeDefined();
             expect(resultado.incidenciasDetalle!.length).toBeGreaterThan(0);
             expect(resultado.borradorCorreo).toBeDefined();

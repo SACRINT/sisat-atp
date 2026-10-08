@@ -166,7 +166,7 @@ export function auditarAcosoDeterministaExcel(
             tieneIncidencias: true,
             incidenciasDetalle: incidencias,
             borradorCorreo,
-            aprobado: false,
+            aprobado: true,
             explicacion: `Se detectaron ${incidencias.length} incidencias de acoso escolar en el reporte Excel. Se generó borrador institucional de notificación.`
         };
     }

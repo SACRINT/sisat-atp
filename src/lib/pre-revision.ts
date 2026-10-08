@@ -2,7 +2,6 @@
 
 import { prisma } from "./db";
 import { callGemini } from "./gemini";
-import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import { v2 as cloudinary } from "cloudinary";
 import { evaluarPaecEntrega, generarReportePaecMarkdown } from "./quality-gates/paec-evaluator";
@@ -15,7 +14,8 @@ import {
 } from "./quality-gates/pmc-evaluator";
 import { evaluarPipsEntrega, generarReportePipsMarkdown } from "./quality-gates/pips-evaluator";
 import {
-    generarBorradorOficioAcosoDeterminista,
+    extraerIncidenciasAcosoExcel,
+    auditarAcosoDeterministaExcel,
     auditarAcosoDeterministaPdf,
 } from "./quality-gates/acoso-evaluator";
 import { evaluarArchivoDiaNaranjaDeterminista } from "./quality-gates/dia-naranja-evaluator";
@@ -568,7 +568,7 @@ Responde únicamente en formato JSON con la siguiente estructura:
                 archivos: reportes,
                 aprobado: aprobadoDiaNaranja,
                 scoreNumerico,
-                estatusOficial: aprobadoDiaNaranja ? "APROBADO" : "REQUIERE_AJUSTES"
+                estatusOficial: aprobadoDiaNaranja ? "APROBADO" : "REQUIERE_CORRECCION"
             };
 
         } else if (programaNombre.includes("ACOSO ESCOLAR")) {
@@ -582,63 +582,7 @@ Responde únicamente en formato JSON con la siguiente estructura:
                 // EXCEL: Report with incidents
                 try {
                     const buffer = await downloadFile(file.driveUrl!);
-                    const workbook = XLSX.read(buffer, { type: "buffer" });
-                    const sheetNames = workbook.SheetNames;
-                    const incidencias: Array<{
-                        mes: string;
-                        categoria: string;
-                        edad: string;
-                        violencia: string[];
-                        escuela: string;
-                        cct: string;
-                        localidad: string;
-                    }> = [];
-
-                    for (const sheetName of sheetNames) {
-                        const sheet = workbook.Sheets[sheetName];
-                        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
-                        
-                        let currentCategoria = "";
-                        for (let r = 7; r < rows.length; r++) {
-                            const row = rows[r];
-                            if (!row || row.length === 0) continue;
-                            
-                            if (row[0] && typeof row[0] === 'string' && ['NIÑAS', 'NIÑOS', 'ADOLESCENTES', 'MUJER', 'HOMBRE'].includes(row[0].toUpperCase().trim())) {
-                                currentCategoria = row[0].toUpperCase().trim();
-                            }
-                            
-                            const schoolName = row[7];
-                            const cct = row[8];
-                            
-                            if (schoolName || cct) {
-                                const agFisica = row[2];
-                                const hostigamiento = row[3];
-                                const discriminatorio = row[4];
-                                const otro = row[5];
-                                
-                                const isX = (val: unknown): boolean => typeof val === 'string' && val.toUpperCase().trim() === 'X';
-                                const tieneCaso = [agFisica, hostigamiento, discriminatorio, otro].some(isX);
-                                
-                                if (tieneCaso) {
-                                    const tiposViolencia: string[] = [];
-                                    if (isX(agFisica)) tiposViolencia.push("Agresión Física");
-                                    if (isX(hostigamiento)) tiposViolencia.push("Hostigamiento");
-                                    if (isX(discriminatorio)) tiposViolencia.push("Discriminatorio");
-                                    if (isX(otro)) tiposViolencia.push("Otro");
-
-                                    incidencias.push({
-                                        mes: sheetName,
-                                        categoria: currentCategoria || "General",
-                                        edad: row[1] ? String(row[1]) : "S/D",
-                                        violencia: tiposViolencia,
-                                        escuela: schoolName ? schoolName.toString().trim() : "N/D",
-                                        cct: cct ? cct.toString().trim() : "N/D",
-                                        localidad: row[9] ? row[9].toString().trim() : "N/D"
-                                    });
-                                }
-                            }
-                        }
-                    }
+                    const incidencias = extraerIncidenciasAcosoExcel(buffer);
 
                     let borradorCorreo = "";
                     if (incidencias.length > 0) {
@@ -664,19 +608,24 @@ Responde únicamente en formato JSON con la siguiente estructura:
                             borradorCorreo = parsed.email_draft || "";
                         } catch (e) {
                             console.error("Error generating email draft with Gemini, falling back to deterministic generator:", e);
-                            borradorCorreo = generarBorradorOficioAcosoDeterminista({
-                                escuelaNombre,
-                                escuelaCct,
-                                incidencias,
+                            const fallbackAudit = auditarAcosoDeterministaExcel(buffer, {
+                                nombre: escuelaNombre,
+                                cct: escuelaCct,
+                                zonaEscolar: entrega.escuela?.zonaEscolar || ""
                             });
+                            borradorCorreo = fallbackAudit.borradorCorreo || "";
                         }
                     }
 
                     resultado = {
                         tipo: "ACOSO_ESCOLAR",
-                        tieneIncidencias: true,
+                        tieneIncidencias: incidencias.length > 0,
                         incidenciasDetalle: incidencias,
-                        borradorCorreo: borradorCorreo || "No se pudo generar el borrador."
+                        borradorCorreo: borradorCorreo || (incidencias.length > 0 ? "Borrador generado." : ""),
+                        aprobado: true,
+                        explicacion: incidencias.length > 0
+                            ? `Se detectaron ${incidencias.length} incidencias de acoso escolar en el reporte Excel. Se generó borrador institucional de notificación.`
+                            : "Reporte en Excel sin incidencias registradas. No se detectaron casos de acoso escolar en los periodos analizados."
                     };
 
                 } catch (e: unknown) {
@@ -684,9 +633,11 @@ Responde únicamente en formato JSON con la siguiente estructura:
                     const msg = e instanceof Error ? e.message : String(e);
                     resultado = {
                         tipo: "ACOSO_ESCOLAR",
-                        tieneIncidencias: true,
+                        tieneIncidencias: false,
+                        aprobado: false,
                         error: `Error al leer Excel: ${msg}`,
-                        borradorCorreo: "Error al leer el archivo Excel."
+                        borradorCorreo: "Error al leer el archivo Excel.",
+                        explicacion: `Error al procesar el archivo Excel: ${msg}`
                     };
                 }
 
@@ -1325,7 +1276,7 @@ Responde únicamente en formato JSON:
                         tipo: "PIPC",
                         aprobado: evaluacion.aprobado,
                         scoreNumerico: evaluacion.scoreNumerico,
-                        estatusOficial: evaluacion.estatusOficial || (evaluacion.aprobado ? "APROBADO" : "REQUIERE_AJUSTES"),
+                        estatusOficial: evaluacion.estatusOficial || (evaluacion.aprobado ? "APROBADO" : "REQUIERE_CORRECCION"),
                         puntuacion: evaluacion.puntuacion,
                         tieneBrigadas: evaluacion.tieneBrigadas,
                         tienePlanEvacuacion: evaluacion.tienePlanEvacuacion,

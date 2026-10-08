@@ -76,14 +76,25 @@ Responde ÚNICAMENTE en formato JSON con la siguiente estructura:
   // Extracción y cálculo del puntaje cuantitativo
   const rawPuntuacionStr = String(parsed.puntuacion || "");
   const numMatch = rawPuntuacionStr.match(/(\d+)/);
-  const parsedScore = numMatch ? parseInt(numMatch[1], 10) : (parsed.aprobado ? 75 : 50);
+
+  // Derivación del puntaje conforme a la rúbrica oficial §3.3 si Gemini omite puntuación explícita (F-4B-12)
+  let scoreDerivado = 0;
+  if (parsed.tieneBrigadas) scoreDerivado += 25;
+  if (parsed.tieneDiagnosticoRiesgos) scoreDerivado += 20;
+  else if (parsed.aprobado && parsed.tieneBrigadas && parsed.tienePlanEvacuacion) scoreDerivado += 20;
+  if (parsed.tienePlanEvacuacion) scoreDerivado += 20;
+  if (parsed.tieneDirectorioEmergencias) scoreDerivado += 10;
+  if (parsed.tieneCroquisSenaletica) scoreDerivado += 10;
+  if (parsed.tieneFirmasSellos) scoreDerivado += 15;
+
+  const parsedScore = numMatch ? parseInt(numMatch[1], 10) : scoreDerivado;
   const scoreNumerico = Math.min(100, Math.max(0, parsedScore));
 
   // Regla vinculante oficial (F-4B-4): Aprobado = score >= 70 && tieneBrigadas === true
   const tieneBrigadas = !!parsed.tieneBrigadas;
   const aprobado = scoreNumerico >= 70 && tieneBrigadas;
   const estadoRecomendado: "APROBADO" | "REQUIERE_CORRECCION" = aprobado ? "APROBADO" : "REQUIERE_CORRECCION";
-  const estatusOficial = aprobado ? "APROBADO" : "REQUIERE_AJUSTES";
+  const estatusOficial = aprobado ? "APROBADO" : "REQUIERE_CORRECCION";
 
   let observaciones = parsed.observaciones || "Revisión de PIPC completada.";
   if (!tieneBrigadas && scoreNumerico >= 70) {
