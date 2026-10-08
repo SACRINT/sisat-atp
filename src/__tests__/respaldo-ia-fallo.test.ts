@@ -303,4 +303,54 @@ describe("Puerta 6: Suplencia Determinista ante Fallo Crítico de IA", () => {
         expect(savedResultado.error).toBeUndefined();
         expect(savedResultado.explicacion).toContain("Evaluación determinista de PIPC");
     });
+
+    it("Día Naranja: ante archivo binario no legible sin IA (ej. JPG), debe emitir que requiere revisión manual", async () => {
+        const entregaId = "entrega-dia-naranja-jpg-fallo-ia";
+        // Magic bytes de archivo binario JPG (\xFF\xD8\xFF\xE0...)
+        const jpgBuffer = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01]);
+
+        mockFindUniqueEntrega.mockResolvedValue({
+            id: entregaId,
+            escuelaId: "escuela-001",
+            archivos: [
+                {
+                    id: "archivo-naranja-jpg-1",
+                    tipo: "ENTREGA",
+                    nombre: "evidencia_marzo.jpg",
+                    etiqueta: "Fotografía de evento",
+                    driveUrl: "https://res.cloudinary.com/demo/raw/upload/v1234/evidencia_marzo.jpg",
+                },
+            ],
+            periodoEntrega: {
+                programa: {
+                    nombre: "DÍA NARANJA",
+                },
+            },
+            escuela: escuelaBase,
+        });
+
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            headers: new Headers(),
+            arrayBuffer: async () => jpgBuffer.buffer.slice(jpgBuffer.byteOffset, jpgBuffer.byteOffset + jpgBuffer.byteLength),
+        } as unknown as Response);
+
+        try {
+            await analizarEntregaConIA(entregaId);
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+
+        expect(mockUpsertPreRev).toHaveBeenCalledTimes(1);
+        const savedResultado = mockUpsertPreRev.mock.calls[0][0].update.resultado;
+
+        expect(savedResultado.tipo).toBe("DIA_NARANJA");
+        expect(savedResultado.aprobado).toBe(false);
+        expect(savedResultado.archivos[0].firmado).toBe(false);
+        expect(savedResultado.archivos[0].sellado).toBe(false);
+        expect(savedResultado.archivos[0].explicacion).toContain("Formato no legible sin IA — requiere revisión manual");
+    });
 });
+

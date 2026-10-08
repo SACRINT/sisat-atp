@@ -193,8 +193,25 @@ export function auditarAcosoDeterministaPdf(
     if (typeof bufferOrText === "string") {
         texto = bufferOrText;
     } else if (Buffer.isBuffer(bufferOrText)) {
-        // En caso de buffer PDF, realizamos escaneo de cadenas de texto ASCII / UTF-8
-        texto = bufferOrText.toString("latin1");
+        const isBinary = /[\x00-\x08\x0E-\x1F]/.test(bufferOrText.slice(0, 100).toString("binary"));
+        if (isBinary) {
+            return {
+                firmado: false,
+                sellado: false,
+                aprobado: false,
+                explicacion: "Formato no legible sin IA — requiere revisión manual"
+            };
+        }
+        texto = bufferOrText.toString("utf-8");
+    }
+
+    if (!texto || texto.trim().length === 0) {
+        return {
+            firmado: false,
+            sellado: false,
+            aprobado: false,
+            explicacion: "Formato no legible sin IA — requiere revisión manual"
+        };
     }
 
     const tLower = texto.toLowerCase();

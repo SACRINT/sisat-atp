@@ -532,19 +532,49 @@ Responde únicamente en formato JSON con la siguiente estructura:
                     console.error(`Error analyzing file ${file.nombre} with Gemini:`, e);
                     if (buffer) {
                         let texto = "";
-                        try {
-                            const pdfRes = await extractTextFromPdf(buffer);
-                            texto = pdfRes.text;
-                        } catch {
-                            texto = buffer.toString("latin1");
+                        let formatoLegible = false;
+
+                        if (file.nombre.toLowerCase().endsWith(".docx")) {
+                            try {
+                                texto = await extractTextFromDocx(buffer);
+                                formatoLegible = texto.trim().length > 0;
+                            } catch {
+                                formatoLegible = false;
+                            }
+                        } else {
+                            try {
+                                const pdfRes = await extractTextFromPdf(buffer);
+                                texto = pdfRes.text;
+                                formatoLegible = texto.trim().length > 0;
+                            } catch {
+                                const isBinary = /[\x00-\x08\x0E-\x1F]/.test(buffer.slice(0, 100).toString("binary"));
+                                const rawStr = buffer.toString("utf-8");
+                                if (!isBinary && rawStr.trim().length > 20) {
+                                    texto = rawStr;
+                                    formatoLegible = true;
+                                } else {
+                                    formatoLegible = false;
+                                }
+                            }
                         }
-                        const fallback = evaluarArchivoDiaNaranjaDeterminista(texto, {
-                            nombre: file.nombre,
-                            etiqueta: file.etiqueta || "Archivo",
-                            escuelaNombre,
-                            escuelaCct
-                        });
-                        reportes.push(fallback);
+
+                        if (!formatoLegible) {
+                            reportes.push({
+                                nombre: file.nombre,
+                                etiqueta: file.etiqueta || "Archivo",
+                                firmado: false,
+                                sellado: false,
+                                explicacion: "Formato no legible sin IA — requiere revisión manual"
+                            });
+                        } else {
+                            const fallback = evaluarArchivoDiaNaranjaDeterminista(texto, {
+                                nombre: file.nombre,
+                                etiqueta: file.etiqueta || "Archivo",
+                                escuelaNombre,
+                                escuelaCct
+                            });
+                            reportes.push(fallback);
+                        }
                     } else {
                         const msg = e instanceof Error ? e.message : String(e);
                         reportes.push({
@@ -674,21 +704,43 @@ Responde únicamente en formato JSON con la siguiente estructura:
                     console.error("Error analyzing acoso PDF with Gemini:", e);
                     if (buffer) {
                         let texto = "";
+                        let formatoLegible = false;
+
                         try {
                             const pdfRes = await extractTextFromPdf(buffer);
                             texto = pdfRes.text;
+                            formatoLegible = texto.trim().length > 0;
                         } catch {
-                            texto = buffer.toString("latin1");
+                            const isBinary = /[\x00-\x08\x0E-\x1F]/.test(buffer.slice(0, 100).toString("binary"));
+                            const rawStr = buffer.toString("utf-8");
+                            if (!isBinary && rawStr.trim().length > 20) {
+                                texto = rawStr;
+                                formatoLegible = true;
+                            } else {
+                                formatoLegible = false;
+                            }
                         }
-                        const fallback = auditarAcosoDeterministaPdf(texto, { escuelaNombre, escuelaCct });
-                        resultado = {
-                            tipo: "ACOSO_ESCOLAR",
-                            tieneIncidencias: false,
-                            firmado: fallback.firmado,
-                            sellado: fallback.sellado,
-                            aprobado: fallback.aprobado,
-                            explicacion: fallback.explicacion
-                        };
+
+                        if (!formatoLegible) {
+                            resultado = {
+                                tipo: "ACOSO_ESCOLAR",
+                                tieneIncidencias: false,
+                                firmado: false,
+                                sellado: false,
+                                aprobado: false,
+                                explicacion: "Formato no legible sin IA — requiere revisión manual"
+                            };
+                        } else {
+                            const fallback = auditarAcosoDeterministaPdf(texto, { escuelaNombre, escuelaCct });
+                            resultado = {
+                                tipo: "ACOSO_ESCOLAR",
+                                tieneIncidencias: false,
+                                firmado: fallback.firmado,
+                                sellado: fallback.sellado,
+                                aprobado: fallback.aprobado,
+                                explicacion: fallback.explicacion
+                            };
+                        }
                     } else {
                         const msg = e instanceof Error ? e.message : String(e);
                         resultado = {
