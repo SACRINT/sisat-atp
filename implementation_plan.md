@@ -169,15 +169,15 @@ Los 51 problemas reportados en ESLint sobre los 13 archivos tocados corresponden
 
 ---
 
-## 5. Auditoría de Plan — Fase 4B: Motores Deterministas de Respaldo (Recepción y Saneamiento)
+## 5. Auditoría de Plan — Fase 4B: Motores Deterministas de Respaldo (Revisión y Saneamiento)
 
-- **Estado de Recepción**: Informe de Auditoría adversarial recibido el 2026-10-07.
-- **Veredicto**: APTO CON RESERVAS (0 P0, 5 P2 y 4 P3 atendidos en diseño pre-implementación).
-- **Atención a Hallazgos de Diseño en `scratch/plan_diseno_fase4_motores_deterministas.md`**:
-  1. **[P2-1 Contrato]**: Se ajustó el plan eliminando propiedades inexistentes (`observaciones`, `esRespaldoDeterminista`, `estadoRecomendado`), empleando exclusivamente los campos oficiales de `PreRevisionResult` (`explicacion`, `estatusOficial`, `tieneIncidencias`, `aprobado`).
-  2. **[P2-2 Regla de Aprobación Unificada]**: Se definió regla única por programa garantizando paridad exacta de dictamen entre la ruta IA y el respaldo determinista (mismo input → mismo dictamen).
-  3. **[P2-3 Fixtures Concretos]**: Se identificaron los archivos reales en `documentos_referencia` (`TEMAS_ACOSO ESCOLAR_2026 - Escuelas CEDAVIM.xlsx` y `21EBH0201W-...xlsx`) y se diseñó el generador de fixtures sintéticos conforme a `pre-revision.ts:546-604`.
-  4. **[P2-4 Evidencia en PDFs]**: Se acotó el C4 de Día Naranja a evidencia textual de formalidad institucional y declaración de firmas, descartando inspección binaria frágil sobre streams comprimidos FlateDecode.
-  5. **[P2-5 Fundamento de Rúbricas]**: Declaración explícita como criterios técnicos internos de la Supervisión Escolar Zona 004 alineados a la Campaña ÚNETE de la SEP (Día Naranja: 4x25, umbral 70) y a la Guía Técnica SEMS/DGB/Protección Civil (PIPC: 25/20/20/20/15, umbral 70 y brigadas obligatorias).
-  6. **[P3 Naming y Alcance]**: Renombrada a Fase 4B (para evitar colisión con Fase 4 CTE de `plan_maestro.md`), constructores nombrados `construirResultadoDesdeAuditoriaDeterminista*` y 0 nuevos `console.*`.
+- **Estado de Recepción**: Informe de Auditoría adversarial (Revisión 2) recibido el 2026-10-07.
+- **Veredicto**: APTO CON RESERVAS (0 P0, 5 P2 atendidos puntualmente en diseño pre-implementación).
+- **Atención a Hallazgos F-4B-1 a F-4B-5 en `scratch/plan_diseno_fase4_motores_deterministas.md`**:
+  1. **[F-4B-1 Fixtures Ejecutables]**: Nombre de archivo corregido a `21EBH0201W-TEMAS_ACOSO_ESCOLAR_2026_-_Escuelas.xlsx` y rutas relativas prefijadas con `../documentos_referencia/...` respecto a la raíz de `SISAT_ATP` (comprobadas con `Test-Path = True`).
+  2. **[F-4B-2 Parser con Mes]**: Se especificó el mapeo obligatorio de `mes: sheetName` (nombre de la pestaña del Excel) en `incidenciasDetalle`, asegurando conformidad estricta con `pre-revision.ts:151`.
+  3. **[F-4B-3 Paridad en Acoso-PDF]**: Se incorporó al alcance la emisión de `aprobado: !!parsed.signed && !!parsed.sealed` en la ruta IA de Acoso-PDF (`pre-revision.ts:681`) para igualar la emisión determinista.
+  4. **[F-4B-4 Enforcement Vinculante en PIPC]**: Se listó `src/lib/validadores/validador-pipc.ts` en módulos afectados y se incluyó la tarea de enforcement post-Gemini que vincula `aprobado = (scoreNumerico >= 70 && tieneBrigadas === true)` y emite `scoreNumerico` y `estatusOficial` idénticos en ambas rutas.
+  5. **[F-4B-5 Modelos Autorizados]**: Se corrigieron las citas a los modelos reales en producción: `gemini-3.5-flash-lite` (default) y `gemini-3.1-flash-lite` (fallback) según `gemini.ts:31-33`.
+  6. **[P3 Consistencia y Métricas]**: Se aclaró el rol vinculante del puntaje $\ge 70$ en Día Naranja determinista para certificar formalidad de firmas y sellos, manteniendo `PreRevisionResult` sin drift.
 
