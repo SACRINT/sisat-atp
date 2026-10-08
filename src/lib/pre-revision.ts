@@ -18,6 +18,7 @@ import {
     generarBorradorOficioAcosoDeterminista,
     auditarAcosoDeterministaPdf,
 } from "./quality-gates/acoso-evaluator";
+import { evaluarArchivoDiaNaranjaDeterminista } from "./quality-gates/dia-naranja-evaluator";
 import { PreRevisionResultadoPersistida } from "./pre-revision-badge";
 
 function parseCloudinaryUrl(url: string) {
@@ -498,8 +499,9 @@ export async function analizarEntregaConIA(entregaId: string, textoCompletoInput
             const reportes: Array<{ nombre: string; etiqueta: string; firmado: boolean; sellado: boolean; explicacion: string }> = [];
 
             for (const file of pdfFiles) {
+                let buffer: Buffer | null = null;
                 try {
-                    const buffer = await downloadFile(file.driveUrl!);
+                    buffer = await downloadFile(file.driveUrl!);
                     
                     const systemInstruction = "Eres un Asesor Técnico Pedagógico experto en revisión de expedientes escolares.";
                     const prompt = `Analiza este documento PDF de entrega correspondiente a la escuela ${escuelaNombre} (${escuelaCct}).
@@ -525,22 +527,39 @@ Responde únicamente en formato JSON con la siguiente estructura:
                         explicacion: parsed.explanation || "Analizado correctamente."
                     });
                 } catch (e: unknown) {
-                    console.error(`Error analyzing file ${file.nombre}:`, e);
-                    const msg = e instanceof Error ? e.message : String(e);
-                    reportes.push({
-                        nombre: file.nombre,
-                        etiqueta: file.etiqueta || "Archivo",
-                        firmado: false,
-                        sellado: false,
-                        explicacion: `Error de análisis: ${msg}`
-                    });
+                    console.error(`Error analyzing file ${file.nombre} with Gemini:`, e);
+                    if (buffer) {
+                        const fallback = evaluarArchivoDiaNaranjaDeterminista(buffer, {
+                            nombre: file.nombre,
+                            etiqueta: file.etiqueta || "Archivo",
+                            escuelaNombre,
+                            escuelaCct
+                        });
+                        reportes.push(fallback);
+                    } else {
+                        const msg = e instanceof Error ? e.message : String(e);
+                        reportes.push({
+                            nombre: file.nombre,
+                            etiqueta: file.etiqueta || "Archivo",
+                            firmado: false,
+                            sellado: false,
+                            explicacion: `Error de análisis: ${msg}`
+                        });
+                    }
                 }
             }
+
+            const totalArchivos = reportes.length;
+            const firmadosYSellados = reportes.filter(r => r.firmado && r.sellado).length;
+            const aprobadoDiaNaranja = totalArchivos > 0 && reportes.every(r => r.firmado && r.sellado);
+            const scoreNumerico = totalArchivos > 0 ? Math.round((firmadosYSellados / totalArchivos) * 100) : 0;
 
             resultado = {
                 tipo: "DIA_NARANJA",
                 archivos: reportes,
-                aprobado: reportes.every(r => r.firmado && r.sellado)
+                aprobado: aprobadoDiaNaranja,
+                scoreNumerico,
+                estatusOficial: aprobadoDiaNaranja ? "APROBADO" : "REQUIERE_AJUSTES"
             };
 
         } else if (programaNombre.includes("ACOSO ESCOLAR")) {
