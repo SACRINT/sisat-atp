@@ -166,3 +166,18 @@ Los 51 problemas reportados en ESLint sobre los 13 archivos tocados corresponden
   - `AdminDashboard.tsx`: 2
   - `EntregasListado.tsx`: 1
 - **Totales exactos**: 31 errores + 20 advertencias = 51 problemas retenidos. Cero problemas nuevos introducidos.
+
+---
+
+## 5. Auditoría de Plan — Fase 4B: Motores Deterministas de Respaldo (Recepción y Saneamiento)
+
+- **Estado de Recepción**: Informe de Auditoría adversarial recibido el 2026-10-07.
+- **Veredicto**: APTO CON RESERVAS (0 P0, 5 P2 y 4 P3 atendidos en diseño pre-implementación).
+- **Atención a Hallazgos de Diseño en `scratch/plan_diseno_fase4_motores_deterministas.md`**:
+  1. **[P2-1 Contrato]**: Se ajustó el plan eliminando propiedades inexistentes (`observaciones`, `esRespaldoDeterminista`, `estadoRecomendado`), empleando exclusivamente los campos oficiales de `PreRevisionResult` (`explicacion`, `estatusOficial`, `tieneIncidencias`, `aprobado`).
+  2. **[P2-2 Regla de Aprobación Unificada]**: Se definió regla única por programa garantizando paridad exacta de dictamen entre la ruta IA y el respaldo determinista (mismo input → mismo dictamen).
+  3. **[P2-3 Fixtures Concretos]**: Se identificaron los archivos reales en `documentos_referencia` (`TEMAS_ACOSO ESCOLAR_2026 - Escuelas CEDAVIM.xlsx` y `21EBH0201W-...xlsx`) y se diseñó el generador de fixtures sintéticos conforme a `pre-revision.ts:546-604`.
+  4. **[P2-4 Evidencia en PDFs]**: Se acotó el C4 de Día Naranja a evidencia textual de formalidad institucional y declaración de firmas, descartando inspección binaria frágil sobre streams comprimidos FlateDecode.
+  5. **[P2-5 Fundamento de Rúbricas]**: Declaración explícita como criterios técnicos internos de la Supervisión Escolar Zona 004 alineados a la Campaña ÚNETE de la SEP (Día Naranja: 4x25, umbral 70) y a la Guía Técnica SEMS/DGB/Protección Civil (PIPC: 25/20/20/20/15, umbral 70 y brigadas obligatorias).
+  6. **[P3 Naming y Alcance]**: Renombrada a Fase 4B (para evitar colisión con Fase 4 CTE de `plan_maestro.md`), constructores nombrados `construirResultadoDesdeAuditoriaDeterminista*` y 0 nuevos `console.*`.
+
