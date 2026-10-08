@@ -20,6 +20,7 @@ import {
 } from "./quality-gates/acoso-evaluator";
 import { evaluarArchivoDiaNaranjaDeterminista } from "./quality-gates/dia-naranja-evaluator";
 import { auditarPipcDeterminista } from "./quality-gates/pipc-evaluator";
+import { evaluarPIPC } from "./validadores/validador-pipc";
 import { PreRevisionResultadoPersistida } from "./pre-revision-badge";
 
 function parseCloudinaryUrl(url: string) {
@@ -1286,15 +1287,17 @@ Responde únicamente en formato JSON:
             // --- PIPC ---
             const file = entrega.archivos.find(a => a.tipo === "ENTREGA" && a.driveUrl);
             if (file) {
-                let extractedText = "";
+                let extractedText = textoCompletoInput || "";
+                let buffer: Buffer | undefined;
                 try {
-                    const { evaluarPIPC } = await import("@/lib/validadores/validador-pipc");
-                    const buffer = await downloadFile(file.driveUrl!);
-                    if (file.nombre.toLowerCase().endsWith(".pdf")) {
-                        const pdfRes = await extractTextFromPdf(buffer);
-                        extractedText = pdfRes.text;
-                    } else if (file.nombre.toLowerCase().endsWith(".docx")) {
-                        extractedText = await extractTextFromDocx(buffer);
+                    buffer = await downloadFile(file.driveUrl!);
+                    if (!extractedText) {
+                        if (file.nombre.toLowerCase().endsWith(".pdf")) {
+                            const pdfRes = await extractTextFromPdf(buffer);
+                            extractedText = pdfRes.text;
+                        } else if (file.nombre.toLowerCase().endsWith(".docx")) {
+                            extractedText = await extractTextFromDocx(buffer);
+                        }
                     }
 
                     const evaluacion = await evaluarPIPC(
