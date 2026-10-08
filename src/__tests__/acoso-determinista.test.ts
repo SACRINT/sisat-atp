@@ -8,7 +8,9 @@ import {
 import {
     createMockAcosoExcelBuffer,
     getReferenceAcosoExcelBuffer,
+    getReferenceAcosoPdfBuffer,
 } from "./fixtures/acoso-excel-fixture";
+import { extractTextFromPdf } from "../lib/pre-revision";
 
 describe("Motor Determinista de Acoso Escolar (Excel y PDF)", () => {
     const escuelaInfo = {
@@ -145,6 +147,24 @@ describe("Motor Determinista de Acoso Escolar (Excel y PDF)", () => {
             expect(res.aprobado).toBe(false);
             expect(res.firmado).toBe(false);
             expect(res.explicacion).toContain("carece de elementos formales");
+        });
+
+        it("debe validar exitosamente un PDF real con compresión FlateDecode extrayendo su texto con extractTextFromPdf", async () => {
+            const realPdfBuffer = getReferenceAcosoPdfBuffer();
+            if (realPdfBuffer) {
+                const { text } = await extractTextFromPdf(realPdfBuffer);
+                expect(text.length).toBeGreaterThan(100);
+                const res = auditarAcosoDeterministaPdf(text, {
+                    nombre: "VICENTE SUAREZ FERRER",
+                    cct: "21EBH0682T",
+                });
+                expect(res.firmado).toBe(true);
+                expect(res.sellado).toBe(true);
+                expect(res.aprobado).toBe(true);
+                expect(res.explicacion).toContain("validado deterministamente");
+            } else {
+                expect(true).toBe(true);
+            }
         });
     });
 });

@@ -531,7 +531,14 @@ Responde únicamente en formato JSON con la siguiente estructura:
                 } catch (e: unknown) {
                     console.error(`Error analyzing file ${file.nombre} with Gemini:`, e);
                     if (buffer) {
-                        const fallback = evaluarArchivoDiaNaranjaDeterminista(buffer, {
+                        let texto = "";
+                        try {
+                            const pdfRes = await extractTextFromPdf(buffer);
+                            texto = pdfRes.text;
+                        } catch {
+                            texto = buffer.toString("latin1");
+                        }
+                        const fallback = evaluarArchivoDiaNaranjaDeterminista(texto, {
                             nombre: file.nombre,
                             etiqueta: file.etiqueta || "Archivo",
                             escuelaNombre,
@@ -715,7 +722,14 @@ Responde únicamente en formato JSON con la siguiente estructura:
                 } catch (e: unknown) {
                     console.error("Error analyzing acoso PDF with Gemini:", e);
                     if (buffer) {
-                        const fallback = auditarAcosoDeterministaPdf(buffer, { escuelaNombre, escuelaCct });
+                        let texto = "";
+                        try {
+                            const pdfRes = await extractTextFromPdf(buffer);
+                            texto = pdfRes.text;
+                        } catch {
+                            texto = buffer.toString("latin1");
+                        }
+                        const fallback = auditarAcosoDeterministaPdf(texto, { escuelaNombre, escuelaCct });
                         resultado = {
                             tipo: "ACOSO_ESCOLAR",
                             tieneIncidencias: false,

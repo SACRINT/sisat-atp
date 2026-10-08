@@ -14,6 +14,17 @@ export function getReferenceAcosoExcelBuffer(): Buffer | null {
 }
 
 /**
+ * Obtiene el buffer del archivo PDF oficial de reporte de acoso escolar si existe en disco.
+ */
+export function getReferenceAcosoPdfBuffer(): Buffer | null {
+    const refPath = path.resolve(__dirname, "../../../../documentos_referencia/reportes_escuelas/INFORME DE ACOSO ESCOLAR_21EBH0682T.pdf");
+    if (fs.existsSync(refPath)) {
+        return fs.readFileSync(refPath);
+    }
+    return null;
+}
+
+/**
  * Genera en memoria un buffer de Excel de Acoso Escolar con la estructura oficial de pestañas mensuales.
  */
 export function createMockAcosoExcelBuffer(options: {

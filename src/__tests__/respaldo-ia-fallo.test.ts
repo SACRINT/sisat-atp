@@ -37,7 +37,10 @@ vi.mock("cloudinary", () => ({
 }));
 
 import { analizarEntregaConIA } from "../lib/pre-revision";
-import { createMockAcosoExcelBuffer } from "./fixtures/acoso-excel-fixture";
+import {
+    createMockAcosoExcelBuffer,
+    getReferenceAcosoPdfBuffer,
+} from "./fixtures/acoso-excel-fixture";
 
 describe("Puerta 6: Suplencia Determinista ante Fallo Crítico de IA", () => {
     const escuelaBase = {
@@ -108,16 +111,20 @@ describe("Puerta 6: Suplencia Determinista ante Fallo Crítico de IA", () => {
         expect(savedResultado.borradorCorreo).toContain(escuelaBase.cct);
     });
 
-    it("Acoso Escolar (PDF): ante fallo de IA de visión, debe emitir dictamen determinista de firmas y sellos sin error de análisis", async () => {
+    it("Acoso Escolar (PDF): ante fallo de IA de visión, debe emitir dictamen determinista de firmas y sellos sin error de análisis usando PDF real", async () => {
         const entregaId = "entrega-acoso-pdf-fallo-ia";
-        const pdfContent = `
+        const realPdf = getReferenceAcosoPdfBuffer();
+        const pdfBuffer = realPdf || Buffer.from(`
             GOBIERNO DEL ESTADO DE PUEBLA - SECRETARÍA DE EDUCACIÓN PÚBLICA
-            BACHILLERATO HEROES DE LA REVOLUCION - 21EBH0201W
+            BACHILLERATO VICENTE SUAREZ FERRER - 21EBH0682T
             INFORME DE CERO CASOS DE ACOSO ESCOLAR
             ATENTAMENTE EL DIRECTOR DEL PLANTEL
             SELLO OFICIAL DE LA INSTITUCIÓN
-        `;
-        const pdfBuffer = Buffer.from(pdfContent, "utf-8");
+        `, "utf-8");
+
+        const escuelaPdf = realPdf
+            ? { nombre: "VICENTE SUAREZ FERRER", cct: "21EBH0682T" }
+            : escuelaBase;
 
         mockFindUniqueEntrega.mockResolvedValue({
             id: entregaId,
@@ -135,7 +142,7 @@ describe("Puerta 6: Suplencia Determinista ante Fallo Crítico de IA", () => {
                     nombre: "ACOSO ESCOLAR",
                 },
             },
-            escuela: escuelaBase,
+            escuela: escuelaPdf,
         });
 
         const originalFetch = globalThis.fetch;
