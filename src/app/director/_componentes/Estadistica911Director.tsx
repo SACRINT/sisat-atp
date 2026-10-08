@@ -41,17 +41,19 @@ interface PeriodoConfig {
 }
 
 interface CruceSicepItem {
-    fechaCruce: string;
-    matriculaSicep: number;
+    id?: string;
+    matriculaSicepTotal: number;
+    matricula911Total: number;
     diferencia: number;
     discrepancias?: unknown;
+    createdAt?: string;
 }
 
 interface RegistroEscuela {
     id: string;
     periodoCorte: "INICIO_CURSOS" | "FIN_CURSOS";
     estado: "PENDIENTE" | "CON_INCONSISTENCIAS" | "VALIDADO" | "ENTREGADO_A_CORDE";
-    inconsistencias: Array<{ campo: string; esperado: number; obtenido: number; mensaje: string }>;
+    inconsistencias: Array<{ campo?: string; mensaje: string }>;
     totalAlumnos: number;
     totalHombres: number;
     totalMujeres: number;
@@ -190,8 +192,6 @@ export default function Estadistica911Director({ escuela }: Estadistica911Direct
                         inconsistencias: Array.isArray(regEncontrado.inconsistenciasJson)
                             ? regEncontrado.inconsistenciasJson.map((inc: RegistroApiInconsistencia) => ({
                                 campo: inc.campo || "Inconsistencia",
-                                esperado: inc.detalles?.sumaCalculada ?? inc.detalles?.totalReportado ?? 0,
-                                obtenido: inc.detalles?.totalReportado ?? 0,
                                 mensaje: inc.descripcion || inc.mensaje || "Discrepancia aritmética detectada"
                             }))
                             : [],
