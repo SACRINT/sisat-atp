@@ -40,6 +40,13 @@ interface PeriodoConfig {
     fechaLimiteFin: string | null;
 }
 
+interface CruceSicepItem {
+    fechaCruce: string;
+    matriculaSicep: number;
+    diferencia: number;
+    discrepancias?: unknown;
+}
+
 interface RegistroEscuela {
     id: string;
     periodoCorte: "INICIO_CURSOS" | "FIN_CURSOS";
@@ -51,11 +58,59 @@ interface RegistroEscuela {
     totalDocentes: number;
     totalGrupos: number;
     detallesGrado: Array<{ grado: number; hombres: number; mujeres: number; total: number; grupos: number }>;
-    crucesSicep: Array<{ fechaCruce: string; matriculaSicep: number; diferencia: number; discrepancias: any }>;
+    crucesSicep: CruceSicepItem[];
     archivoUrl: string | null;
     archivoNombre: string | null;
     observaciones: string | null;
     updatedAt: string;
+}
+
+interface RegistroApiInconsistencia {
+    campo?: string;
+    descripcion?: string;
+    mensaje?: string;
+    detalles?: { sumaCalculada?: number; totalReportado?: number };
+}
+
+interface RegistroApiDetalle {
+    semestreGrado: number;
+    hombres?: number;
+    mujeres?: number;
+    total?: number;
+    grupos?: number;
+}
+
+interface RegistroApiItem {
+    id: string;
+    escuelaId?: string;
+    escuelaCCT?: string;
+    escuela?: { cct?: string; id?: string };
+    tipoCorte?: string;
+    estado: "PENDIENTE" | "CON_INCONSISTENCIAS" | "VALIDADO" | "ENTREGADO_A_CORDE";
+    inconsistenciasJson?: RegistroApiInconsistencia[];
+    totalAlumnos?: number;
+    totalHombres?: number;
+    totalMujeres?: number;
+    totalDocentes?: number;
+    totalGrupos?: number;
+    detalles?: RegistroApiDetalle[];
+    crucesSicep?: CruceSicepItem[];
+    archivoUrl?: string | null;
+    archivoNombre?: string | null;
+    notasAtp?: string | null;
+    updatedAt?: string;
+}
+
+interface ProyeccionPlantel {
+    matriculaTotalEstimada?: number;
+    capacidadInstaladaOptima?: number;
+    intervaloConfianzaMin?: number;
+    intervaloConfianzaMax?: number;
+    densidadPromedioPorGrupo?: number;
+    totalGruposAutorizados?: number;
+    docentesEstimadosRequeridos?: number;
+    semaforoRiesgo?: "EQUILIBRADO" | "RIESGO_SOBRECUPO" | "RIESGO_SUBUTILIZACION" | "RIESGO_DESERCION_CRITICA" | string;
+    observacionOperativa?: string;
 }
 
 export default function Estadistica911Director({ escuela }: Estadistica911DirectorProps) {
@@ -68,7 +123,7 @@ export default function Estadistica911Director({ escuela }: Estadistica911Direct
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Estado predictivo para el plantel del director
-    const [proyeccion, setProyeccion] = useState<any | null>(null);
+    const [proyeccion, setProyeccion] = useState<ProyeccionPlantel | null>(null);
     const [loadingProyeccion, setLoadingProyeccion] = useState(false);
     const [corteProyeccion, setCorteProyeccion] = useState<"INICIO_DE_CURSOS" | "FIN_DE_CURSOS">("INICIO_DE_CURSOS");
 
@@ -120,13 +175,46 @@ export default function Estadistica911Director({ escuela }: Estadistica911Direct
                 setConfig(confData.config);
             }
 
-            // Cargar registro de la escuela
+            // Cargar registro de la escuela desde data.registros
             const resReg = await fetch("/api/admin/estadistica-911");
             if (resReg.ok) {
                 const data = await resReg.json();
-                const miEscuela = data.escuelas?.find((e: any) => e.cct === escuela.cct || e.id === escuela.id);
-                if (miEscuela && miEscuela.registro) {
-                    setRegistro(miEscuela.registro);
+                const regEncontrado = (data.registros as RegistroApiItem[] | undefined)?.find(
+                    (r: RegistroApiItem) => r.escuela?.cct === escuela.cct || r.escuelaCCT === escuela.cct || r.escuelaId === escuela.id
+                );
+                if (regEncontrado) {
+                    setRegistro({
+                        id: regEncontrado.id,
+                        periodoCorte: regEncontrado.tipoCorte === "FIN_DE_CURSOS" ? "FIN_CURSOS" : "INICIO_CURSOS",
+                        estado: regEncontrado.estado,
+                        inconsistencias: Array.isArray(regEncontrado.inconsistenciasJson)
+                            ? regEncontrado.inconsistenciasJson.map((inc: RegistroApiInconsistencia) => ({
+                                campo: inc.campo || "Inconsistencia",
+                                esperado: inc.detalles?.sumaCalculada ?? inc.detalles?.totalReportado ?? 0,
+                                obtenido: inc.detalles?.totalReportado ?? 0,
+                                mensaje: inc.descripcion || inc.mensaje || "Discrepancia aritmética detectada"
+                            }))
+                            : [],
+                        totalAlumnos: regEncontrado.totalAlumnos || 0,
+                        totalHombres: regEncontrado.totalHombres || 0,
+                        totalMujeres: regEncontrado.totalMujeres || 0,
+                        totalDocentes: regEncontrado.totalDocentes || 0,
+                        totalGrupos: regEncontrado.totalGrupos || 0,
+                        detallesGrado: Array.isArray(regEncontrado.detalles)
+                            ? regEncontrado.detalles.map((d: RegistroApiDetalle) => ({
+                                grado: d.semestreGrado,
+                                hombres: d.hombres || 0,
+                                mujeres: d.mujeres || 0,
+                                total: d.total || 0,
+                                grupos: d.grupos || 0
+                            }))
+                            : [],
+                        crucesSicep: Array.isArray(regEncontrado.crucesSicep) ? regEncontrado.crucesSicep : [],
+                        archivoUrl: regEncontrado.archivoUrl || null,
+                        archivoNombre: regEncontrado.archivoNombre || null,
+                        observaciones: regEncontrado.notasAtp || null,
+                        updatedAt: regEncontrado.updatedAt || new Date().toISOString()
+                    });
                 } else {
                     setRegistro(null);
                 }
@@ -134,7 +222,7 @@ export default function Estadistica911Director({ escuela }: Estadistica911Direct
 
             // Cargar proyección inicial
             await cargarProyeccion(corteProyeccion);
-        } catch (err: any) {
+        } catch (err) {
             console.error("Error al cargar datos de Estadística 911:", err);
             setMensaje({ tipo: "error", texto: "No se pudieron cargar los datos de estadística." });
         } finally {
@@ -174,8 +262,9 @@ export default function Estadistica911Director({ escuela }: Estadistica911Direct
             } else {
                 setMensaje({ tipo: "error", texto: data.error || "Error al procesar el archivo 911." });
             }
-        } catch (err: any) {
-            setMensaje({ tipo: "error", texto: err.message || "Error al conectar con el servidor." });
+        } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : "Error al conectar con el servidor.";
+            setMensaje({ tipo: "error", texto: errorMsg });
         } finally {
             setUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = "";
