@@ -248,7 +248,7 @@ export async function importarDescubrimientos({
             procesoOrigenId: "ATP-PROC-004",
             prioridad: "MEDIA",
             complejidad: "MEDIA",
-            objetivo: "Validador aritmético de formatos oficiales 911.8 y cruce contra matrícula SICEP con generador de indicadores zonales.",
+            objetivo: "Validador aritmético de formatos oficiales 911 (911.7 / .G / .I) y cruce contra matrícula SICEP con generador de indicadores zonales.",
             problemaQueResuelve: "Discrepancias aritméticas entre matrícula inicial, altas/bajas, repetidores y egreso efectivo.",
             beneficioCualitativo: "Indicadores zonales de reprobación y eficiencia terminal calculados al instante.",
             ahorroHorasAnualMin: 72,

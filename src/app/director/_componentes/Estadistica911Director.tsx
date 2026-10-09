@@ -587,7 +587,7 @@ export default function Estadistica911Director({ escuela }: Estadistica911Direct
                                     color: corteProyeccion === "INICIO_DE_CURSOS" ? "#ffffff" : "#64748b"
                                 }}
                             >
-                                911.7A Inicio
+                                Inicio de Cursos
                             </button>
                             <button
                                 onClick={() => {
@@ -605,7 +605,7 @@ export default function Estadistica911Director({ escuela }: Estadistica911Direct
                                     color: corteProyeccion === "FIN_DE_CURSOS" ? "#ffffff" : "#64748b"
                                 }}
                             >
-                                911.7B Fin
+                                Fin de Cursos
                             </button>
                         </div>
                     </div>

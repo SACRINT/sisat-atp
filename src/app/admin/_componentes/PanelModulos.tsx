@@ -153,7 +153,7 @@ const MODULOS: ModuloInfo[] = [
     {
         key: "showEstadistica911",
         nombre: "Estadística 911 / SICEP",
-        descripcion: "Auditoría y validación aritmética de formatos oficiales 911.8 de inicio y fin de cursos.",
+        descripcion: "Auditoría y validación aritmética de formatos oficiales 911 (911.7 / .G / .I) de inicio y fin de cursos.",
         icon: <BarChart3 size={22} />,
         color: "#059669",
         configEndpoint: "/api/admin/modulos-activacion",

@@ -483,7 +483,7 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                             borderRadius: "9999px",
                             textTransform: "uppercase"
                         }}>
-                            {isInicioCursos ? "911.7A Inicio de Cursos" : "911.7B Fin de Cursos"}
+                            {isInicioCursos ? "Inicio de Cursos" : "Fin de Cursos"}
                         </span>
                     </div>
                     <p style={{ margin: 0, fontSize: "0.85rem", color: "#94a3b8" }}>
@@ -1023,7 +1023,7 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                                     color: corteProyeccion === "INICIO_DE_CURSOS" ? "#ffffff" : "#64748b"
                                 }}
                             >
-                                911.7A Inicio de Cursos
+                                Inicio de Cursos
                             </button>
                             <button
                                 onClick={() => {
@@ -1041,7 +1041,7 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                                     color: corteProyeccion === "FIN_DE_CURSOS" ? "#ffffff" : "#64748b"
                                 }}
                             >
-                                911.7B Fin de Cursos
+                                Fin de Cursos
                             </button>
                         </div>
 
@@ -1675,8 +1675,8 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                                         color: "#1e293b"
                                     }}
                                 >
-                                    <option value="INICIO_DE_CURSOS">🟢 911.7A - Inicio de Cursos</option>
-                                    <option value="FIN_DE_CURSOS">🔵 911.7B - Fin de Cursos</option>
+                                    <option value="INICIO_DE_CURSOS">🟢 Inicio de Cursos</option>
+                                    <option value="FIN_DE_CURSOS">🔵 Fin de Cursos</option>
                                 </select>
                             </div>
 
