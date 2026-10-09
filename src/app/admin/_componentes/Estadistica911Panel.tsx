@@ -1245,10 +1245,11 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                             ) : (
                                 <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                                     {selectedRegistro.crucesSicep.map((cruce: CruceSicepPanelItem, idx: number) => {
-                                        const varPct = cruce.matricula911Total > 0
-                                            ? Math.round((Math.abs(cruce.matriculaSicepTotal - cruce.matricula911Total) / cruce.matricula911Total) * 100)
+                                        const variacionRelativa = cruce.matricula911Total > 0
+                                            ? Math.abs(cruce.matriculaSicepTotal - cruce.matricula911Total) / cruce.matricula911Total
                                             : 0;
-                                        const tieneDiscrepancia = varPct > 10;
+                                        const tieneDiscrepancia = variacionRelativa > 0.10;
+                                        const varPct = (variacionRelativa * 100).toFixed(1);
                                         return (
                                             <div
                                                 key={cruce.id || idx}
