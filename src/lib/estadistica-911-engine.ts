@@ -336,15 +336,30 @@ export function procesarFormato911Excel(buffer: Buffer): ResultadoValidacion911 
             }
         }
 
+        // Extraer texto descriptivo de la fila para evitar colisiones con valores numéricos (ej. 15 alumnos con SEMESTRE 1)
+        const labelText = row
+            .filter(c => typeof c === "string" && isNaN(Number(c)))
+            .map(c => String(c ?? "").toUpperCase().trim())
+            .join(" ");
+
         // Búsqueda por semestres (1° a 6° o 1er a 6to)
         for (let s = 1; s <= 6; s++) {
             const semStr1 = `${s}°`;
             const semStr2 = `${s}ER`;
             const semStr3 = `${s}DO`;
-            const semStr4 = `${s}TO`;
-            const semStr5 = `SEMESTRE ${s}`;
+            const semStr4 = `${s}RO`;
+            const semStr5 = `${s}TO`;
+            const semRegex = new RegExp(`(^|[^0-9])${s}(°|ER|DO|RO|TO|\\s+SEMESTRE|\\s+SEM)($|[^0-9])`, "i");
 
-            if (rowText.includes(semStr1) || rowText.includes(semStr2) || rowText.includes(semStr3) || rowText.includes(semStr4) || rowText.includes(semStr5)) {
+            const esEsteSemestre = semRegex.test(labelText) ||
+                labelText.includes(semStr1) ||
+                labelText.includes(semStr2) ||
+                labelText.includes(semStr3) ||
+                labelText.includes(semStr4) ||
+                labelText.includes(semStr5) ||
+                new RegExp(`\\bSEMESTRE\\s*${s}\\b`, "i").test(labelText);
+
+            if (esEsteSemestre) {
                 // Extraer números de la fila
                 const nums = row.map(c => Number(c)).filter(n => !isNaN(n) && n >= 0);
                 if (nums.length >= 3) {
@@ -358,6 +373,7 @@ export function procesarFormato911Excel(buffer: Buffer): ResultadoValidacion911 
                         semestresMap[s].grupos = 1;
                     }
                 }
+                break;
             }
         }
     }
