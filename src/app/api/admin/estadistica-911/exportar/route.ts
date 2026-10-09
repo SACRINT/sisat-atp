@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { registrarError } from "@/lib/error-log";
@@ -7,7 +7,7 @@ import { generarConcentradoZonal911Excel } from "@/lib/estadistica-911-engine";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
     try {
         const session = await auth();
         if (!session?.user) {
@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
                     mujeres: d.mujeres,
                     total: d.total,
                     grupos: d.grupos,
-                    desgloseEdades: d.desgloseEdades as any
+                    desgloseEdades: (d.desgloseEdades as Record<string, { h: number; m: number }>) || undefined
                 })) : []
             };
         });
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
         const corteLabel = tipoCorte === "INICIO_DE_CURSOS" ? "Inicio_Cursos" : "Fin_Cursos";
         const filename = `Concentrado_Zonal_911_${corteLabel}_${ciclo.nombre.replace(/[^a-zA-Z0-9]/g, "_")}.xlsx`;
 
-        return new NextResponse(excelBuffer as any, {
+        return new NextResponse(new Uint8Array(excelBuffer), {
             status: 200,
             headers: {
                 "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
