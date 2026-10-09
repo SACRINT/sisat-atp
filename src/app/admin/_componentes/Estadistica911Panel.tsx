@@ -19,8 +19,6 @@ import {
     Building2,
     Users,
     GraduationCap,
-    Send,
-    HelpCircle,
     Sparkles,
     TrendingUp,
     Layers
@@ -36,6 +34,117 @@ interface CruceSicepPanelItem {
     createdAt: string;
 }
 
+interface EscuelaItem {
+    id: string;
+    cct: string;
+    nombre: string;
+    localidad?: string | null;
+    municipio?: string | null;
+    zonaEscolar?: string | null;
+    total?: number;
+    gruposPrimerAno?: number;
+    gruposSegundoAno?: number;
+    gruposTercerAno?: number;
+}
+
+interface DetalleRegistroItem {
+    id?: string;
+    semestreGrado: number;
+    hombres: number;
+    mujeres: number;
+    total: number;
+    grupos: number;
+}
+
+interface InconsistenciaItem {
+    tipo?: string;
+    severidad?: "INFO" | "ADVERTENCIA" | "ERROR_CRITICO" | string;
+    campo?: string;
+    descripcion?: string;
+    detalles?: Record<string, unknown>;
+}
+
+interface Estadistica911RegistroItem {
+    id: string;
+    tenantId: string;
+    cicloEscolarId: string;
+    escuelaId: string;
+    tipoCorte: string;
+    estado: string;
+    totalHombres: number;
+    totalMujeres: number;
+    totalAlumnos: number;
+    totalGrupos: number;
+    totalDocentes: number;
+    totalAprobados: number;
+    totalReprobados: number;
+    totalEgresados: number;
+    totalDesercion: number;
+    archivoNombre?: string | null;
+    archivoUrl?: string | null;
+    sha256Hash?: string | null;
+    notasAtp?: string | null;
+    notasAtpJson?: unknown;
+    inconsistenciasJson?: InconsistenciaItem[] | null;
+    createdAt: string;
+    updatedAt: string;
+    detalles?: DetalleRegistroItem[];
+    crucesSicep?: CruceSicepPanelItem[];
+    escuela?: EscuelaItem;
+}
+
+interface EstadisticaConfigItem {
+    id?: string;
+    tipoCorte?: string;
+    fechaLimite?: string | null;
+    activo?: boolean;
+    visibleEnDirector?: boolean;
+}
+
+interface KpisZonalesItem {
+    totalEscuelas: number;
+    entregadas: number;
+    validados: number;
+    conInconsistencias: number;
+    pendientes: number;
+    matriculaZonal: number;
+    hombresZonal: number;
+    mujeresZonal: number;
+    gruposZonal: number;
+    docentesZonal: number;
+}
+
+interface ProyeccionEscuelaItem {
+    escuelaId: string;
+    nombre: string;
+    cct: string;
+    municipio?: string | null;
+    totalGruposAutorizados?: number;
+    matriculaTotalEstimada?: number;
+    capacidadInstaladaOptima?: number;
+    intervaloConfianzaMin?: number;
+    intervaloConfianzaMax?: number;
+    densidadPromedioPorGrupo?: number;
+    docentesEstimadosRequeridos?: number;
+    semaforoRiesgo?: "RIESGO_SOBRECUPO" | "RIESGO_SUBUTILIZACION" | "RIESGO_DESERCION_CRITICA" | "EQUILIBRADO" | string;
+    observacionOperativa?: string;
+}
+
+interface ProyeccionZonalItem {
+    matriculaZonalEstimada: number;
+    matriculaZonalMin: number;
+    matriculaZonalMax: number;
+    capacidadZonalOptima: number;
+    totalGruposZonales: number;
+    totalEscuelasAnalizadas: number;
+    docentesZonalesRequeridos: number;
+    conteoEquilibradas?: number;
+    conteoRiesgoSobrecupo?: number;
+    conteoRiesgoSubutilizacion?: number;
+    metodoCalculo?: string;
+    escuelas?: ProyeccionEscuelaItem[];
+}
+
 interface Estadistica911PanelProps {
     readOnly?: boolean;
 }
@@ -45,17 +154,17 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
     const [refreshing, setRefreshing] = useState(false);
     const [data, setData] = useState<{
         ciclo?: { id: string; nombre: string; activo: boolean };
-        config?: any;
-        escuelas?: any[];
-        registros?: any[];
-        kpis?: any;
+        config?: EstadisticaConfigItem;
+        escuelas?: EscuelaItem[];
+        registros?: Estadistica911RegistroItem[];
+        kpis?: KpisZonalesItem;
     }>({});
     const [searchTerm, setSearchTerm] = useState("");
     const [filtroEstado, setFiltroEstado] = useState<string>("TODOS");
 
     // Modales
-    const [selectedEscuela, setSelectedEscuela] = useState<any | null>(null);
-    const [selectedRegistro, setSelectedRegistro] = useState<any | null>(null);
+    const [selectedEscuela, setSelectedEscuela] = useState<EscuelaItem | null>(null);
+    const [selectedRegistro, setSelectedRegistro] = useState<Estadistica911RegistroItem | null>(null);
     const [modalDetalleOpen, setModalDetalleOpen] = useState(false);
     const [modalUploadOpen, setModalUploadOpen] = useState(false);
     const [modalConfigOpen, setModalConfigOpen] = useState(false);
@@ -79,7 +188,7 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
 
     // Estado para vista predictiva
     const [vistaTab, setVistaTab] = useState<"auditoria" | "predictivo">("auditoria");
-    const [proyeccionZonal, setProyeccionZonal] = useState<any | null>(null);
+    const [proyeccionZonal, setProyeccionZonal] = useState<ProyeccionZonalItem | null>(null);
     const [loadingProyeccion, setLoadingProyeccion] = useState(false);
     const [corteProyeccion, setCorteProyeccion] = useState<"INICIO_DE_CURSOS" | "FIN_DE_CURSOS">("INICIO_DE_CURSOS");
 
@@ -268,9 +377,9 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                 setMatriculaSicepInput("");
                 await cargarDatos();
                 if (json.cruce) {
-                    setSelectedRegistro((prev: Record<string, unknown> | null) => (prev ? {
+                    setSelectedRegistro((prev) => (prev ? {
                         ...prev,
-                        crucesSicep: [json.cruce, ...(((prev.crucesSicep as CruceSicepPanelItem[]) || []))]
+                        crucesSicep: [json.cruce, ...((prev.crucesSicep || []))]
                     } : null));
                 }
             } else {
@@ -667,7 +776,7 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                                             let a3H = 0, a3M = 0, a3T = 0;
 
                                             if (reg && reg.detalles) {
-                                                reg.detalles.forEach((d: any) => {
+                                                reg.detalles.forEach((d: DetalleRegistroItem) => {
                                                     if (d.semestreGrado === 1 || d.semestreGrado === 2) {
                                                         a1H += d.hombres; a1M += d.mujeres; a1T += d.total;
                                                     } else if (d.semestreGrado === 3 || d.semestreGrado === 4) {
@@ -1026,7 +1135,7 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {proyeccionZonal.escuelas?.map((ep: any) => {
+                                            {proyeccionZonal.escuelas?.map((ep: ProyeccionEscuelaItem) => {
                                                 const semaforoColor = ep.semaforoRiesgo === "RIESGO_SOBRECUPO"
                                                     ? { bg: "#fee2e2", text: "#991b1b", label: "SOBRECUPO" }
                                                     : ep.semaforoRiesgo === "RIESGO_SUBUTILIZACION"
@@ -1146,7 +1255,7 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                                 </div>
                             ) : (
                                 <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                                    {selectedRegistro.inconsistenciasJson.map((inc: any, i: number) => (
+                                    {((selectedRegistro.inconsistenciasJson as InconsistenciaItem[]) || []).map((inc: InconsistenciaItem, i: number) => (
                                         <div
                                             key={i}
                                             style={{
@@ -1187,7 +1296,7 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {selectedRegistro.detalles.map((d: any) => (
+                                            {selectedRegistro.detalles.map((d: DetalleRegistroItem) => (
                                                 <tr key={d.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
                                                     <td style={{ padding: "0.5rem 0.75rem", fontWeight: 700 }}>{d.semestreGrado}° Semestre</td>
                                                     <td style={{ padding: "0.5rem 0.75rem", textAlign: "center" }}>{d.hombres}</td>
