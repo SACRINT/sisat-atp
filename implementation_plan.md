@@ -331,3 +331,39 @@ Los 51 problemas reportados en ESLint sobre los 13 archivos tocados corresponden
   - `npx eslint <archivos_tocados>` = 0 errores, 0 advertencias.
   - `npm run build` = 81/81 rutas compiladas exitosamente con Turbopack (Código 0).
 
+---
+
+## 10. Fase 2 Ruta A+OCR — Extracción de Formato 911 desde PDF Digital y Escaneado (ATP-MOD-03)
+
+- **Objetivo**: Habilitar la ingestión y extracción estructurada de formatos oficiales 911 cargados como PDF (digital o escaneado) e imágenes en el módulo ATP-MOD-03, sustituyendo el guardado en cero por extracción real y validación aritmética.
+- **Entregables Implementados Quirúrgicamente**:
+  1. **Servicio Extractor Multimodal (`src/lib/estadistica-911-pdf-extractor.ts`)**:
+     - Exporta `extraerDatos911(buffer: Buffer, mimeType: string): Promise<DatosFormato911 | null>`.
+     - Flujo de dos vías:
+       * Detección de capa de texto con `pdf-parse/lib/pdf-parse.js`.
+       * Si el texto es >= 80 caracteres, intenta extracción determinista por expresiones regulares (CCT, docentes, tipo de corte, semestres).
+       * Si el archivo es una imagen (`image/*`), un escaneado (< 80 caracteres) o si la heurística regex no detecta semestres válidos (como ocurre en formatos SICEP con números comprimidos), canaliza automáticamente a OCR multimodal mediante `callGemini` (Gemini Flash Lite con responseSchema JSON estricto).
+     - Validación de sanidad: rechaza estructuras sin semestres numéricos válidos retornando `null` para activar captura asistida.
+     - Commit: `05004cb`.
+  2. **Enganche en Endpoint de Carga y UI (`upload/route.ts`, `Director`, `Panel`)**:
+     - `upload/route.ts`: admite extensiones `.xlsx`, `.xls`, `.pdf`, `.jpg`, `.jpeg`, `.png`, `.webp`.
+     - Procesa PDFs e imágenes mediante `extraerDatos911`, valida la estructura resultante con `validarAritmetica911(datosExtraidos, sha)` y adjunta la advertencia informativa `INFO`: `"Datos extraídos automáticamente desde PDF/imagen — verifique los totales contra el documento original."`.
+     - Conserva fallback resiliente (registro en cero + aviso) ante fallos de IA o formatos no estructurados.
+     - Tipado estricto `Prisma.InputJsonValue` en `inconsistenciasJson` y `desgloseEdades`, erradicando `any`.
+     - Actualización de inputs file en `Estadistica911Director.tsx` y `Estadistica911Panel.tsx` para aceptar `image/*`.
+     - Commit: `23e4110`.
+  3. **Suite de Pruebas Unitarias (`src/__tests__/estadistica-911-pdf-extractor.test.ts`)**:
+     - 6 pruebas unitarias que cubren:
+       * Extracción completa de CCT, docentes y los 6 semestres ante respuesta estructurada de Gemini.
+       * Limpieza de bloques de markdown ```json.
+       * Fallback defensivo devolviendo `null` ante error de IA (503 / cuota).
+       * Validación de sanidad rechazando semestres vacíos.
+       * Verificación condicional (`it.skipIf`) con fixtures reales en disco (`Estadística de inicio 26-27  Tecomate.pdf` y `Estadística de fin 25-26 Tecomate.pdf`).
+     - Commit: `5b0219f`.
+- **Validación Final de Calidad (Ronda 6)**:
+  - `npx tsc --noEmit` = Código 0 (0 errores).
+  - `npm test` = 12 suites / 72 tests pasados (100% verde).
+  - `npx eslint <archivos_tocados>` = 0 errores, 0 advertencias.
+  - `npm run build` = 81/81 rutas compiladas exitosamente con Turbopack (Código 0).
+
+
