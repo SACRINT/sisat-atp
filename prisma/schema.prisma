@@ -1610,7 +1610,7 @@ model EstadisticaPeriodoConfig {
   @@index([tenantId])
 }
 
-/// Registro de entrega y validación de formato 911.8 por escuela
+/// Registro de entrega y validación de formato oficial 911 (911.7 / .G / .I) por escuela
 model Estadistica911Registro {
   id                  String                    @id @default(cuid())
   tenantId            String

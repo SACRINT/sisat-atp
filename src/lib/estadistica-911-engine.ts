@@ -416,7 +416,7 @@ export function generarConcentradoZonal911Excel(registros: {
     rows.push(["SECRETARÍA DE EDUCACIÓN PÚBLICA DEL ESTADO DE PUEBLA"]);
     rows.push(["SUBSECRETARÍA DE EDUCACIÓN OBLIGATORIA - DIRECCIÓN GENERAL DE BACHILLERATOS"]);
     rows.push([nombreSupervision || (process.env.ZONA_ESCOLAR ? `SUPERVISIÓN ESCOLAR DE BACHILLERATOS GENERALES - ZONA ${process.env.ZONA_ESCOLAR}` : "SUPERVISIÓN ESCOLAR DE BACHILLERATOS GENERALES")]);
-    rows.push(["CONCENTRADO ZONAL DE ESTADÍSTICA OFICIAL 911.8"]);
+    rows.push(["CONCENTRADO ZONAL DE ESTADÍSTICA OFICIAL 911"]);
     rows.push([`FECHA DE GENERACIÓN: ${new Date().toLocaleDateString("es-MX", { dateStyle: "long" })}`]);
     rows.push([]); // Espacio
 

@@ -483,7 +483,7 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                             borderRadius: "9999px",
                             textTransform: "uppercase"
                         }}>
-                            {isInicioCursos ? "911.8A Inicio de Cursos" : "911.8B Fin de Cursos"}
+                            {isInicioCursos ? "911.7A Inicio de Cursos" : "911.7B Fin de Cursos"}
                         </span>
                     </div>
                     <p style={{ margin: 0, fontSize: "0.85rem", color: "#94a3b8" }}>
@@ -988,7 +988,7 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                                 ⚠️ PROYECCIÓN ESTADÍSTICA ESTIMADA (ATP-MOD-03)
                             </div>
                             <div style={{ fontSize: "0.8rem", color: "#b45309", marginTop: "0.15rem" }}>
-                                Los valores son estimaciones deterministas basadas en capacidad instalada de grupos y normativas de ocupación SEP. No sustituyen los datos capturados y sellados en el formato oficial 911.8.
+                                Los valores son estimaciones deterministas basadas en capacidad instalada de grupos y normativas de ocupación SEP. No sustituyen los datos capturados y sellados en el formato oficial 911 (911.7).
                             </div>
                         </div>
                     </div>
@@ -1023,7 +1023,7 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                                     color: corteProyeccion === "INICIO_DE_CURSOS" ? "#ffffff" : "#64748b"
                                 }}
                             >
-                                911.8A Inicio de Cursos
+                                911.7A Inicio de Cursos
                             </button>
                             <button
                                 onClick={() => {
@@ -1041,7 +1041,7 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                                     color: corteProyeccion === "FIN_DE_CURSOS" ? "#ffffff" : "#64748b"
                                 }}
                             >
-                                911.8B Fin de Cursos
+                                911.7B Fin de Cursos
                             </button>
                         </div>
 
@@ -1543,7 +1543,7 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #e2e8f0", paddingBottom: "0.75rem" }}>
                             <div>
                                 <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "#1e293b", margin: 0 }}>
-                                    Cargar Formato Oficial 911.8
+                                    Cargar Formato Oficial 911
                                 </h3>
                                 <p style={{ fontSize: "0.78rem", color: "#64748b", margin: "0.2rem 0 0" }}>
                                     {selectedEscuela.nombre} ({selectedEscuela.cct})
@@ -1675,8 +1675,8 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                                         color: "#1e293b"
                                     }}
                                 >
-                                    <option value="INICIO_DE_CURSOS">🟢 911.8A - Inicio de Cursos</option>
-                                    <option value="FIN_DE_CURSOS">🔵 911.8B - Fin de Cursos</option>
+                                    <option value="INICIO_DE_CURSOS">🟢 911.7A - Inicio de Cursos</option>
+                                    <option value="FIN_DE_CURSOS">🔵 911.7B - Fin de Cursos</option>
                                 </select>
                             </div>
 

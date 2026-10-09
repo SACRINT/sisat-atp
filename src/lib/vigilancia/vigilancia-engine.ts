@@ -394,7 +394,7 @@ export async function ejecutarVigilanciaProactiva(tenantIdParam?: string): Promi
       // C. Estado CON_INCONSISTENCIAS
       if (!tieneDiscrepancia && reg.estado === "CON_INCONSISTENCIAS") {
         tieneDiscrepancia = true;
-        detalleMotivo = `El formato 911.8 contiene observaciones e inconsistencias aritméticas pendientes de solventar.`;
+        detalleMotivo = `El formato 911 contiene observaciones e inconsistencias aritméticas pendientes de solventar.`;
       }
 
       if (tieneDiscrepancia) {

@@ -312,7 +312,7 @@ export default function Estadistica911Director({ escuela }: Estadistica911Direct
                         </h2>
                     </div>
                     <p style={{ margin: 0, fontSize: "0.875rem", opacity: 0.9 }}>
-                        Formato Oficial 911.8 — {config?.periodoCorte === "FIN_CURSOS" ? "Fin de Cursos" : "Inicio de Cursos"}
+                        Formato Oficial 911 (911.7) — {config?.periodoCorte === "FIN_CURSOS" ? "Fin de Cursos" : "Inicio de Cursos"}
                     </p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
@@ -407,7 +407,7 @@ export default function Estadistica911Director({ escuela }: Estadistica911Direct
                         <div style={{ border: "2px dashed #cbd5e1", borderRadius: "12px", padding: "1.5rem", textAlign: "center", background: "#fcfdfe" }}>
                             <Upload size={28} color="#059669" style={{ margin: "0 auto 0.75rem" }} />
                             <h4 style={{ margin: "0 0 0.25rem", fontSize: "0.95rem", fontWeight: 700 }}>
-                                {registro ? "Actualizar Formato 911.8" : "Subir Formato 911.8"}
+                                {registro ? "Actualizar Formato 911" : "Subir Formato 911"}
                             </h4>
                             <p style={{ margin: "0 0 1rem", fontSize: "0.75rem", color: "#64748b" }}>
                                 Formato Excel (.xlsx, .xls) o PDF descargado del sistema oficial 911
@@ -544,7 +544,7 @@ export default function Estadistica911Director({ escuela }: Estadistica911Direct
                         ) : (
                             <div style={{ padding: "2rem", textAlign: "center", color: "#94a3b8", fontSize: "0.85rem" }}>
                                 <FileSpreadsheet size={36} style={{ margin: "0 auto 0.5rem", opacity: 0.5 }} />
-                                <p>Aún no se ha cargado el formato 911.8 para este periodo.</p>
+                                <p>Aún no se ha cargado el formato oficial 911 para este periodo.</p>
                             </div>
                         )}
                     </div>
@@ -587,7 +587,7 @@ export default function Estadistica911Director({ escuela }: Estadistica911Direct
                                     color: corteProyeccion === "INICIO_DE_CURSOS" ? "#ffffff" : "#64748b"
                                 }}
                             >
-                                911.8A Inicio
+                                911.7A Inicio
                             </button>
                             <button
                                 onClick={() => {
@@ -605,7 +605,7 @@ export default function Estadistica911Director({ escuela }: Estadistica911Direct
                                     color: corteProyeccion === "FIN_DE_CURSOS" ? "#ffffff" : "#64748b"
                                 }}
                             >
-                                911.8B Fin
+                                911.7B Fin
                             </button>
                         </div>
                     </div>
