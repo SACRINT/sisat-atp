@@ -694,19 +694,6 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                                 👨‍🏫 {kpis.docentesZonal} docentes frente a grupo
                             </div>
                         </div>
-
-                        <div style={{ background: "#ffffff", padding: "1.25rem", borderRadius: "12px", border: "1px solid #e2e8f0", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#64748b", fontSize: "0.8rem", fontWeight: 700 }}>
-                                <span>DESERCIÓN Y EFICIENCIA</span>
-                                <TrendingUp style={{ width: "18px", height: "18px", color: (kpis.tasaDesercionZonal || 0) > 5 ? "#ef4444" : "#10b981" }} />
-                            </div>
-                            <div style={{ fontSize: "1.75rem", fontWeight: 900, color: (kpis.tasaDesercionZonal || 0) > 5 ? "#dc2626" : "#1e293b", marginTop: "0.25rem" }}>
-                                {kpis.tasaDesercionZonal ?? 0}% <span style={{ fontSize: "0.95rem", color: "#64748b", fontWeight: 600 }}>Deserción</span>
-                            </div>
-                            <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "0.25rem" }}>
-                                🎓 Aprobación zonal: {kpis.tasaAprobacionZonal ?? 0}% ({kpis.totalEgresadosZonal ?? 0} egresados)
-                            </div>
-                        </div>
                     </div>
 
                     {/* Barra de Búsqueda y Filtros */}
