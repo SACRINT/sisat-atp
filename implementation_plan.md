@@ -287,4 +287,47 @@ Los 51 problemas reportados en ESLint sobre los 13 archivos tocados corresponden
   - `npm test` = 10 suites / 49 tests pasados (100% verde).
   - `npx eslint` = 0 errores nuevos en archivos tocados.
   - `npm run build` = 81/81 rutas optimizadas exitosamente (código 0).
-- **Estado Actual**: Auditoría de solo lectura entregada. Esperando veredicto adversarial de OpenCode antes de autorizar la Fase 2 (fixes quirúrgicos).
+- **Estado Actual**: Auditoría de solo lectura completada. Procediendo con remediaciones quirúrgicas de Fase 2 autorizadas por OpenCode.
+
+---
+
+## 9. Resolución de Auditoría Adversarial — Módulo MOD-03 (Estadística 911 / SICEP) Rondas 4 y 5
+
+- **Estado de Auditoría**: Remediación quirúrgica de hallazgos P0, P1, P2 y P3 completada con 11 commits individuales verificados.
+- **Resolución Quirúrgica Ítem por Ítem**:
+  1. **[H-5 & H-8 (P1/P3) Gestión Determinista de Cruces SICEP]**:
+     - Ordenamiento `{ orderBy: { createdAt: "desc" } }` en consultas Prisma (`src/app/api/admin/estadistica-911/route.ts:68` y `src/lib/vigilancia/vigilancia-engine.ts:362`).
+     - En endpoint POST (`cruces/route.ts`), reemplazo limpio de inconsistencias previas `DISCREPANCIA_SICEP` y restauración automática a estado `VALIDADO` si ya no restan inconsistencias críticas.
+     - Validación estricta de número entero (`Number.isInteger(sicepNum) && sicepNum >= 0`), validación de `Array.isArray(discrepancias)` y sanitización de respuestas 500.
+     - Commits: `dffb8c8` y `af58d22`.
+  2. **[H-6 (P1) Activación de DESCUADRE_TOTAL en Lector Excel]**:
+     - En `procesarFormato911Excel` (`estadistica-911-engine.ts:450-465`), detección de filas de totales generales del formato oficial e inyección en `datos.totalAlumnos`, activando la Regla 1 (`DESCUADRE_TOTAL`) ante cualquier discrepancia aritmética interna.
+     - Commit: `ef5e02d`.
+  3. **[H-7 (P2) Umbral Exacto de Discrepancia SICEP]**:
+     - Reemplazo de redondeos `Math.round` por la fórmula exacta `variacionRelativa > 0.10` en `Estadistica911Panel.tsx`, evitando falsos negativos en márgenes frontera (e.g. 10.4%).
+     - Commit: `e4d0a15`.
+  4. **[H-10 (P2) Erradicación de Deuda Técnica `any` en Panel]**:
+     - Tipado exhaustivo de todas las estructuras en `Estadistica911Panel.tsx` mediante interfaces `EscuelaItem`, `DetalleRegistroItem`, `InconsistenciaItem`, `Estadistica911RegistroItem`, `CruceSicepItem`, `ProyeccionZonalItem`. ESLint en 0 errores y 0 warnings.
+     - Commit: `7ec4f0a`.
+  5. **[Cola P2(a) Cobertura de Pruebas Unitarias Motor 911]**:
+     - Creación de suite unitaria `src/__tests__/estadistica-911-engine.test.ts` con 17 pruebas que cubren las 7 reglas de consistencia de `validarAritmetica911`, los casos frontera de `validarCruceSicep` y el parser de Excel.
+     - Commit: `99a8758`.
+  6. **[H-11 (P2) Erradicación de Métrica Falsa 0% en Dashboard]**:
+     - Opcional A: Retiro de tarjeta estática "DESERCIÓN Y EFICIENCIA" en `Estadistica911Panel.tsx` para evitar inducir a error con un 0% estático hasta contar con fuente de datos activa de fin de cursos.
+     - Commit: `e711f56`.
+  7. **[H-12 (P3) Normalización Normativa de Rótulos y Referencias 911]**:
+     - Sustitución de rótulos no oficiales "911.7A / 911.7B" por la denominación oficial SEP: "Inicio de Cursos" y "Fin de Cursos" en `Estadistica911Director.tsx` y `Estadistica911Panel.tsx`.
+     - Corrección de las dos referencias residuales a "911.8" en `PanelModulos.tsx` e `importar-descubrimientos.ts` a "911 (911.7 / .G / .I)".
+     - Commit: `aeda59f`.
+  8. **[Mantenimiento: Exportación Concentrado Zonal Tipada]**:
+     - Eliminación de casts `any` y tipado binario con `Uint8Array` en `src/app/api/admin/estadistica-911/exportar/route.ts`.
+     - Commit: `944e9e8`.
+- **Justificación de Aplazamiento P2(c) (Informe Oficial de Supervisión)**:
+  - El concentrado oficial normativo requerido por la supervisión escolar ya se encuentra disponible al 100% en formato Excel oficial SEP (`generarConcentradoZonal911Excel`).
+  - La emisión de un dictamen ejecutivo en PDF/Word se programa formalmente para la Fase de Generadores Documentales Institucionales para evitar generar plantillas vacías sin ingesta real de datos.
+- **Validación Final de Calidad (Ronda 5)**:
+  - `npx tsc --noEmit` = Código 0 (0 errores).
+  - `npm test` = 11 suites / 66 tests pasados (100% verde).
+  - `npx eslint <archivos_tocados>` = 0 errores, 0 advertencias.
+  - `npm run build` = 81/81 rutas compiladas exitosamente con Turbopack (Código 0).
+
