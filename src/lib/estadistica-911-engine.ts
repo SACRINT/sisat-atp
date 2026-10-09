@@ -16,7 +16,7 @@ export interface DetalleGradoInput {
 }
 
 export interface Inconsistencia911 {
-    tipo: "DESCUADRE_GENERO" | "DESCUADRE_EDADES" | "DESCUADRE_TOTAL" | "FALTA_GRUPOS" | "FALTA_DOCENTES" | "VALOR_INVALIDO" | "DISCREPANCIA_SICEP";
+    tipo: "DESCUADRE_GENERO" | "DESCUADRE_EDADES" | "DESCUADRE_TOTAL" | "FALTA_GRUPOS" | "FALTA_DOCENTES" | "VALOR_INVALIDO" | "DISCREPANCIA_SICEP" | "INFO";
     severidad: "INFO" | "ADVERTENCIA" | "ERROR_CRITICO";
     semestreGrado?: number;
     campo: string;

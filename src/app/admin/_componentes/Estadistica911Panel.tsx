@@ -1555,14 +1555,14 @@ export default function Estadistica911Panel({ readOnly = false }: Estadistica911
                             }}>
                                 <FileSpreadsheet style={{ width: "36px", height: "36px", color: "#10b981", margin: "0 auto 0.5rem" }} />
                                 <p style={{ fontSize: "0.85rem", fontWeight: 600, color: "#334155", margin: 0 }}>
-                                    {uploadFile ? uploadFile.name : "Seleccione o arrastre el archivo Excel (.xlsx / .xls) o PDF"}
+                                    {uploadFile ? uploadFile.name : "Seleccione o arrastre el archivo Excel (.xlsx / .xls), PDF o imagen (JPG/PNG) del formato 911"}
                                 </p>
                                 <p style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.25rem" }}>
                                     El motor validará automáticamente la suma por género, edades y grupos.
                                 </p>
                                 <input
                                     type="file"
-                                    accept=".xlsx,.xls,.pdf"
+                                    accept=".xlsx,.xls,.pdf,.jpg,.jpeg,.png,.webp,image/*"
                                     onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
                                     style={{ marginTop: "0.75rem", fontSize: "0.8rem" }}
                                 />

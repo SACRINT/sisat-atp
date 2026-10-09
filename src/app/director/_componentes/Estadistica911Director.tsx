@@ -410,12 +410,12 @@ export default function Estadistica911Director({ escuela }: Estadistica911Direct
                                 {registro ? "Actualizar Formato 911" : "Subir Formato 911"}
                             </h4>
                             <p style={{ margin: "0 0 1rem", fontSize: "0.75rem", color: "#64748b" }}>
-                                Formato Excel (.xlsx, .xls) o PDF descargado del sistema oficial 911
+                                Formato Excel (.xlsx, .xls), PDF o imagen (JPG/PNG) del formato 911
                             </p>
                             <input
                                 ref={fileInputRef}
                                 type="file"
-                                accept=".xlsx,.xls,.pdf"
+                                accept=".xlsx,.xls,.pdf,.jpg,.jpeg,.png,.webp,image/*"
                                 onChange={handleSubirArchivo}
                                 style={{ display: "none" }}
                                 id="archivo-911-input"

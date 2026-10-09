@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { registrarError } from "@/lib/error-log";
 import { obtenerCicloActual } from "@/lib/ciclo";
 import { procesarFormato911Excel, validarAritmetica911, calcularSha256, DatosFormato911 } from "@/lib/estadistica-911-engine";
+import { extraerDatos911 } from "@/lib/estadistica-911-pdf-extractor";
 
 export const dynamic = "force-dynamic";
 
@@ -74,32 +76,57 @@ export async function POST(req: NextRequest) {
             const buffer = Buffer.from(arrayBuffer);
 
             // Validar extensión
-            const ext = file.name.split(".").pop()?.toLowerCase();
+            const ext = file.name.split(".").pop()?.toLowerCase() || "";
+            const extensionesPermitidas = ["xlsx", "xls", "pdf", "jpg", "jpeg", "png", "webp"];
+            if (!extensionesPermitidas.includes(ext)) {
+                return NextResponse.json({
+                    error: "Formato no permitido. Solo se aceptan archivos Excel (.xlsx, .xls), PDF (.pdf) o imágenes (.jpg, .jpeg, .png, .webp)."
+                }, { status: 400 });
+            }
+
             if (ext === "xlsx" || ext === "xls") {
                 resultado = procesarFormato911Excel(buffer);
             } else {
-                // PDF u otro formato: calcular hash y generar estructura base
+                // PDF o imagen: calcular hash y extraer datos
                 const sha = calcularSha256(buffer);
-                resultado = {
-                    totalHombres: 0,
-                    totalMujeres: 0,
-                    totalAlumnos: 0,
-                    totalGrupos: 0,
-                    totalDocentes: 0,
-                    totalAprobados: 0,
-                    totalReprobados: 0,
-                    totalEgresados: 0,
-                    totalDesercion: 0,
-                    inconsistencias: [{
+                const mimeType = file.type || (
+                    ext === "pdf" ? "application/pdf" :
+                    ext === "png" ? "image/png" :
+                    ext === "webp" ? "image/webp" :
+                    "image/jpeg"
+                );
+
+                const datosExtraidos = await extraerDatos911(buffer, mimeType);
+                if (datosExtraidos) {
+                    resultado = validarAritmetica911(datosExtraidos, sha);
+                    resultado.inconsistencias.push({
                         tipo: "INFO",
                         severidad: "INFO",
-                        campo: "Formato PDF",
-                        descripcion: "Archivo PDF recibido. La captura numérica detallada se puede ingresar o verificar manualmente."
-                    }],
-                    detallesGrados: [],
-                    esValido: true,
-                    sha256Hash: sha
-                };
+                        campo: "Extracción Automática",
+                        descripcion: "Datos extraídos automáticamente desde PDF/imagen — verifique los totales contra el documento original."
+                    });
+                } else {
+                    resultado = {
+                        totalHombres: 0,
+                        totalMujeres: 0,
+                        totalAlumnos: 0,
+                        totalGrupos: 0,
+                        totalDocentes: 0,
+                        totalAprobados: 0,
+                        totalReprobados: 0,
+                        totalEgresados: 0,
+                        totalDesercion: 0,
+                        inconsistencias: [{
+                            tipo: "INFO",
+                            severidad: "INFO",
+                            campo: "Formato PDF/Imagen",
+                            descripcion: "Archivo PDF o imagen recibido. La captura numérica detallada se puede ingresar o verificar manualmente."
+                        }],
+                        detallesGrados: [],
+                        esValido: true,
+                        sha256Hash: sha
+                    };
+                }
             }
         } else {
             // Payload JSON directo (captura manual)
@@ -155,7 +182,7 @@ export async function POST(req: NextRequest) {
                 totalEgresados: resultado.totalEgresados,
                 totalDesercion: resultado.totalDesercion,
                 estado: estadoFinal,
-                inconsistenciasJson: resultado.inconsistencias as any
+                inconsistenciasJson: resultado.inconsistencias as unknown as Prisma.InputJsonValue
             },
             create: {
                 tenantId,
@@ -176,7 +203,7 @@ export async function POST(req: NextRequest) {
                 totalEgresados: resultado.totalEgresados,
                 totalDesercion: resultado.totalDesercion,
                 estado: estadoFinal,
-                inconsistenciasJson: resultado.inconsistencias as any
+                inconsistenciasJson: resultado.inconsistencias as unknown as Prisma.InputJsonValue
             }
         });
 
@@ -195,7 +222,7 @@ export async function POST(req: NextRequest) {
                     mujeres: d.mujeres,
                     total: d.total,
                     grupos: d.grupos,
-                    desgloseEdades: (d.desgloseEdades || {}) as any
+                    desgloseEdades: (d.desgloseEdades || {}) as unknown as Prisma.InputJsonValue
                 }))
             });
         }
