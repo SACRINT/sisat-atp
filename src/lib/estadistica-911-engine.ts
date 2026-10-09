@@ -262,6 +262,7 @@ export function procesarFormato911Excel(buffer: Buffer): ResultadoValidacion911 
     let cct = "";
     const nombreEscuela = "";
     let totalDocentes = 0;
+    let totalAlumnosReportado: number | undefined = undefined;
     const grados: DetalleGradoInput[] = [];
 
     // Inicializar los 6 semestres de bachillerato
@@ -295,6 +296,43 @@ export function procesarFormato911Excel(buffer: Buffer): ResultadoValidacion911 
                     totalDocentes = n;
                     break;
                 }
+            }
+        }
+
+        // Detección de Fila de Total Global (H-6)
+        const esFilaTotal = (
+            rowText.includes("TOTAL GENERAL") ||
+            rowText.includes("TOTAL ALUMNOS") ||
+            rowText.includes("TOTAL DE ALUMNOS") ||
+            rowText.includes("MATRICULA TOTAL") ||
+            rowText.includes("TOTAL MATRICULA") ||
+            rowText.includes("TOTAL PLANTEL") ||
+            rowText.includes("TOTAL ESCUELA") ||
+            row.some(c => {
+                const s = String(c ?? "").trim().toUpperCase();
+                return s === "TOTAL" || s === "TOTALES" || s === "SUMA TOTAL";
+            })
+        );
+
+        const noEsDocente = !rowText.includes("DOCENTE") && !rowText.includes("PROFESOR") && !rowText.includes("PERSONAL");
+        const noEsGrupos = !rowText.includes("TOTAL GRUPOS") && !rowText.includes("TOTAL DE GRUPOS");
+        const noEsSemestre = ![1, 2, 3, 4, 5, 6].some(s =>
+            rowText.includes(`${s}°`) ||
+            rowText.includes(`${s}ER`) ||
+            rowText.includes(`${s}DO`) ||
+            rowText.includes(`${s}TO`) ||
+            rowText.includes(`SEMESTRE ${s}`)
+        );
+
+        if (esFilaTotal && noEsDocente && noEsGrupos && noEsSemestre && totalAlumnosReportado === undefined) {
+            const nums = row.map(c => Number(c)).filter(n => !isNaN(n) && n >= 0);
+            if (nums.length >= 3) {
+                // Convención típica 911: [Hombres, Mujeres, Total, ...]
+                totalAlumnosReportado = nums[2];
+            } else if (nums.length === 1) {
+                totalAlumnosReportado = nums[0];
+            } else if (nums.length === 2) {
+                totalAlumnosReportado = Math.max(nums[0], nums[1]);
             }
         }
 
@@ -333,6 +371,7 @@ export function procesarFormato911Excel(buffer: Buffer): ResultadoValidacion911 
         cct,
         nombreEscuela,
         totalDocentes,
+        totalAlumnos: totalAlumnosReportado,
         grados
     };
 
