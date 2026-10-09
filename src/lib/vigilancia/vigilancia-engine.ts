@@ -359,7 +359,9 @@ export async function ejecutarVigilanciaProactiva(tenantIdParam?: string): Promi
       where: { tenantId },
       include: {
         escuela: true,
-        crucesSicep: true,
+        crucesSicep: {
+          orderBy: { createdAt: "desc" },
+        },
         detalles: true,
       },
     });
@@ -538,9 +540,10 @@ export async function ejecutarVigilanciaProactiva(tenantIdParam?: string): Promi
     } catch (ofiErr) {
       console.warn("[vigilancia-engine] Aviso al evaluar oficios por vencer:", ofiErr);
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[vigilancia-engine] Error en ejecución de vigilancia proactiva:", error);
-    resultado.errores.push(error?.message || String(error));
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    resultado.errores.push(errorMsg);
   }
 
   return resultado;

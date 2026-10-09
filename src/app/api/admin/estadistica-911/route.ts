@@ -65,7 +65,9 @@ export async function GET(req: NextRequest) {
                 detalles: {
                     orderBy: { semestreGrado: "asc" }
                 },
-                crucesSicep: true,
+                crucesSicep: {
+                    orderBy: { createdAt: "desc" }
+                },
                 escuela: {
                     select: {
                         id: true,
@@ -86,7 +88,7 @@ export async function GET(req: NextRequest) {
         let sumDocentes = 0;
         let validadosCount = 0;
         let conInconsistenciasCount = 0;
-        let pendientesCount = escuelas.length - registros.length;
+        const pendientesCount = escuelas.length - registros.length;
 
         registros.forEach(r => {
             sumHombres += r.totalHombres;

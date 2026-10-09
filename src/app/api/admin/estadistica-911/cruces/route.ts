@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
         }
 
         const sicepNum = Number(matriculaSicepTotal);
-        if (isNaN(sicepNum) || sicepNum < 0) {
+        if (!Number.isInteger(sicepNum) || sicepNum < 0) {
             return NextResponse.json({ error: "La matrícula SICEP debe ser un número entero mayor o igual a 0" }, { status: 400 });
         }
 
@@ -113,25 +113,36 @@ export async function POST(req: NextRequest) {
             }
         });
 
-        // 3. Si hay inconsistencia y el registro estaba VALIDADO, agregar la advertencia al registro
-        if (evaluacionCruce.hayDiscrepancia && evaluacionCruce.inconsistencia) {
-            const rawInconsistencias = registro.inconsistenciasJson;
-            const inconsistenciasActuales = Array.isArray(rawInconsistencias) ? rawInconsistencias : [];
-            const yaExisteDiscrepancia = inconsistenciasActuales.some(
-                (inc: unknown) => typeof inc === "object" && inc !== null && "tipo" in inc && (inc as { tipo: string }).tipo === "DISCREPANCIA_SICEP"
-            );
+        // 3. Actualizar inconsistenciasJson y estado del registro 911
+        // Filtrar cualquier DISCREPANCIA_SICEP previa para reemplazar en lugar de apilar (H-5)
+        const rawInconsistencias = registro.inconsistenciasJson;
+        const inconsistenciasActuales = Array.isArray(rawInconsistencias) ? (rawInconsistencias as Array<Record<string, unknown>>) : [];
+        const otrasInconsistencias = inconsistenciasActuales.filter(
+            (inc) => typeof inc === "object" && inc !== null && (inc as { tipo?: string }).tipo !== "DISCREPANCIA_SICEP"
+        );
 
-            if (!yaExisteDiscrepancia) {
-                const nuevasInconsistencias = [...inconsistenciasActuales, evaluacionCruce.inconsistencia];
-                await prisma.estadistica911Registro.update({
-                    where: { id: registro.id },
-                    data: {
-                        inconsistenciasJson: nuevasInconsistencias as Prisma.InputJsonValue,
-                        estado: "CON_INCONSISTENCIAS"
-                    }
-                });
+        let nuevasInconsistencias: Array<Record<string, unknown>>;
+        let nuevoEstado = registro.estado;
+
+        if (evaluacionCruce.hayDiscrepancia && evaluacionCruce.inconsistencia) {
+            nuevasInconsistencias = [...otrasInconsistencias, evaluacionCruce.inconsistencia as unknown as Record<string, unknown>];
+            nuevoEstado = "CON_INCONSISTENCIAS";
+        } else {
+            nuevasInconsistencias = otrasInconsistencias;
+            // Si ya no hay discrepancia SICEP y no hay errores críticos, restaurar a VALIDADO (o mantener ENTREGADO_A_CORDE)
+            const tieneCriticos = nuevasInconsistencias.some((i) => i.severidad === "ERROR_CRITICO");
+            if (!tieneCriticos && nuevoEstado !== "ENTREGADO_A_CORDE") {
+                nuevoEstado = "VALIDADO";
             }
         }
+
+        await prisma.estadistica911Registro.update({
+            where: { id: registro.id },
+            data: {
+                inconsistenciasJson: nuevasInconsistencias as Prisma.InputJsonValue,
+                estado: nuevoEstado
+            }
+        });
 
         return NextResponse.json({
             success: true,
@@ -146,6 +157,6 @@ export async function POST(req: NextRequest) {
             metodo: "POST",
             stack: err instanceof Error ? err.stack : undefined
         });
-        return NextResponse.json({ error: msg }, { status: 500 });
+        return NextResponse.json({ error: "Error interno al procesar cruce SICEP" }, { status: 500 });
     }
 }
