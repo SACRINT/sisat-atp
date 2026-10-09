@@ -86,6 +86,10 @@ export async function GET(req: NextRequest) {
         let sumAlumnos = 0;
         let sumGrupos = 0;
         let sumDocentes = 0;
+        let sumAprobados = 0;
+        let sumReprobados = 0;
+        let sumEgresados = 0;
+        let sumDesercion = 0;
         let validadosCount = 0;
         let conInconsistenciasCount = 0;
         const pendientesCount = escuelas.length - registros.length;
@@ -96,6 +100,10 @@ export async function GET(req: NextRequest) {
             sumAlumnos += r.totalAlumnos;
             sumGrupos += r.totalGrupos;
             sumDocentes += r.totalDocentes;
+            sumAprobados += r.totalAprobados || 0;
+            sumReprobados += r.totalReprobados || 0;
+            sumEgresados += r.totalEgresados || 0;
+            sumDesercion += r.totalDesercion || 0;
 
             if (r.estado === "VALIDADO" || r.estado === "ENTREGADO_A_CORDE") {
                 validadosCount++;
@@ -103,6 +111,10 @@ export async function GET(req: NextRequest) {
                 conInconsistenciasCount++;
             }
         });
+
+        const totalEvaluados = sumAprobados + sumReprobados;
+        const tasaDesercionZonal = sumAlumnos > 0 ? Number(((sumDesercion / sumAlumnos) * 100).toFixed(1)) : 0;
+        const tasaAprobacionZonal = totalEvaluados > 0 ? Number(((sumAprobados / totalEvaluados) * 100).toFixed(1)) : 0;
 
         const kpis = {
             totalEscuelas: escuelas.length,
@@ -114,7 +126,13 @@ export async function GET(req: NextRequest) {
             hombresZonal: sumHombres,
             mujeresZonal: sumMujeres,
             gruposZonal: sumGrupos,
-            docentesZonal: sumDocentes
+            docentesZonal: sumDocentes,
+            totalDesercionZonal: sumDesercion,
+            totalAprobadosZonal: sumAprobados,
+            totalReprobadosZonal: sumReprobados,
+            totalEgresadosZonal: sumEgresados,
+            tasaDesercionZonal,
+            tasaAprobacionZonal
         };
 
         return NextResponse.json({
