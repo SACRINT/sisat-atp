@@ -82,6 +82,10 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "La matrícula SICEP debe ser un número entero mayor o igual a 0" }, { status: 400 });
         }
 
+        if (discrepancias !== undefined && !Array.isArray(discrepancias)) {
+            return NextResponse.json({ error: "El campo discrepancias debe ser un arreglo" }, { status: 400 });
+        }
+
         // 1. Verificar existencia del registro 911 dentro del tenant
         const registro = await prisma.estadistica911Registro.findFirst({
             where: { id: registroId, tenantId },
@@ -97,7 +101,7 @@ export async function POST(req: NextRequest) {
         const diferencia = evaluacionCruce.diferencia;
 
         // Discrepancias formateadas para almacenamiento
-        const payloadDiscrepancias: Prisma.InputJsonValue = (discrepancias ?? (
+        const payloadDiscrepancias: Prisma.InputJsonValue = (Array.isArray(discrepancias) ? discrepancias : (
             evaluacionCruce.inconsistencia ? [evaluacionCruce.inconsistencia] : []
         )) as Prisma.InputJsonValue;
 
