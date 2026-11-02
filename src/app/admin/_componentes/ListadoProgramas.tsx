@@ -2,7 +2,7 @@
 
 import { useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronUp, ChevronDown, MessageSquare, Download, Eye, Loader2, FileCheck2, FilePlus2, Trash2, Upload, RefreshCw, CheckCircle2, Clock, Activity } from "lucide-react";
+import { ChevronUp, ChevronDown, MessageSquare, Download, Eye, Loader2, FileCheck2, FilePlus2, Trash2, Upload, RefreshCw, CheckCircle2, Clock, Activity, FileSpreadsheet } from "lucide-react";
 import JSZip from "jszip";
 import { ESTADOS, ESTADO_LABELS, getNombrePeriodo } from "@/lib/constants";
 import { ProgramaAdmin } from "@/types";
@@ -28,17 +28,14 @@ export interface BotonUnificacion {
 export function obtenerBotonesUnificacion(prog: ProgramaAdmin): BotonUnificacion[] {
     const num = prog.numArchivos || 1;
     const etiquetas = (prog.etiquetasArchivos || []).filter(Boolean);
+    const botones: BotonUnificacion[] = [];
 
     // Caso 1: 1 solo archivo requerido (ej. El ABC de las Emociones, PMC, PAEC, etc.)
     if (num <= 1) {
-        return [
-            { tipo: "EVIDENCIAS", label: "Unificar Evidencias", etiquetaMatch: null }
-        ];
-    }
-
-    // Caso 2: 2 o más archivos con etiquetas definidas
-    if (etiquetas.length >= num) {
-        return etiquetas.slice(0, num).map((etiq, idx) => {
+        botones.push({ tipo: "EVIDENCIAS", label: "Unificar Evidencias", etiquetaMatch: null });
+    } else if (etiquetas.length >= num) {
+        // Caso 2: 2 o más archivos con etiquetas definidas
+        const mapped = etiquetas.slice(0, num).map((etiq, idx) => {
             const lower = etiq.toLowerCase();
             let label = `Unificar ${etiq}`;
             let tipo = `DOC_${idx + 1}`;
@@ -61,17 +58,30 @@ export function obtenerBotonesUnificacion(prog: ProgramaAdmin): BotonUnificacion
                 etiquetaMatch: lower
             };
         });
+        botones.push(...mapped);
+    } else {
+        // Caso 3: Fallback si numArchivos > 1 pero sin etiquetas configuradas
+        for (let i = 0; i < num; i++) {
+            botones.push({
+                tipo: `ARCHIVO_${i + 1}`,
+                label: `Unificar Archivo ${i + 1}`,
+                etiquetaMatch: `archivo ${i + 1}`
+            });
+        }
     }
 
-    // Caso 3: Fallback si numArchivos > 1 pero sin etiquetas configuradas
-    const botones: BotonUnificacion[] = [];
-    for (let i = 0; i < num; i++) {
+    // Agregar botón de Concentrado XLSX si el programa tiene entregas en Excel o es Día Naranja
+    const tieneXlsx = prog.nombre.toUpperCase().includes("NARANJA") ||
+        prog.periodos?.some(p => p.entregas?.some(e => e.archivos?.some(a => a.driveUrl && (a.nombre.toLowerCase().endsWith(".xlsx") || a.driveUrl.toLowerCase().includes(".xlsx")))));
+
+    if (tieneXlsx) {
         botones.push({
-            tipo: `ARCHIVO_${i + 1}`,
-            label: `Unificar Archivo ${i + 1}`,
-            etiquetaMatch: `archivo ${i + 1}`
+            tipo: "CONCENTRADO_XLSX",
+            label: "Unificar Concentrado (XLSX)",
+            etiquetaMatch: null
         });
     }
+
     return botones;
 }
 
@@ -514,6 +524,56 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
         }
     }
 
+    async function handleUnificarXlsx(prog: ProgramaAdmin, periodoId?: string) {
+        const mergeKey = `${prog.id}_${periodoId || "ALL"}_CONCENTRADO_XLSX`;
+        setMergingKeys(prev => ({ ...prev, [mergeKey]: true }));
+        onSetMessage({ type: "success", text: "Generando concentrado zonal en Excel (XLSX)..." });
+
+        try {
+            const res = await fetch(`/api/programas/${prog.id}/unificar-xlsx`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ periodoId }),
+            });
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || `Error ${res.status} al generar el archivo Excel`);
+            }
+
+            const blob = await res.blob();
+            const disposition = res.headers.get("content-disposition");
+            let filename = "CONCENTRADO_ZONAL_DIA_NARANJA.xlsx";
+            if (disposition) {
+                const match = disposition.match(/filename="?([^"]+)"?/);
+                if (match?.[1]) filename = match[1];
+            }
+
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(blobUrl);
+
+            onSetMessage({
+                type: "success",
+                text: `✅ ${filename} descargado exitosamente con datos y fotografías organizadas por CCT.`,
+            });
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : String(e);
+            onSetMessage({ type: "error", text: `❌ ${msg || "Error al unificar el concentrado XLSX."}` });
+        } finally {
+            setMergingKeys(prev => {
+                const next = { ...prev };
+                delete next[mergeKey];
+                return next;
+            });
+        }
+    }
+
     async function handleEstadoChange(entregaId: string, nuevoEstado: string) {
         setUpdatingEstado(entregaId);
         try {
@@ -609,6 +669,13 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                 e.archivos && e.archivos.some(a => a.driveUrl && a.nombre.toLowerCase().endsWith(".pdf"))
             )
         );
+        const hasXlsxProg = prog.periodos.some(p =>
+            p.entregas.some(e =>
+                e.archivos && e.archivos.some(a => a.driveUrl && (a.nombre.toLowerCase().endsWith(".xlsx") || a.driveUrl.toLowerCase().includes(".xlsx")))
+            )
+        ) || prog.nombre.toUpperCase().includes("NARANJA");
+
+        const hasAnyUnificacionProg = hasPdfsProg || hasXlsxProg;
 
         return (
             <div key={prog.id} className="card" style={{ padding: 0, borderLeft: `5px solid ${progressColor}`, background: cardBgGradient }}>
@@ -643,26 +710,33 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             <span style={{ fontWeight: 700, color: progressColor }}>{porc}%</span>
 
-                                    {/* ── Botones de unificación PDF Universal (por CCT) ── */}
-                                    {hasPdfsProg && (
+                                    {/* ── Botones de unificación Universal (por CCT) ── */}
+                                    {hasAnyUnificacionProg && (
                                         <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
                                             {botonesUnificacion.map((btn) => {
+                                                const esXlsx = btn.tipo === "CONCENTRADO_XLSX";
+                                                if (esXlsx && !hasXlsxProg) return null;
+                                                if (!esXlsx && !hasPdfsProg) return null;
+
                                                 const btnKey = `${prog.id}_ALL_${btn.tipo}`;
                                                 const isThisMerging = Boolean(mergingKeys[btnKey]);
                                                 const esEvidencia = btn.tipo === "EVIDENCIAS";
-                                                const borderCol = esEvidencia ? "#059669" : "var(--primary)";
-                                                const textCol = esEvidencia ? "#059669" : "var(--primary)";
-                                                const Icon = esEvidencia ? FilePlus2 : FileCheck2;
+                                                const borderCol = esXlsx ? "#16a34a" : esEvidencia ? "#059669" : "var(--primary)";
+                                                const textCol = esXlsx ? "#16a34a" : esEvidencia ? "#059669" : "var(--primary)";
+                                                const Icon = esXlsx ? FileSpreadsheet : esEvidencia ? FilePlus2 : FileCheck2;
 
                                                 return (
                                                     <button
                                                         key={btn.tipo}
-                                                        onClick={() => handleMergePdfs(prog, btn)}
+                                                        onClick={() => esXlsx ? handleUnificarXlsx(prog) : handleMergePdfs(prog, btn)}
                                                         disabled={isThisMerging}
-                                                        title={`Unificar todos los PDFs de ${btn.label} en un solo archivo (ordenados por CCT)`}
+                                                        title={esXlsx
+                                                            ? "Generar y descargar concentrado zonal en Excel (.xlsx) con conteos de personal y fotografías"
+                                                            : `Unificar todos los PDFs de ${btn.label} en un solo archivo (ordenados por CCT)`
+                                                        }
                                                         style={{
                                                             display: "inline-flex", alignItems: "center", gap: "0.25rem",
-                                                            background: isThisMerging ? "var(--primary-bg)" : "white",
+                                                            background: isThisMerging ? (esXlsx ? "#f0fdf4" : "var(--primary-bg)") : "white",
                                                             border: `1px solid ${borderCol}`, borderRadius: "5px",
                                                             color: textCol, padding: "0.2rem 0.45rem",
                                                             fontSize: "0.7rem", fontWeight: 700, cursor: isThisMerging ? "not-allowed" : "pointer",
@@ -671,25 +745,27 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                                                         }}
                                                     >
                                                         {isThisMerging
-                                                            ? <><Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} /> Uniendo...</>
+                                                            ? <><Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} /> {esXlsx ? "Generando..." : "Uniendo..."}</>
                                                             : <><Icon size={11} /> {btn.label}</>
                                                         }
                                                     </button>
                                                 );
                                             })}
 
-                                            {/* Engranaje para editar prefijo */}
-                                            <button
-                                                onClick={() => setShowPrefixProgId(curr => curr === prog.id ? null : prog.id)}
-                                                title="Cambiar prefijo del nombre del archivo"
-                                                style={{
-                                                    background: "none", border: "1px solid var(--border)", borderRadius: "5px",
-                                                    color: "var(--text-muted)", padding: "0.2rem 0.3rem",
-                                                    cursor: "pointer", fontSize: "0.7rem", display: "inline-flex", alignItems: "center",
-                                                }}
-                                            >
-                                                ✎
-                                            </button>
+                                            {/* Engranaje para editar prefijo (solo para PDFs) */}
+                                            {hasPdfsProg && (
+                                                <button
+                                                    onClick={() => setShowPrefixProgId(curr => curr === prog.id ? null : prog.id)}
+                                                    title="Cambiar prefijo del nombre del archivo"
+                                                    style={{
+                                                        background: "none", border: "1px solid var(--border)", borderRadius: "5px",
+                                                        color: "var(--text-muted)", padding: "0.2rem 0.3rem",
+                                                        cursor: "pointer", fontSize: "0.7rem", display: "inline-flex", alignItems: "center",
+                                                    }}
+                                                >
+                                                    ✎
+                                                </button>
+                                            )}
                                         </div>
                                     )}
 
@@ -792,30 +868,43 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                                                     </div>
                                                     {!readOnly && (() => {
                                                         const hasPdfsPeriodo = periodo.entregas.some(e => e.archivos && e.archivos.some(a => a.driveUrl && a.nombre.toLowerCase().endsWith(".pdf")));
+                                                        const hasXlsxPeriodo = periodo.entregas.some(e => e.archivos && e.archivos.some(a => a.driveUrl && (a.nombre.toLowerCase().endsWith(".xlsx") || a.driveUrl.toLowerCase().includes(".xlsx")))) || prog.nombre.toUpperCase().includes("NARANJA");
+                                                        const hasAnyUnificacionPeriodo = hasPdfsPeriodo || hasXlsxPeriodo;
+
                                                         return (
                                                             <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                                                                {hasPdfsPeriodo && (
+                                                                {hasAnyUnificacionPeriodo && (
                                                                     <div style={{ display: "flex", gap: "0.25rem", alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
                                                                         {botonesUnificacion.map((btn) => {
+                                                                            const esXlsx = btn.tipo === "CONCENTRADO_XLSX";
+                                                                            if (esXlsx && !hasXlsxPeriodo) return null;
+                                                                            if (!esXlsx && !hasPdfsPeriodo) return null;
+
                                                                             const btnKey = `${prog.id}_${periodo.id}_${btn.tipo}`;
                                                                             const isThisMerging = Boolean(mergingKeys[btnKey]);
                                                                             const btnText = btn.tipo === "REGISTROS" ? "Unificar Registros"
                                                                                 : btn.tipo === "EVIDENCIAS" ? "Unificar Evidencias"
                                                                                 : btn.label;
+                                                                            const borderCol = esXlsx ? "#16a34a" : "var(--primary)";
+                                                                            const textCol = esXlsx ? "#16a34a" : "var(--primary)";
+                                                                            const Icon = esXlsx ? FileSpreadsheet : FileCheck2;
 
                                                                             return (
                                                                                 <button
                                                                                     key={btn.tipo}
-                                                                                    onClick={() => handleMergePdfs(prog, btn, periodo.id)}
+                                                                                    onClick={() => esXlsx ? handleUnificarXlsx(prog, periodo.id) : handleMergePdfs(prog, btn, periodo.id)}
                                                                                     disabled={isThisMerging}
-                                                                                    title={`Unificar PDFs de ${btn.label} para ${getPeriodoLabel(periodo, prog.nombre)} ordenados por CCT`}
+                                                                                    title={esXlsx
+                                                                                        ? `Generar concentrado zonal en Excel (.xlsx) para ${getPeriodoLabel(periodo, prog.nombre)} ordenado por CCT`
+                                                                                        : `Unificar PDFs de ${btn.label} para ${getPeriodoLabel(periodo, prog.nombre)} ordenados por CCT`
+                                                                                    }
                                                                                     style={{
                                                                                         padding: "0.15rem 0.45rem",
                                                                                         fontSize: "0.7rem",
                                                                                         borderRadius: "4px",
-                                                                                        background: isThisMerging ? "var(--primary-bg)" : "#ffffff",
-                                                                                        border: "1px solid var(--primary)",
-                                                                                        color: "var(--primary)",
+                                                                                        background: isThisMerging ? (esXlsx ? "#f0fdf4" : "var(--primary-bg)") : "#ffffff",
+                                                                                        border: `1px solid ${borderCol}`,
+                                                                                        color: textCol,
                                                                                         cursor: isThisMerging ? "not-allowed" : "pointer",
                                                                                         display: "inline-flex",
                                                                                         alignItems: "center",
@@ -826,9 +915,9 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                                                                                     }}
                                                                                 >
                                                                                     {isThisMerging ? (
-                                                                                        <><Loader2 size={10} style={{ animation: "spin 1s linear infinite" }} /> Uniendo...</>
+                                                                                        <><Loader2 size={10} style={{ animation: "spin 1s linear infinite" }} /> {esXlsx ? "Generando..." : "Uniendo..."}</>
                                                                                     ) : (
-                                                                                        <><FileCheck2 size={10} /> {btnText}</>
+                                                                                        <><Icon size={10} /> {btnText}</>
                                                                                     )}
                                                                                 </button>
                                                                             );
