@@ -45,13 +45,43 @@ function parseCloudinaryUrl(url: string) {
 }
 
 /**
- * Downloads file buffer with fallback between direct CDN URL and signed Cloudinary HMAC URL.
+ * Extracts cell value as clean string, unpacking OpenXML RichText and formula results.
+ * Prevents `[object Object]` from appearing in consolidated tables.
+ */
+function getCellValueAsString(value: unknown): string {
+    if (value === null || value === undefined) return "";
+    if (typeof value === "string") return value.trim();
+    if (typeof value === "number" || typeof value === "boolean") return String(value);
+    if (typeof value === "object") {
+        const valObj = value as Record<string, unknown>;
+        if (Array.isArray(valObj.richText)) {
+            return valObj.richText.map((p: any) => p?.text || "").join("").trim();
+        }
+        if (valObj.result !== undefined) {
+            return getCellValueAsString(valObj.result);
+        }
+        if (typeof valObj.text === "string") {
+            return valObj.text.trim();
+        }
+    }
+    return String(value).trim();
+}
+
+/**
+ * Normalizes strings by removing accents and converting to uppercase for comparison.
+ */
+function normalizeText(s: string): string {
+    return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+}
+
+/**
+ * Downloads file buffer with fallback between direct CDN URL and signed Cloudinary HMAC URL candidates.
  */
 async function fetchFileBuffer(fileUrl: string, driveId?: string | null): Promise<Buffer | null> {
     try {
         const directRes = await fetch(fileUrl, {
             headers: { "User-Agent": "SISAT-ATP/1.0" },
-            signal: AbortSignal.timeout(10000),
+            signal: AbortSignal.timeout(12000),
         });
         if (directRes.ok) {
             const arr = await directRes.arrayBuffer();
@@ -69,17 +99,30 @@ async function fetchFileBuffer(fileUrl: string, driveId?: string | null): Promis
         if (cloudName && apiKey && apiSecret && fileUrl.includes("res.cloudinary.com")) {
             configureCloudinary();
             const parsed = parseCloudinaryUrl(fileUrl);
-            const publicId = driveId || parsed?.publicId;
-            if (publicId) {
-                const signedUrl = cloudinary.utils.private_download_url(
-                    publicId,
-                    "",
-                    { resource_type: "raw", type: "upload" }
-                );
-                const signedRes = await fetch(signedUrl, { signal: AbortSignal.timeout(10000) });
-                if (signedRes.ok) {
-                    const arr = await signedRes.arrayBuffer();
-                    return Buffer.from(arr);
+            const basePublicId = driveId || parsed?.publicId;
+            if (basePublicId) {
+                const candidates = [
+                    { resType: "raw", id: basePublicId, format: "" },
+                    { resType: "raw", id: basePublicId.replace(/\.[^/.]+$/, ""), format: "xlsx" },
+                    { resType: "image", id: basePublicId.replace(/\.[^/.]+$/, ""), format: "xlsx" },
+                    { resType: "image", id: basePublicId, format: "" },
+                ];
+
+                for (const cand of candidates) {
+                    try {
+                        const signedUrl = cloudinary.utils.private_download_url(
+                            cand.id,
+                            cand.format,
+                            { resource_type: cand.resType as any, type: "upload" }
+                        );
+                        const signedRes = await fetch(signedUrl, { signal: AbortSignal.timeout(10000) });
+                        if (signedRes.ok) {
+                            const arr = await signedRes.arrayBuffer();
+                            return Buffer.from(arr);
+                        }
+                    } catch {
+                        // continue to next candidate
+                    }
                 }
             }
         }
@@ -169,7 +212,7 @@ function detectarColumnasPersonal(ws: ExcelJS.Worksheet): ColumnaPersonalMap {
     for (let r = 15; r <= 18; r++) {
         const row = ws.getRow(r);
         for (let c = 1; c <= 20; c++) {
-            const val = String(row.getCell(c).value || "").toUpperCase().trim();
+            const val = normalizeText(getCellValueAsString(row.getCell(c).value));
             if (val.includes("MANTENIMIENTO")) colMap.mantenimiento = c;
             else if (val.includes("ADMINISTRATIV")) colMap.administrativos = c;
             else if (val.includes("DOCENTE")) colMap.docentes = c;
@@ -273,7 +316,7 @@ export async function POST(
         // Detectar escuelas en filas 18-34 de la plantilla maestra
         const escuelasMaster: Record<string, { row: number; label: string }> = {};
         for (let r = 18; r <= 34; r++) {
-            const val = String(masterWs.getCell(`G${r}`).value || "").trim();
+            const val = getCellValueAsString(masterWs.getCell(`G${r}`).value);
             const match = val.match(/\((21[A-Z0-9]+)\)/i);
             if (match) {
                 escuelasMaster[match[1].toUpperCase()] = { row: r, label: val };
@@ -306,6 +349,27 @@ export async function POST(
         const escuelasExitosas: { cct: string; nombre: string; fotos: number }[] = [];
         const escuelasFallidas: { cct: string; nombre: string; motivo: string }[] = [];
 
+        // Registrar escuelas que entregaron solo PDF o no entregaron .xlsx
+        for (const e of targetPeriodo.entregas) {
+            const cct = e.escuela.cct.toUpperCase();
+            if (!escuelasMaster[cct]) continue;
+            const tieneXlsx = e.archivos?.some(a =>
+                a.tipo === "ENTREGA" &&
+                a.driveUrl &&
+                (a.nombre.toLowerCase().endsWith(".xlsx") || a.driveUrl.toLowerCase().includes(".xlsx"))
+            );
+            if (!tieneXlsx) {
+                const tienePdf = e.archivos?.some(a => a.tipo === "ENTREGA");
+                escuelasFallidas.push({
+                    cct,
+                    nombre: e.escuela.nombre,
+                    motivo: tienePdf
+                        ? "Entregó solo archivo PDF (falta formato Excel .xlsx)"
+                        : "Sin archivo de entrega en este periodo"
+                });
+            }
+        }
+
         // Ordenar entregas por fecha más reciente
         const entregasOrdenadas = [...entregasConXlsx].sort((a, b) => {
             const dateA = a.fechaSubida ? new Date(a.fechaSubida).getTime() : new Date(a.createdAt).getTime();
@@ -329,7 +393,7 @@ export async function POST(
 
             const fileBuf = await fetchFileBuffer(archivoXlsx.driveUrl, archivoXlsx.driveId);
             if (!fileBuf) {
-                escuelasFallidas.push({ cct, nombre: entrega.escuela.nombre, motivo: "Fallo al descargar archivo desde almacenamiento" });
+                escuelasFallidas.push({ cct, nombre: entrega.escuela.nombre, motivo: "Archivo no encontrado en almacenamiento remoto (HTTP 404)" });
                 continue;
             }
 
@@ -345,7 +409,7 @@ export async function POST(
                 let actHeaderRow: number | null = null;
                 for (let r = 20; r <= Math.min(schoolWs.rowCount, 55); r++) {
                     for (let c = 1; c <= 8; c++) {
-                        const cellVal = String(schoolWs.getRow(r).getCell(c).value || "").trim().toUpperCase();
+                        const cellVal = normalizeText(getCellValueAsString(schoolWs.getRow(r).getCell(c).value));
                         if (cellVal.includes("ACTIVIDAD") || cellVal.includes("OBJETIVO") || cellVal.includes("DESCRIPCI")) {
                             actHeaderRow = r;
                             break;
@@ -359,54 +423,105 @@ export async function POST(
                 if (actHeaderRow) {
                     for (let r = actHeaderRow + 1; r <= Math.min(schoolWs.rowCount, actHeaderRow + 10); r++) {
                         const row = schoolWs.getRow(r);
-                        const act = row.getCell(4).value;
-                        const obj = row.getCell(5).value;
-                        const desc = row.getCell(6).value;
-                        const nombreCt = row.getCell(3).value;
+                        const act = getCellValueAsString(row.getCell(4).value);
+                        const obj = getCellValueAsString(row.getCell(5).value);
+                        const desc = getCellValueAsString(row.getCell(6).value);
+                        const nombreCt = getCellValueAsString(row.getCell(3).value);
 
-                        if ((act || obj || desc) && String(act).trim() !== "#VALUE!") {
+                        if ((act || obj || desc) && act !== "#VALUE!") {
                             actData = {
-                                nombreCt: nombreCt ? String(nombreCt).trim() : null,
-                                actividad: act ? String(act).trim() : "",
-                                objetivo: obj ? String(obj).trim() : "",
-                                descripcion: desc ? String(desc).trim() : "",
+                                nombreCt: nombreCt || null,
+                                actividad: act,
+                                objetivo: obj,
+                                descripcion: desc,
                             };
                             break;
                         }
                     }
                 }
 
-                // 7.3. Extraer conteos de personal de la tabla superior usando columnas dinámicas
+                // 7.3. Extraer conteos de personal con búsqueda en 3 niveles (CCT, Nombre, fila 18)
                 let topCounts: DatosEscuela["topCounts"] = undefined;
-                for (let r = 16; r <= Math.min(schoolWs.rowCount, 36); r++) {
-                    const c7Val = String(schoolWs.getRow(r).getCell(7).value || "").trim().toUpperCase();
-                    if (c7Val.includes(cct)) {
-                        const getNum = (colIdx?: number) => {
-                            if (!colIdx) return null;
-                            const val = schoolWs.getRow(r).getCell(colIdx).value;
-                            if (val === null || val === undefined || val === "" || val === " ") return null;
-                            const n = Number(val);
-                            return isNaN(n) ? null : n;
-                        };
-                        const getRaw = (colIdx?: number) => {
-                            if (!colIdx) return null;
-                            return schoolWs.getRow(r).getCell(colIdx).value;
-                        };
+                const normCct = normalizeText(cct);
+                const normNom = normalizeText(entrega.escuela.nombre);
+                const nomTokens = normNom
+                    .split(/[^A-Z0-9]+/)
+                    .filter(t => t.length >= 3 && t !== "BACHILLERATO" && t !== "GENERAL" && t !== "OFICIAL");
 
-                        topCounts = {
-                            mantenimiento: getNum(schoolCols.mantenimiento || 8),
-                            administrativos: getNum(schoolCols.administrativos || 9),
-                            docentes: getNum(schoolCols.docentes || 10),
-                            directores: getNum(schoolCols.directores || 11),
-                            supervisores: getNum(schoolCols.supervisores || 12),
-                            atp: getNum(schoolCols.atp || 13),
-                            jefes: getRaw(schoolCols.jefes || 14),
-                        };
-                        break;
+                let personalTargetRow: number | null = null;
+
+                // Nivel 1: CCT en filas 17-34
+                for (let r = 17; r <= Math.min(schoolWs.rowCount, 34); r++) {
+                    const row = schoolWs.getRow(r);
+                    for (let c = 1; c <= 15; c++) {
+                        const val = normalizeText(getCellValueAsString(row.getCell(c).value));
+                        if (val.includes(normCct)) {
+                            personalTargetRow = r;
+                            break;
+                        }
+                    }
+                    if (personalTargetRow) break;
+                }
+
+                // Nivel 2: Nombre de la escuela en filas 17-34
+                if (!personalTargetRow) {
+                    for (let r = 17; r <= Math.min(schoolWs.rowCount, 34); r++) {
+                        const cell7Val = normalizeText(getCellValueAsString(schoolWs.getRow(r).getCell(7).value));
+                        if (nomTokens.length > 0 && nomTokens.every(tok => cell7Val.includes(tok))) {
+                            personalTargetRow = r;
+                            break;
+                        }
                     }
                 }
 
-                // 7.4. Extraer fotografías usando API pública (extractImageMedia)
+                if (!personalTargetRow) {
+                    for (let r = 17; r <= Math.min(schoolWs.rowCount, 34); r++) {
+                        const cell7Val = normalizeText(getCellValueAsString(schoolWs.getRow(r).getCell(7).value));
+                        const matchCount = nomTokens.filter(tok => cell7Val.includes(tok)).length;
+                        if (matchCount >= 2 || (nomTokens.length === 1 && matchCount === 1)) {
+                            personalTargetRow = r;
+                            break;
+                        }
+                    }
+                }
+
+                // Nivel 3: Plantilla individual (fila 18)
+                if (!personalTargetRow && schoolWs.rowCount >= 18) {
+                    const r18 = schoolWs.getRow(18);
+                    const docVal = r18.getCell(schoolCols.docentes || 10).value;
+                    if (docVal !== null && docVal !== undefined && docVal !== "") {
+                        personalTargetRow = 18;
+                    }
+                }
+
+                if (personalTargetRow) {
+                    const r = personalTargetRow;
+                    const getNum = (colIdx?: number) => {
+                        if (!colIdx) return null;
+                        const raw = schoolWs.getRow(r).getCell(colIdx).value;
+                        const str = getCellValueAsString(raw);
+                        if (!str || str === "" || str === " ") return null;
+                        const n = Number(str);
+                        return isNaN(n) ? null : n;
+                    };
+                    const getRaw = (colIdx?: number) => {
+                        if (!colIdx) return null;
+                        const str = getCellValueAsString(schoolWs.getRow(r).getCell(colIdx).value);
+                        return str || null;
+                    };
+
+                    topCounts = {
+                        mantenimiento: getNum(schoolCols.mantenimiento || 8),
+                        administrativos: getNum(schoolCols.administrativos || 9),
+                        docentes: getNum(schoolCols.docentes || 10),
+                        directores: getNum(schoolCols.directores || 11),
+                        supervisores: getNum(schoolCols.supervisores || 12),
+                        atp: getNum(schoolCols.atp || 13),
+                        jefes: getRaw(schoolCols.jefes || 14),
+                    };
+                }
+
+                // 7.4. Extraer fotografías usando API pública con fallback para imágenes "En Celda" (Excel 365)
                 const schoolImages = schoolWs.getImages();
                 const validImages: { buffer: Buffer; extension: string }[] = [];
                 for (const img of schoolImages) {
@@ -414,6 +529,25 @@ export async function POST(
                     const media = extractImageMedia(schoolWb, img);
                     if (media && media.buffer) {
                         validImages.push(media);
+                    }
+                }
+
+                // Fallback para imágenes incrustadas dentro de celda (model.media)
+                if (validImages.length === 0) {
+                    const rawMedia = (schoolWb.model as any)?.media || (schoolWb as any).media || [];
+                    for (const m of rawMedia) {
+                        let mBuf: Buffer | null = null;
+                        if (Buffer.isBuffer(m.buffer)) mBuf = m.buffer;
+                        else if (m.buffer instanceof Uint8Array || m.buffer instanceof ArrayBuffer) mBuf = Buffer.from(m.buffer);
+                        else if (typeof m.base64 === "string") mBuf = Buffer.from(m.base64, "base64");
+
+                        if (mBuf && mBuf.byteLength > 2000) {
+                            const isSepLogo = (mBuf.byteLength >= 106000 && mBuf.byteLength <= 107000 && (m.extension === "png" || m.name?.includes("image")));
+                            if (!isSepLogo) {
+                                const extension = (m.extension === "jpg" ? "jpeg" : m.extension) || "jpeg";
+                                validImages.push({ buffer: mBuf, extension });
+                            }
+                        }
                     }
                 }
 
@@ -454,6 +588,24 @@ export async function POST(
                 if (masterCols.atp && tc.atp !== null) masterWs.getRow(r).getCell(masterCols.atp).value = tc.atp;
                 if (masterCols.jefes && tc.jefes !== null && tc.jefes !== undefined) masterWs.getRow(r).getCell(masterCols.jefes).value = tc.jefes;
             }
+        }
+
+        // 8.1. Garantizar fórmulas limpias y explícitas en fila 35 de Totales
+        if (masterCols.mantenimiento) {
+            const colLetter = masterWs.getColumn(masterCols.mantenimiento).letter;
+            masterWs.getCell(`${colLetter}35`).value = { formula: `SUM(${colLetter}18:${colLetter}34)` };
+        }
+        if (masterCols.administrativos) {
+            const colLetter = masterWs.getColumn(masterCols.administrativos).letter;
+            masterWs.getCell(`${colLetter}35`).value = { formula: `SUM(${colLetter}18:${colLetter}34)` };
+        }
+        if (masterCols.docentes) {
+            const colLetter = masterWs.getColumn(masterCols.docentes).letter;
+            masterWs.getCell(`${colLetter}35`).value = { formula: `SUM(${colLetter}18:${colLetter}34)` };
+        }
+        if (masterCols.directores) {
+            const colLetter = masterWs.getColumn(masterCols.directores).letter;
+            masterWs.getCell(`${colLetter}35`).value = { formula: `SUM(${colLetter}18:${colLetter}34)` };
         }
 
         // 9. Construir tabla de actividades (fila 40+, una fila por escuela ordenada por CCT)
