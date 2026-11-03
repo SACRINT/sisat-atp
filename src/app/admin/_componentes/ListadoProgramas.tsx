@@ -524,8 +524,12 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
         }
     }
 
-    async function handleUnificarXlsx(prog: ProgramaAdmin, periodoId?: string) {
-        const mergeKey = `${prog.id}_${periodoId || "ALL"}_CONCENTRADO_XLSX`;
+    async function handleUnificarXlsx(prog: ProgramaAdmin, periodoId: string) {
+        if (!periodoId) {
+            onSetMessage({ type: "error", text: "Debe seleccionar un periodo válido para generar el concentrado." });
+            return;
+        }
+        const mergeKey = `${prog.id}_${periodoId}_CONCENTRADO_XLSX`;
         setMergingKeys(prev => ({ ...prev, [mergeKey]: true }));
         onSetMessage({ type: "success", text: "Generando concentrado zonal en Excel (XLSX)..." });
 
@@ -549,6 +553,17 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                 if (match?.[1]) filename = match[1];
             }
 
+            // Reporte de escuelas procesadas vs fallidas
+            const resumenHeader = res.headers.get("x-resumen-proceso");
+            let detalleResumen: { total: number; procesadas: number; fallidas: { cct: string; motivo: string }[] } | null = null;
+            if (resumenHeader) {
+                try {
+                    detalleResumen = JSON.parse(decodeURIComponent(resumenHeader));
+                } catch {
+                    // Ignorar error al parsear header
+                }
+            }
+
             const blobUrl = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = blobUrl;
@@ -558,10 +573,18 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
             document.body.removeChild(a);
             URL.revokeObjectURL(blobUrl);
 
-            onSetMessage({
-                type: "success",
-                text: `✅ ${filename} descargado exitosamente con datos y fotografías organizadas por CCT.`,
-            });
+            if (detalleResumen && detalleResumen.fallidas && detalleResumen.fallidas.length > 0) {
+                const fallidasTxt = detalleResumen.fallidas.map(f => `${f.cct}`).join(", ");
+                onSetMessage({
+                    type: "success",
+                    text: `⚠️ ${filename} descargado (${detalleResumen.procesadas}/${detalleResumen.total} escuelas). Pendientes/omitidas: ${fallidasTxt}`,
+                });
+            } else {
+                onSetMessage({
+                    type: "success",
+                    text: `✅ ${filename} descargado exitosamente con todas las escuelas procesadas y fotografías organizadas por CCT.`,
+                });
+            }
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : String(e);
             onSetMessage({ type: "error", text: `❌ ${msg || "Error al unificar el concentrado XLSX."}` });
@@ -728,7 +751,19 @@ export default function ListadoProgramas({ programas, onSetMessage, onSetCorrecc
                                                 return (
                                                     <button
                                                         key={btn.tipo}
-                                                        onClick={() => esXlsx ? handleUnificarXlsx(prog) : handleMergePdfs(prog, btn)}
+                                                        onClick={() => {
+                                                            if (esXlsx) {
+                                                                const targetPer = prog.periodos.find(p => p.activo) ||
+                                                                    [...prog.periodos].sort((a, b) => (b.mes || 0) - (a.mes || 0))[0];
+                                                                if (!targetPer) {
+                                                                    onSetMessage({ type: "error", text: "No hay periodos disponibles para generar el concentrado." });
+                                                                    return;
+                                                                }
+                                                                handleUnificarXlsx(prog, targetPer.id);
+                                                            } else {
+                                                                handleMergePdfs(prog, btn);
+                                                            }
+                                                        }}
                                                         disabled={isThisMerging}
                                                         title={esXlsx
                                                             ? "Generar y descargar concentrado zonal en Excel (.xlsx) con conteos de personal y fotografías"

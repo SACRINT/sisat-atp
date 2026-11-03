@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 
 /** 1 pixel in DrawingML EMUs at 96 DPI */
 const EMU_PER_PIXEL = 9525;
+const MAX_SERVERLESS_BYTES = 20 * 1024 * 1024; // 20 MB
 
 function configureCloudinary() {
     cloudinary.config({
@@ -88,6 +89,99 @@ async function fetchFileBuffer(fileUrl: string, driveId?: string | null): Promis
     return null;
 }
 
+/**
+ * Locates the master template from public/ or other server directories.
+ */
+function getMasterTemplatePath(): string | null {
+    const candidates = [
+        path.join(process.cwd(), "public", "plantillas", "Dia_Naranja", "EVIDENCIA DE ACTIVIDADES DÍA NARANJA ZONA004.xlsx"),
+        path.join(process.cwd(), "documentos_referencia", "Dia_Naranja", "EVIDENCIA DE ACTIVIDADES DÍA NARANJA ZONA004.xlsx"),
+        path.join(__dirname, "..", "..", "..", "..", "..", "public", "plantillas", "Dia_Naranja", "EVIDENCIA DE ACTIVIDADES DÍA NARANJA ZONA004.xlsx"),
+        path.join(__dirname, "..", "..", "..", "..", "..", "documentos_referencia", "Dia_Naranja", "EVIDENCIA DE ACTIVIDADES DÍA NARANJA ZONA004.xlsx"),
+        path.resolve("./public/plantillas/Dia_Naranja/EVIDENCIA DE ACTIVIDADES DÍA NARANJA ZONA004.xlsx"),
+        path.resolve("./documentos_referencia/Dia_Naranja/EVIDENCIA DE ACTIVIDADES DÍA NARANJA ZONA004.xlsx"),
+    ];
+
+    for (const p of candidates) {
+        if (fs.existsSync(p)) {
+            return p;
+        }
+    }
+    return null;
+}
+
+/**
+ * Safely extracts image buffer and extension from an ExcelJS workbook without assuming raw internal model indices.
+ */
+function extractImageMedia(
+    workbook: ExcelJS.Workbook,
+    img: { imageId: string; range: ExcelJS.ImageRange } | any
+): { buffer: Buffer; extension: string } | null {
+    // 1. Try public API workbook.getImage(numericId)
+    const numericId = parseInt(img.imageId, 10);
+    let mediaItem: any = !isNaN(numericId) ? workbook.getImage(numericId) : null;
+
+    // 2. Safe fallback: search media array by id/index/name
+    if (!mediaItem && Array.isArray((workbook as any).media)) {
+        mediaItem = (workbook as any).media.find((m: any, idx: number) =>
+            idx === numericId || String(m.index) === String(img.imageId) || String(m.name) === String(img.imageId)
+        );
+    }
+
+    if (!mediaItem && Array.isArray((workbook as any).model?.media)) {
+        mediaItem = (workbook as any).model.media.find((m: any, idx: number) =>
+            idx === numericId || String(m.index) === String(img.imageId) || String(m.name) === String(img.imageId)
+        );
+    }
+
+    if (!mediaItem) return null;
+
+    let buf: Buffer | null = null;
+    if (Buffer.isBuffer(mediaItem.buffer)) {
+        buf = mediaItem.buffer;
+    } else if (mediaItem.buffer instanceof Uint8Array || mediaItem.buffer instanceof ArrayBuffer) {
+        buf = Buffer.from(mediaItem.buffer);
+    } else if (typeof mediaItem.base64 === "string") {
+        buf = Buffer.from(mediaItem.base64, "base64");
+    }
+
+    if (!buf) return null;
+    const extension = (mediaItem.extension === "jpg" ? "jpeg" : mediaItem.extension) || "jpeg";
+    return { buffer: buf, extension };
+}
+
+interface ColumnaPersonalMap {
+    mantenimiento?: number;
+    administrativos?: number;
+    docentes?: number;
+    directores?: number;
+    supervisores?: number;
+    atp?: number;
+    jefes?: number;
+}
+
+/**
+ * Dynamically detects personnel columns by inspecting header text in rows 15-18.
+ * Avoids hardcoding column letters (H, I, J, K, L, M, N).
+ */
+function detectarColumnasPersonal(ws: ExcelJS.Worksheet): ColumnaPersonalMap {
+    const colMap: ColumnaPersonalMap = {};
+    for (let r = 15; r <= 18; r++) {
+        const row = ws.getRow(r);
+        for (let c = 1; c <= 20; c++) {
+            const val = String(row.getCell(c).value || "").toUpperCase().trim();
+            if (val.includes("MANTENIMIENTO")) colMap.mantenimiento = c;
+            else if (val.includes("ADMINISTRATIV")) colMap.administrativos = c;
+            else if (val.includes("DOCENTE")) colMap.docentes = c;
+            else if (val.includes("DIRECTOR")) colMap.directores = c;
+            else if (val.includes("SUPERVISOR")) colMap.supervisores = c;
+            else if (val.includes("A.T.P.") || val.includes("ATP") || val.includes("INSPECTOR")) colMap.atp = c;
+            else if (val.includes("JEFE")) colMap.jefes = c;
+        }
+    }
+    return colMap;
+}
+
 export async function POST(
     request: NextRequest,
     context: { params: Promise<{ id: string }> }
@@ -106,11 +200,19 @@ export async function POST(
         const body = await request.json().catch(() => ({}));
         const { periodoId } = body as { periodoId?: string };
 
-        // 2. Query program and periods
+        // 2. Exigir periodoId explícito (evita adivinanzas)
+        if (!periodoId || typeof periodoId !== "string" || !periodoId.trim()) {
+            return NextResponse.json({
+                error: "Debe especificar un 'periodoId' válido para generar el concentrado zonal de ese periodo."
+            }, { status: 400 });
+        }
+
+        // 3. Query program and target period
         const programa = await prisma.programa.findUnique({
             where: { id: programaId },
             include: {
                 periodos: {
+                    where: { id: periodoId },
                     include: {
                         entregas: {
                             include: {
@@ -127,50 +229,48 @@ export async function POST(
             return NextResponse.json({ error: "Programa no encontrado" }, { status: 404 });
         }
 
-        // 3. Find target period
-        let targetPeriodo = periodoId
-            ? programa.periodos.find(p => p.id === periodoId)
-            : programa.periodos.find(p => p.activo) || programa.periodos.find(p =>
-                p.entregas.some(e => e.archivos.some(a => a.nombre.toLowerCase().endsWith(".xlsx") || a.driveUrl?.toLowerCase().includes(".xlsx")))
-            ) || programa.periodos[0];
-
+        const targetPeriodo = programa.periodos[0];
         if (!targetPeriodo) {
-            return NextResponse.json({ error: "No se encontró ningún periodo para este programa" }, { status: 404 });
+            return NextResponse.json({
+                error: `No se encontró el periodo con id '${periodoId}' para este programa.`
+            }, { status: 404 });
         }
 
-        // 4. Collect entregas that have .xlsx files
+        // 4. Filtrar entregas que tengan archivos válidos de tipo ENTREGA con extensión .xlsx
         const entregasConXlsx = targetPeriodo.entregas.filter(e =>
-            e.archivos && e.archivos.some(a => a.driveUrl && (a.nombre.toLowerCase().endsWith(".xlsx") || a.driveUrl.toLowerCase().includes(".xlsx")))
+            e.archivos && e.archivos.some(a =>
+                a.tipo === "ENTREGA" &&
+                a.driveUrl &&
+                (a.nombre.toLowerCase().endsWith(".xlsx") || a.driveUrl.toLowerCase().includes(".xlsx"))
+            )
         );
 
         if (entregasConXlsx.length === 0) {
             return NextResponse.json({
-                error: "No se encontraron archivos de Excel (.xlsx) entregados en este periodo."
+                error: "No se encontraron archivos de entrega en Excel (.xlsx) en este periodo."
             }, { status: 404 });
         }
 
-        // 5. Locate Master Template
-        const candidatePaths = [
-            path.join(process.cwd(), "documentos_referencia", "Dia_Naranja", "EVIDENCIA DE ACTIVIDADES DÍA NARANJA ZONA004.xlsx"),
-            path.join(process.cwd(), "..", "documentos_referencia", "Dia_Naranja", "EVIDENCIA DE ACTIVIDADES DÍA NARANJA ZONA004.xlsx"),
-        ];
-        const templatePath = candidatePaths.find(p => fs.existsSync(p));
-
+        // 5. Localizar plantilla maestra verificando con fs.existsSync
+        const templatePath = getMasterTemplatePath();
         if (!templatePath) {
             return NextResponse.json({
-                error: "Plantilla maestra de Día Naranja no encontrada en el servidor."
+                error: "Plantilla maestra de Día Naranja no encontrada en el servidor. Verifique que exista en public/plantillas/Dia_Naranja/."
             }, { status: 500 });
         }
 
-        // 6. Read Master Template with ExcelJS
+        // 6. Leer plantilla maestra con ExcelJS
         const masterWb = new ExcelJS.Workbook();
         await masterWb.xlsx.readFile(templatePath);
         const masterWs = masterWb.worksheets[0];
 
-        // Ensure Column G has ample width for side-by-side evidence images
+        // Ancho suficiente en Columna G para fotos horizontales lado a lado
         masterWs.getColumn("G").width = 78;
 
-        // Detect schools in rows 18-34 of master template
+        // Detectar columnas de personal en la plantilla maestra
+        const masterCols = detectarColumnasPersonal(masterWs);
+
+        // Detectar escuelas en filas 18-34 de la plantilla maestra
         const escuelasMaster: Record<string, { row: number; label: string }> = {};
         for (let r = 18; r <= 34; r++) {
             const val = String(masterWs.getCell(`G${r}`).value || "").trim();
@@ -180,7 +280,7 @@ export async function POST(
             }
         }
 
-        // 7. Process each school's uploaded Excel file
+        // 7. Procesar entregas por escuela
         interface DatosEscuela {
             cct: string;
             nombreCt?: string;
@@ -203,19 +303,33 @@ export async function POST(
         }
 
         const datosEscuelas: Record<string, DatosEscuela> = {};
+        const escuelasExitosas: { cct: string; nombre: string; fotos: number }[] = [];
+        const escuelasFallidas: { cct: string; nombre: string; motivo: string }[] = [];
 
-        for (const entrega of entregasConXlsx) {
+        // Ordenar entregas por fecha más reciente
+        const entregasOrdenadas = [...entregasConXlsx].sort((a, b) => {
+            const dateA = a.fechaSubida ? new Date(a.fechaSubida).getTime() : new Date(a.createdAt).getTime();
+            const dateB = b.fechaSubida ? new Date(b.fechaSubida).getTime() : new Date(b.createdAt).getTime();
+            return dateB - dateA;
+        });
+
+        for (const entrega of entregasOrdenadas) {
             const cct = entrega.escuela.cct.toUpperCase();
-            // Find latest .xlsx file in entrega
-            const archivoXlsx = entrega.archivos
-                .filter(a => a.driveUrl && (a.nombre.toLowerCase().endsWith(".xlsx") || a.driveUrl.toLowerCase().includes(".xlsx")))
-                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
 
-            if (!archivoXlsx || !archivoXlsx.driveUrl) continue;
+            // Filtrar archivos de tipo ENTREGA con extensión .xlsx y tomar el más reciente
+            const archivosXlsx = entrega.archivos
+                .filter(a => a.tipo === "ENTREGA" && a.driveUrl && (a.nombre.toLowerCase().endsWith(".xlsx") || a.driveUrl.toLowerCase().includes(".xlsx")))
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+            const archivoXlsx = archivosXlsx[0];
+            if (!archivoXlsx || !archivoXlsx.driveUrl) {
+                escuelasFallidas.push({ cct, nombre: entrega.escuela.nombre, motivo: "Sin archivo de tipo ENTREGA .xlsx" });
+                continue;
+            }
 
             const fileBuf = await fetchFileBuffer(archivoXlsx.driveUrl, archivoXlsx.driveId);
             if (!fileBuf) {
-                console.warn(`[unificar-xlsx] Could not download file for CCT ${cct}`);
+                escuelasFallidas.push({ cct, nombre: entrega.escuela.nombre, motivo: "Fallo al descargar archivo desde almacenamiento" });
                 continue;
             }
 
@@ -224,7 +338,10 @@ export async function POST(
                 await schoolWb.xlsx.load(fileBuf as any);
                 const schoolWs = schoolWb.worksheets[0];
 
-                // 7.1. Dynamic activity header detection (do NOT hardcode row 40)
+                // Detectar columnas de personal dinámicamente en la hoja de la escuela
+                const schoolCols = detectarColumnasPersonal(schoolWs);
+
+                // 7.1. Detección dinámica de cabecera de actividad
                 let actHeaderRow: number | null = null;
                 for (let r = 20; r <= Math.min(schoolWs.rowCount, 55); r++) {
                     for (let c = 1; c <= 8; c++) {
@@ -237,7 +354,7 @@ export async function POST(
                     if (actHeaderRow) break;
                 }
 
-                // 7.2. Extract activity text
+                // 7.2. Extraer datos de la actividad
                 let actData: DatosEscuela["actData"] = undefined;
                 if (actHeaderRow) {
                     for (let r = actHeaderRow + 1; r <= Math.min(schoolWs.rowCount, actHeaderRow + 10); r++) {
@@ -259,46 +376,49 @@ export async function POST(
                     }
                 }
 
-                // 7.3. Extract personnel counts from top table
+                // 7.3. Extraer conteos de personal de la tabla superior usando columnas dinámicas
                 let topCounts: DatosEscuela["topCounts"] = undefined;
                 for (let r = 16; r <= Math.min(schoolWs.rowCount, 36); r++) {
                     const c7Val = String(schoolWs.getRow(r).getCell(7).value || "").trim().toUpperCase();
                     if (c7Val.includes(cct)) {
-                        const getNum = (val: any) => {
+                        const getNum = (colIdx?: number) => {
+                            if (!colIdx) return null;
+                            const val = schoolWs.getRow(r).getCell(colIdx).value;
                             if (val === null || val === undefined || val === "" || val === " ") return null;
                             const n = Number(val);
                             return isNaN(n) ? null : n;
                         };
+                        const getRaw = (colIdx?: number) => {
+                            if (!colIdx) return null;
+                            return schoolWs.getRow(r).getCell(colIdx).value;
+                        };
+
                         topCounts = {
-                            mantenimiento: getNum(schoolWs.getRow(r).getCell(8).value),
-                            administrativos: getNum(schoolWs.getRow(r).getCell(9).value),
-                            docentes: getNum(schoolWs.getRow(r).getCell(10).value),
-                            directores: getNum(schoolWs.getRow(r).getCell(11).value),
-                            supervisores: getNum(schoolWs.getRow(r).getCell(12).value),
-                            atp: getNum(schoolWs.getRow(r).getCell(13).value),
-                            jefes: schoolWs.getRow(r).getCell(14).value,
+                            mantenimiento: getNum(schoolCols.mantenimiento || 8),
+                            administrativos: getNum(schoolCols.administrativos || 9),
+                            docentes: getNum(schoolCols.docentes || 10),
+                            directores: getNum(schoolCols.directores || 11),
+                            supervisores: getNum(schoolCols.supervisores || 12),
+                            atp: getNum(schoolCols.atp || 13),
+                            jefes: getRaw(schoolCols.jefes || 14),
                         };
                         break;
                     }
                 }
 
-                // 7.4. Extract evidence photos (skip header logo at row < 10)
+                // 7.4. Extraer fotografías usando API pública (extractImageMedia)
                 const schoolImages = schoolWs.getImages();
                 const validImages: { buffer: Buffer; extension: string }[] = [];
                 for (const img of schoolImages) {
-                    if (img.range.tl.row < 10) continue; // Skip header logo
-                    const media = (schoolWb.model as any).media?.[parseInt(img.imageId)];
+                    if (img.range.tl.row < 10) continue; // Descartar logo institucional de cabecera
+                    const media = extractImageMedia(schoolWb, img);
                     if (media && media.buffer) {
-                        validImages.push({
-                            buffer: media.buffer,
-                            extension: media.extension
-                        });
+                        validImages.push(media);
                     }
                 }
 
-                // Store if better than previous entry
-                const prev = datosEscuelas[cct];
-                if (!prev || (actData && !prev.actData) || (validImages.length > prev.images.length)) {
+                // Combinación sin pérdida de datos válidos
+                if (!datosEscuelas[cct]) {
                     datosEscuelas[cct] = {
                         cct,
                         nombreCt: entrega.escuela.nombre,
@@ -306,30 +426,37 @@ export async function POST(
                         actData,
                         images: validImages,
                     };
+                } else {
+                    if (!datosEscuelas[cct].actData && actData) datosEscuelas[cct].actData = actData;
+                    if (!datosEscuelas[cct].topCounts && topCounts) datosEscuelas[cct].topCounts = topCounts;
+                    if (datosEscuelas[cct].images.length === 0 && validImages.length > 0) datosEscuelas[cct].images = validImages;
                 }
+
+                escuelasExitosas.push({ cct, nombre: entrega.escuela.nombre, fotos: validImages.length });
             } catch (err: unknown) {
                 const msg = err instanceof Error ? err.message : String(err);
-                console.error(`[unificar-xlsx] Error parsing Excel for ${cct}:`, msg);
+                console.error(`[unificar-xlsx] Error procesando Excel de ${cct}:`, msg);
+                escuelasFallidas.push({ cct, nombre: entrega.escuela.nombre, motivo: `Error al procesar archivo: ${msg}` });
             }
         }
 
-        // 8. Update Top Table (Personnel counts, rows 18-34)
+        // 8. Escribir conteos en tabla superior (filas 18-34) usando columnas dinámicas
         for (const [cct, info] of Object.entries(escuelasMaster)) {
             const sData = datosEscuelas[cct];
             if (sData && sData.topCounts) {
                 const tc = sData.topCounts;
                 const r = info.row;
-                if (tc.mantenimiento !== null) masterWs.getCell(`H${r}`).value = tc.mantenimiento;
-                if (tc.administrativos !== null) masterWs.getCell(`I${r}`).value = tc.administrativos;
-                if (tc.docentes !== null) masterWs.getCell(`J${r}`).value = tc.docentes;
-                if (tc.directores !== null) masterWs.getCell(`K${r}`).value = tc.directores;
-                if (tc.supervisores !== null) masterWs.getCell(`L${r}`).value = tc.supervisores;
-                if (tc.atp !== null) masterWs.getCell(`M${r}`).value = tc.atp;
-                if (tc.jefes !== null && tc.jefes !== undefined) masterWs.getCell(`N${r}`).value = tc.jefes;
+                if (masterCols.mantenimiento && tc.mantenimiento !== null) masterWs.getRow(r).getCell(masterCols.mantenimiento).value = tc.mantenimiento;
+                if (masterCols.administrativos && tc.administrativos !== null) masterWs.getRow(r).getCell(masterCols.administrativos).value = tc.administrativos;
+                if (masterCols.docentes && tc.docentes !== null) masterWs.getRow(r).getCell(masterCols.docentes).value = tc.docentes;
+                if (masterCols.directores && tc.directores !== null) masterWs.getRow(r).getCell(masterCols.directores).value = tc.directores;
+                if (masterCols.supervisores && tc.supervisores !== null) masterWs.getRow(r).getCell(masterCols.supervisores).value = tc.supervisores;
+                if (masterCols.atp && tc.atp !== null) masterWs.getRow(r).getCell(masterCols.atp).value = tc.atp;
+                if (masterCols.jefes && tc.jefes !== null && tc.jefes !== undefined) masterWs.getRow(r).getCell(masterCols.jefes).value = tc.jefes;
             }
         }
 
-        // 9. Build Activity Table (Rows 40+, one row per school sorted by CCT)
+        // 9. Construir tabla de actividades (fila 40+, una fila por escuela ordenada por CCT)
         const cctsSorted = Object.keys(escuelasMaster).sort();
         let currentRow = 40;
 
@@ -346,9 +473,9 @@ export async function POST(
             masterWs.getCell(`D${currentRow}`).value = act.actividad || "";
             masterWs.getCell(`E${currentRow}`).value = act.objetivo || "";
             masterWs.getCell(`F${currentRow}`).value = act.descripcion || "";
-            masterWs.getCell(`G${currentRow}`).value = ""; // Image anchor cell
+            masterWs.getCell(`G${currentRow}`).value = ""; // Contenedor de fotos
 
-            // Format row cells (thin borders, Calibri 9pt, middle alignment)
+            // Bordes, tipografía y alineación
             for (let c = 1; c <= 7; c++) {
                 const cell = masterWs.getRow(currentRow).getCell(c);
                 cell.border = {
@@ -365,7 +492,7 @@ export async function POST(
                 cell.font = { name: "Calibri", size: 9 };
             }
 
-            // Layout evidence images side-by-side without overlapping!
+            // Distribuir fotografías horizontalmente sin solapamiento
             if (images.length > 0) {
                 masterWs.getRow(currentRow).height = 195;
                 const count = Math.min(images.length, 4);
@@ -398,10 +525,9 @@ export async function POST(
 
                 for (let i = 0; i < count; i++) {
                     const img = images[i];
-                    const ext = (img.extension === "jpg" ? "jpeg" : img.extension) as "jpeg" | "png" | "gif";
                     const addedId = masterWb.addImage({
                         buffer: img.buffer as any,
-                        extension: ext,
+                        extension: img.extension as "jpeg" | "png" | "gif",
                     });
 
                     const colOffPx = startPx + i * (imgW + gapPx);
@@ -409,7 +535,7 @@ export async function POST(
 
                     masterWs.addImage(addedId, {
                         tl: {
-                            nativeCol: 6, // Column G (0-indexed)
+                            nativeCol: 6, // Columna G
                             nativeColOff: Math.floor(colOffPx * EMU_PER_PIXEL),
                             nativeRow: currentRow - 1,
                             nativeRowOff: Math.floor(rowOffPx * EMU_PER_PIXEL),
@@ -425,22 +551,38 @@ export async function POST(
             currentRow++;
         }
 
-        // 10. Generate XLSX buffer and return as download
+        // 10. Generar buffer XLSX y validar límite de respuesta para serverless
         const buffer = await masterWb.xlsx.writeBuffer();
+        if (buffer.byteLength > MAX_SERVERLESS_BYTES) {
+            return NextResponse.json({
+                error: `El archivo generado (${(buffer.byteLength / 1024 / 1024).toFixed(2)} MB) excede el umbral seguro de descarga.`
+            }, { status: 413 });
+        }
+
         const periodoNombre = getNombrePeriodo(targetPeriodo, programa.nombre);
         const fileName = `CONCENTRADO_ZONAL_DIA_NARANJA_${periodoNombre.toUpperCase().replace(/[/\\?%*:|"<>]/g, "_")}.xlsx`;
+
+        // Reporte de procesamiento para el frontend en encabezado HTTP
+        const resumenProceso = {
+            total: Object.keys(escuelasMaster).length,
+            procesadas: escuelasExitosas.length,
+            exitosas: escuelasExitosas,
+            fallidas: escuelasFallidas,
+        };
 
         return new NextResponse(new Uint8Array(buffer), {
             status: 200,
             headers: {
                 "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 "Content-Disposition": `attachment; filename="${fileName}"`,
+                "Content-Length": String(buffer.byteLength),
+                "X-Resumen-Proceso": encodeURIComponent(JSON.stringify(resumenProceso)),
                 "Cache-Control": "no-store",
             },
         });
     } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.error("[unificar-xlsx] Unhandled error:", msg);
+        console.error("[unificar-xlsx] Error no controlado:", msg);
         return NextResponse.json({ error: `Error al unificar Excel: ${msg}` }, { status: 500 });
     }
 }
